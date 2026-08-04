@@ -1,19 +1,40 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ProductFull } from "@/lib/storefront";
-import AddToCartButton from "./AddToCartButton";
-import { Suspense } from "react";
-import CartProvider from "./CartProvider";
+import { notFound } from "next/navigation";
+import type { ProductPageData } from "@/lib/storefront";
+import AddToCartButton from "../../_components/AddToCartButton";
+import CartProvider from "../../_components/CartProvider";
+import FeaturedProducts from "../../_components/FeaturedProducts";
 
-interface ProductDetailProps {
-  product: ProductFull;
-  currencySymbol?: string;
+export interface ProductDetailMainProps {
+  content: ProductPageData;
 }
 
-export default function ProductDetail({
-  product,
-  currencySymbol = "$",
-}: ProductDetailProps) {
+const productDetailScopedStyles = `
+  .product-gallery-thumb {
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .product-gallery-main {
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+`;
+
+/**
+ * ProductDetailMain — Page-Specific Main Component for Product Detail View.
+ * Located beside `app/(ecommerce)/product/[slug]/page.tsx`.
+ */
+export default function ProductDetailMain({ content }: ProductDetailMainProps) {
+  const { product, currencySymbol = "$" } = content;
+
+  if (!product) {
+    notFound();
+  }
+
+  // Inline fallbacks
+  const name = product.meta_info?.title || product.name || "Product Details";
+  const shortDescription = product.short_description || null;
+  const description = product.description || null;
+
   const price = Number(product.price);
   const comparePrice = product.compare_at_price
     ? Number(product.compare_at_price)
@@ -29,27 +50,28 @@ export default function ProductDetail({
     product.stock_quantity > 0 &&
     product.stock_quantity <= product.low_stock_threshold;
 
-  // Gallery: feature_image_url first, then additional images
+  // Gallery compilation: feature_image_url first, followed by additional images
   const galleryImages: { url: string; alt: string }[] = [];
   if (product.feature_image_url) {
     galleryImages.push({
       url: product.feature_image_url,
-      alt: product.feature_image_alt_text ?? product.name,
+      alt: product.feature_image_alt_text ?? name,
     });
   }
   for (const img of product.images) {
     if (img.url !== product.feature_image_url) {
-      galleryImages.push({ url: img.url, alt: img.alt_text ?? product.name });
+      galleryImages.push({ url: img.url, alt: img.alt_text ?? name });
     }
   }
 
   return (
-    <div>
-      {/* Dark banner so the transparent header text stays visible */}
+    <div className="page-enter">
+      <style dangerouslySetInnerHTML={{ __html: productDetailScopedStyles }} />
+
+      {/* ── Breadcrumb Header ────────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-zinc-800 to-zinc-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/30" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          {/* Breadcrumb */}
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
           <nav aria-label="Breadcrumb">
             <ol className="flex items-center gap-2 text-sm text-white/60">
               <li>
@@ -69,26 +91,26 @@ export default function ProductDetail({
               )}
               <li className="text-white/40">/</li>
               <li className="text-white/80 font-medium line-clamp-1">
-                {product.name}
+                {name}
               </li>
             </ol>
           </nav>
         </div>
       </div>
 
+      {/* ── Product Main Showcase Grid ───────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
-          {/* Gallery */}
+          {/* Gallery Column */}
           <div className="flex flex-col gap-3">
-            {/* Main image */}
-            <div className="relative aspect-square bg-zinc-100 rounded-2xl overflow-hidden">
+            {/* Main Featured Image */}
+            <div className="relative aspect-square bg-zinc-100 rounded-2xl overflow-hidden shadow-sm">
               {galleryImages[0] ? (
                 <Image
                   src={galleryImages[0].url}
                   alt={galleryImages[0].alt}
                   fill
-                  // unoptimized
-                  className="object-cover"
+                  className="product-gallery-main object-cover"
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   priority
                 />
@@ -108,25 +130,24 @@ export default function ProductDetail({
                 </div>
               )}
               {isOnSale && discountPct && (
-                <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
                   -{discountPct}%
                 </span>
               )}
             </div>
 
-            {/* Thumbnail strip */}
+            {/* Thumbnail Strip */}
             {galleryImages.length > 1 && (
               <div className="flex gap-2 flex-wrap">
                 {galleryImages.slice(1).map((img, i) => (
                   <div
                     key={i}
-                    className="relative w-20 h-20 bg-zinc-100 rounded-xl overflow-hidden border-2 border-transparent hover:border-zinc-300 transition-colors"
+                    className="product-gallery-thumb relative w-20 h-20 bg-zinc-100 rounded-xl overflow-hidden border-2 border-transparent hover:border-zinc-400 cursor-pointer"
                   >
                     <Image
                       src={img.url}
                       alt={img.alt}
                       fill
-                      // unoptimized
                       className="object-cover"
                       sizes="80px"
                     />
@@ -136,9 +157,9 @@ export default function ProductDetail({
             )}
           </div>
 
-          {/* Product info */}
+          {/* Product Details & Call to Action Column */}
           <div className="flex flex-col gap-6">
-            {/* Category + Name */}
+            {/* Category + Title */}
             <div>
               {product.category_name && (
                 <p className="text-xs text-zinc-400 uppercase tracking-widest font-medium mb-2">
@@ -146,11 +167,11 @@ export default function ProductDetail({
                 </p>
               )}
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
-                {product.name}
+                {name}
               </h1>
             </div>
 
-            {/* Pricing */}
+            {/* Pricing Section */}
             <div className="flex items-baseline gap-3">
               <span className="text-3xl font-bold text-zinc-900">
                 {currencySymbol}
@@ -163,23 +184,23 @@ export default function ProductDetail({
                 </span>
               )}
               {isOnSale && discountPct && (
-                <span className="text-sm font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                <span className="text-sm font-semibold text-red-500 bg-red-50 px-2.5 py-0.5 rounded-full">
                   Save {discountPct}%
                 </span>
               )}
             </div>
 
-            {/* Short description */}
-            {product.short_description && (
+            {/* Short Description */}
+            {shortDescription && (
               <p className="text-zinc-600 text-base leading-relaxed">
-                {product.short_description}
+                {shortDescription}
               </p>
             )}
 
-            {/* Stock status */}
+            {/* Stock Availability Indicator */}
             <div className="flex items-center gap-2">
               <div
-                className={`w-2 h-2 rounded-full ${
+                className={`w-2.5 h-2.5 rounded-full ${
                   inStock
                     ? lowStock
                       ? "bg-amber-400"
@@ -187,43 +208,48 @@ export default function ProductDetail({
                     : "bg-red-400"
                 }`}
               />
-              <span className="text-sm text-zinc-600">
+              <span className="text-sm font-medium text-zinc-600">
                 {!inStock
                   ? "Out of stock"
                   : lowStock
-                    ? `Only ${product.stock_quantity} left`
-                    : "In stock"}
+                    ? `Only ${product.stock_quantity} left in stock`
+                    : "In stock and ready to ship"}
               </span>
             </div>
 
-            {/* SKU */}
+            {/* SKU Badge */}
             {product.sku && (
-              <p className="text-xs text-zinc-400">SKU: {product.sku}</p>
+              <p className="text-xs text-zinc-400 font-mono">
+                SKU: {product.sku}
+              </p>
             )}
 
-            {/* Add to Cart */}
-            <Suspense>
-              <CartProvider>
-                <AddToCartButton
-                  product={product}
-                  currencySymbol={currencySymbol}
-                />
-              </CartProvider>
-            </Suspense>
+            {/* Add to Cart Trigger */}
+            <CartProvider>
+              <AddToCartButton
+                product={product}
+                currencySymbol={currencySymbol}
+              />
+            </CartProvider>
 
-            {/* Full description */}
-            {product.description && (
-              <div className="pt-4 border-t border-zinc-100">
-                <h2 className="text-sm font-semibold text-zinc-700 uppercase tracking-wider mb-3">
+            {/* Comprehensive Description */}
+            {description && (
+              <div className="pt-6 border-t border-zinc-100">
+                <h2 className="text-xs font-semibold text-zinc-700 uppercase tracking-widest mb-3">
                   Description
                 </h2>
                 <div className="text-sm text-zinc-600 leading-relaxed whitespace-pre-line">
-                  {product.description}
+                  {description}
                 </div>
               </div>
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Featured Products Block ("You Might Also Like") ──────────────── */}
+      <div className="border-t border-zinc-100">
+        <FeaturedProducts title="You Might Also Like" limit={4} />
       </div>
     </div>
   );

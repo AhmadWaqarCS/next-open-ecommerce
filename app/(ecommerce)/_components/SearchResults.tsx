@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { searchProducts, getSiteConfig } from "@/lib/storefront";
+import { getSearchPageData } from "@/lib/storefront";
 import ProductCard from "./ProductCard";
 
 interface SearchResultsProps {
@@ -11,12 +11,8 @@ export default async function SearchResults({
   query,
   page,
 }: SearchResultsProps) {
-  const [{ products, total, pageCount }, config] = await Promise.all([
-    searchProducts(query, page),
-    getSiteConfig(),
-  ]);
-
-  const currencySymbol = config?.currency_symbol ?? "$";
+  const { products, total, pageCount, currencySymbol } =
+    await getSearchPageData(query, page);
 
   if (products.length === 0) {
     return (

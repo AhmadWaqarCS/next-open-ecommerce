@@ -28,6 +28,75 @@ export interface StorefrontConfig {
   home_tagline_label: string | null;
 }
 
+export interface HeaderData {
+  siteName: string;
+  lightLogoUrl: string | null;
+  darkLogoUrl: string | null;
+  topbarMessage: string | null;
+  currencySymbol: string;
+  navCategories: NavCategory[];
+}
+
+export interface FooterData {
+  siteName: string;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  socialLinks: Record<string, string | null>;
+  currencySymbol: string;
+  shopCategories: NavCategory[];
+  shippingMethods: StorefrontShippingMethod[];
+  paymentMethods: StorefrontPaymentMethod[];
+  sitePages: { title: string; slug: string }[];
+}
+
+export interface HeroBannerData {
+  homeTaglineLabel: string | null;
+  tagline: string | null;
+  description: string | null;
+  accentColor: string;
+  primaryColor: string;
+  categories: ShopCategory[];
+}
+
+export interface SiteFeaturesData {
+  accentColor: string;
+  features: {
+    icon: string;
+    title: string;
+    desc: string;
+  }[];
+}
+
+export interface CategoryPageData {
+  category: {
+    name: string;
+    description: string | null;
+    image_url: string | null;
+    bg_color: string | null;
+    meta_info: Record<string, string>;
+  } | null;
+  products: ProductCard[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  currencySymbol: string;
+}
+
+export interface ProductPageData {
+  product: ProductFull | null;
+  currencySymbol: string;
+}
+
+export interface SearchPageData {
+  products: ProductCard[];
+  total: number;
+  pageCount: number;
+  currencySymbol: string;
+}
+
 export interface NavCategory {
   id: number;
   name: string;
@@ -214,6 +283,99 @@ export const getCategories = cache(async (): Promise<NavCategory[]> => {
     },
     orderBy: { sort_order: "asc" },
   });
+});
+
+// ─── Header Micro Data Fetcher ───────────────────────────────────────────────
+
+export const getHeaderData = cache(async (): Promise<HeaderData> => {
+  const [config, navCategories] = await Promise.all([
+    getSiteConfig(),
+    getCategories(),
+  ]);
+
+  return {
+    siteName: config?.name || "Store",
+    lightLogoUrl: config?.light_logo_url || null,
+    darkLogoUrl: config?.dark_logo_url || null,
+    topbarMessage: config?.topbar_message || null,
+    currencySymbol: config?.currency_symbol || "$",
+    navCategories: navCategories || [],
+  };
+});
+
+// ─── Footer Micro Data Fetcher ───────────────────────────────────────────────
+
+export const getFooterData = cache(async (): Promise<FooterData> => {
+  const [config, shopCategories, shippingMethods, paymentMethods, sitePages] =
+    await Promise.all([
+      getSiteConfig(),
+      getCategories(),
+      getShippingMethods(),
+      getPaymentMethods(),
+      prisma.site_page.findMany({
+        where: { is_active: true, deleted_at: null },
+        select: { title: true, slug: true },
+        orderBy: { title: "asc" },
+      }),
+    ]);
+
+  return {
+    siteName: config?.name || "Store",
+    description: config?.description || null,
+    email: config?.email || null,
+    phone: config?.phone || null,
+    address: config?.address || null,
+    socialLinks: config?.social_links || {},
+    currencySymbol: config?.currency_symbol || "$",
+    shopCategories: shopCategories || [],
+    shippingMethods: shippingMethods || [],
+    paymentMethods: paymentMethods || [],
+    sitePages: sitePages || [],
+  };
+});
+
+// ─── Home Page Hero Micro Data Fetcher ───────────────────────────────────────
+
+export const getHeroBannerData = cache(async (): Promise<HeroBannerData> => {
+  const [config, categories] = await Promise.all([
+    getSiteConfig(),
+    getShopCategoriesWithCount(),
+  ]);
+
+  return {
+    homeTaglineLabel: config?.home_tagline_label || null,
+    tagline: config?.tagline || "Wear what you love.",
+    description: config?.description || "Curated fashion for every occasion.",
+    accentColor: config?.accent_color || "#e8c98e",
+    primaryColor: config?.primary_color || "#0f0f0f",
+    categories: categories || [],
+  };
+});
+
+// ─── Site Features Micro Data Fetcher ───────────────────────────────────────
+
+export const getSiteFeaturesData = cache(async (): Promise<SiteFeaturesData> => {
+  const config = await getSiteConfig();
+  return {
+    accentColor: config?.accent_color || "#e8c98e",
+    features: [
+      {
+        icon: "M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4",
+        title: "Free Returns",
+        desc: "Easy 30-day returns. No questions asked.",
+      },
+      {
+        icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+        title: "Secure Checkout",
+        desc: "256-bit SSL encryption on every order.",
+      },
+      {
+        icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z",
+        title: "24/7 Support",
+        desc: "We're here whenever you need us.",
+      },
+    ],
+  };
 });
 
 // ─── Shop Categories (home page grid) ─────────────────────────────────────────
@@ -444,6 +606,20 @@ export async function getCategoryProducts(
   };
 }
 
+export const getCategoryPageData = cache(
+  async (slug: string, page = 1): Promise<CategoryPageData> => {
+    const [result, config] = await Promise.all([
+      getCategoryProducts(slug, page),
+      getSiteConfig(),
+    ]);
+
+    return {
+      ...result,
+      currencySymbol: config?.currency_symbol || "$",
+    };
+  },
+);
+
 // ─── Single Product (full detail) ─────────────────────────────────────────────
 
 export const getProductBySlug = cache(
@@ -504,6 +680,20 @@ export const getProductBySlug = cache(
         compare_at_price:
           v.compare_at_price !== null ? String(v.compare_at_price) : null,
       })),
+    };
+  },
+);
+
+export const getProductPageData = cache(
+  async (slug: string): Promise<ProductPageData> => {
+    const [product, config] = await Promise.all([
+      getProductBySlug(slug),
+      getSiteConfig(),
+    ]);
+
+    return {
+      product,
+      currencySymbol: config?.currency_symbol || "$",
     };
   },
 );
@@ -600,6 +790,21 @@ export async function searchProducts(
     })),
     total,
     pageCount: Math.ceil(total / pageSize),
+  };
+}
+
+export async function getSearchPageData(
+  query: string,
+  page = 1,
+): Promise<SearchPageData> {
+  const [searchResult, config] = await Promise.all([
+    searchProducts(query, page),
+    getSiteConfig(),
+  ]);
+
+  return {
+    ...searchResult,
+    currencySymbol: config?.currency_symbol || "$",
   };
 }
 

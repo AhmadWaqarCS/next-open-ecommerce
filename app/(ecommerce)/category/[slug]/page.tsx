@@ -1,7 +1,7 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
-import { getAllCategorySlugs, getCategoryProducts } from "@/lib/storefront";
-import CategoryContent from "./CategoryContent";
+import { cacheLife, cacheTag } from "next/cache";
+import { getAllCategorySlugs, getCategoryPageData } from "@/lib/storefront";
+import CategoryPageMain from "./CategoryPageMain";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -17,7 +17,7 @@ export async function generateMetadata({
   params,
 }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { category } = await getCategoryProducts(slug, 1);
+  const { category } = await getCategoryPageData(slug, 1);
   if (!category) return { title: "Category Not Found" };
   const meta = category.meta_info;
   return {
@@ -26,24 +26,13 @@ export async function generateMetadata({
   };
 }
 
-async function CategoryPageInner({ params, searchParams }: CategoryPageProps) {
+export default async function CategoryPage({
+  params,
+  searchParams,
+}: CategoryPageProps) {
   const { slug } = await params;
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
-  return <CategoryContent slug={slug} page={page} />;
-}
-
-export default function CategoryPage(props: CategoryPageProps) {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-[40vh] flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-zinc-900 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
-      <CategoryPageInner {...props} />
-    </Suspense>
-  );
+  return <CategoryPageMain slug={slug} page={page} />;
 }

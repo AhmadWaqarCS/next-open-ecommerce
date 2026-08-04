@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { useCart } from "@/lib/cart";
@@ -8,22 +10,71 @@ interface CartDrawerProps {
   currencySymbol?: string;
 }
 
+const cartScopedStyles = `
+  .cart-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0);
+    z-index: 998;
+    pointer-events: none;
+    transition: background-color 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cart-backdrop--open {
+    background-color: rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .cart-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: 100%;
+    max-width: 400px;
+    background: #ffffff;
+    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .cart-drawer--open {
+    transform: translateX(0);
+  }
+`;
+
 export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
+  const [mounted, setMounted] = useState(false);
   const { state, itemCount, subtotal, removeItem, updateQty, closeDrawer } =
     useCart();
 
   const { items, drawerOpen } = state;
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  const drawerJSX = (
     <>
-      {/* ── Backdrop ───────────────────────────────────────────────────────── */}
+      <style dangerouslySetInnerHTML={{ __html: cartScopedStyles }} />
+
+      {/* ── Backdrop Overlay ────────────────────────────────────────────────── */}
       <div
         className={`cart-backdrop ${drawerOpen ? "cart-backdrop--open" : ""}`}
         onClick={closeDrawer}
         aria-hidden="true"
       />
 
-      {/* ── Drawer panel ───────────────────────────────────────────────────── */}
+      {/* ── Full Height Slide-out Panel ─────────────────────────────────────── */}
       <aside
         id="cart-drawer"
         role="dialog"
@@ -32,7 +83,7 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
         className={`cart-drawer ${drawerOpen ? "cart-drawer--open" : ""}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
           <h2 className="text-base font-bold text-zinc-900">
             Your Cart{" "}
             {itemCount > 0 && (
@@ -45,7 +96,7 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
             type="button"
             onClick={closeDrawer}
             aria-label="Close cart"
-            className="text-zinc-400 hover:text-zinc-900 transition-colors"
+            className="text-zinc-400 hover:text-zinc-900 transition-colors p-1 rounded-lg hover:bg-zinc-100"
           >
             <svg
               className="w-5 h-5"
@@ -63,8 +114,8 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
           </button>
         </div>
 
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        {/* Items List */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-16">
               <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center">
@@ -103,16 +154,15 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
               {items.map((item) => (
                 <li
                   key={item.key}
-                  className="flex gap-3 py-3 border-b border-zinc-50 last:border-0"
+                  className="flex gap-3 py-3 border-b border-zinc-100 last:border-0"
                 >
                   {/* Image */}
-                  <div className="relative w-16 h-16 bg-zinc-100 rounded-xl overflow-hidden shrink-0">
+                  <div className="relative w-16 h-16 bg-zinc-100 rounded-xl overflow-hidden shrink-0 border border-zinc-100">
                     {item.imageUrl ? (
                       <Image
                         src={item.imageUrl}
                         alt={item.productName}
                         fill
-                        // unoptimized
                         className="object-cover"
                         sizes="64px"
                       />
@@ -147,7 +197,7 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
                       {(item.unitPrice * item.quantity).toFixed(2)}
                     </p>
 
-                    {/* Qty controls */}
+                    {/* Qty Controls */}
                     <div className="flex items-center gap-2 mt-2">
                       <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden text-xs">
                         <button
@@ -173,7 +223,7 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
                       <button
                         type="button"
                         onClick={() => removeItem(item.key)}
-                        className="text-xs text-zinc-400 hover:text-red-500 transition-colors ml-auto"
+                        className="text-xs text-zinc-400 hover:text-red-500 transition-colors ml-auto font-medium"
                         aria-label="Remove item"
                       >
                         Remove
@@ -186,11 +236,11 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer Checkout Summary */}
         {items.length > 0 && (
-          <div className="border-t border-zinc-100 px-5 py-5">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-zinc-500">Subtotal</span>
+          <div className="border-t border-zinc-100 px-5 py-5 shrink-0 bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-zinc-500 font-medium">Subtotal</span>
               <span className="text-base font-bold text-zinc-900">
                 {currencySymbol}
                 {subtotal.toFixed(2)}
@@ -202,14 +252,14 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
             <Link
               href="/checkout"
               onClick={closeDrawer}
-              className="block w-full bg-zinc-900 text-white text-center font-semibold py-3.5 rounded-xl hover:bg-zinc-700 active:scale-[0.98] transition-all duration-200 text-sm"
+              className="block w-full bg-zinc-900 text-white text-center font-semibold py-3.5 rounded-xl hover:bg-zinc-800 active:scale-[0.98] transition-all duration-200 text-sm shadow-md"
             >
               Checkout
             </Link>
             <button
               type="button"
               onClick={closeDrawer}
-              className="block w-full text-center text-xs text-zinc-400 hover:text-zinc-700 transition-colors mt-3"
+              className="block w-full text-center text-xs font-medium text-zinc-400 hover:text-zinc-700 transition-colors mt-3"
             >
               Continue Shopping
             </button>
@@ -218,4 +268,6 @@ export default function CartDrawer({ currencySymbol = "$" }: CartDrawerProps) {
       </aside>
     </>
   );
+
+  return createPortal(drawerJSX, document.body);
 }

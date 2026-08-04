@@ -6,9 +6,9 @@ import "./ecommerce-style.css";
 import SiteHeader from "./_components/SiteHeader";
 import SiteFooter from "./_components/SiteFooter";
 import {
-  getCategories,
   getSiteConfig,
-  getShippingMethods,
+  getHeaderData,
+  getFooterData,
 } from "@/lib/storefront";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -55,13 +55,20 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function EcommerceRootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  cacheTag("site-config", "categories", "shop-categories", "shipping-methods");
+  cacheTag(
+    "site-config",
+    "categories",
+    "shop-categories",
+    "shipping-methods",
+    "payment-methods",
+    "site-pages"
+  );
   cacheLife("max");
 
-  const [config, navCategories, shippingMethods] = await Promise.all([
+  const [headerData, footerData, config] = await Promise.all([
+    getHeaderData(),
+    getFooterData(),
     getSiteConfig(),
-    getCategories(),
-    getShippingMethods(),
   ]);
 
   if (!config) throw new Error("Site config not found.");
@@ -81,19 +88,9 @@ export default async function EcommerceRootLayout({
         <style dangerouslySetInnerHTML={{ __html: colorStyle }} />
       </head>
       <body className="min-h-full flex flex-col bg-white text-zinc-900 antialiased">
-        <div>
-          <SiteHeader
-            siteConfig={config}
-            navCategories={navCategories}
-            topbarMessage={config.topbar_message}
-          />
-          <main className="flex-1 pt-16 -mt-10">{children}</main>
-          <SiteFooter
-            siteConfig={config}
-            shopCategories={navCategories}
-            shippingMethods={shippingMethods}
-          />
-        </div>
+        <SiteHeader content={headerData} />
+        <main className="flex-1">{children}</main>
+        <SiteFooter content={footerData} />
       </body>
     </html>
   );

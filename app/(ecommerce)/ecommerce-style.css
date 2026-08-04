@@ -12,7 +12,11 @@
   --color-primary: #0f0f0f;
   --color-secondary: #1a1a1a;
   --color-accent: #e8c98e;
-  --color-accent-light: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  --color-accent-light: color-mix(
+    in srgb,
+    var(--color-accent) 15%,
+    transparent
+  );
   --color-accent-hover: color-mix(in srgb, var(--color-accent) 85%, black);
 
   /* Surface */
@@ -47,7 +51,9 @@
 
 /* ─── Base ────────────────────────────────────────────────────────────────── */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -60,179 +66,44 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
   line-height: 1.6;
-}
-
-/* ─── Header — CSS scroll-driven glassmorphism (no JS) ───────────────────── */
-
-/*
- * The header transitions from fully transparent (over hero) to a
- * frosted-glass white bar as the user scrolls past 80px.
- * Uses CSS scroll-driven animations — zero JavaScript required.
- * Supported in Chromium 115+, Firefox 127+, Safari 18+.
- * Older browsers fall back to the initial transparent state (graceful).
- */
-
-@keyframes header-solidify {
-  from {
-    background-color: transparent;
-    border-bottom-color: transparent;
-    box-shadow: none;
-  }
-  to {
-    background-color: rgba(255, 255, 255, 0.85);
-    border-bottom-color: rgba(228, 228, 231, 0.6);
-    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
-  }
-}
-
-@keyframes header-topbar-hide {
-  from { max-height: 40px; opacity: 1; padding-top: 0.5rem; padding-bottom: 0.5rem; }
-  to   { max-height: 0;    opacity: 0; padding-top: 0;      padding-bottom: 0; overflow: hidden; }
-}
-
-@keyframes header-logo-darken {
-  from { color: #ffffff; }
-  to   { color: #09090b; }
-}
-
-@keyframes header-nav-link-darken {
-  from { color: rgba(255, 255, 255, 0.9); }
-  to   { color: #3f3f46; }
-}
-
-@keyframes header-icon-darken {
-  from { color: rgba(255, 255, 255, 0.8); }
-  to   { color: #52525b; }
-}
-
-.header-root {
-  backdrop-filter: none;
-  animation: header-solidify linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0px 80px;
-  border-bottom: 1px solid transparent;
-  transition: none;
-}
-
-/* Frosted glass after scroll range kicks in */
-@supports (animation-timeline: scroll()) {
-  .header-root {
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-  }
-}
-
-/* Topbar hides as user scrolls */
-.header-topbar {
-  animation: header-topbar-hide linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0px 80px;
-  overflow: hidden;
-}
-
-/* Logo text color */
-.header-logo-text {
-  animation: header-logo-darken linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0px 80px;
-}
-
-/* Nav links color */
-.header-nav-link {
-  animation: header-nav-link-darken linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0px 80px;
-}
-.header-nav-link:hover { color: #09090b; }
-
-/* Icon buttons (search, cart, hamburger) */
-.header-icon-btn {
-  animation: header-icon-darken linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0px 80px;
-}
-.header-icon-btn:hover { color: #09090b; }
-
-/* Nav underline slide */
-.header-nav-link {
-  position: relative;
-}
-.header-nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 0;
-  height: 1.5px;
-  background: currentColor;
-  transition: width var(--transition-base);
-}
-.header-nav-link:hover::after { width: 100%; }
-
-/* ─── Mobile Drawer ───────────────────────────────────────────────────────── */
-
-.mobile-drawer {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition:
-    max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.25s ease;
-  background-color: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(16px) saturate(180%);
-  border-top: 1px solid rgba(228, 228, 231, 0.6);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-}
-
-/* Open state — toggled by MobileMenuToggle via data-mobile-open attribute */
-header[data-mobile-open] .mobile-drawer {
-  max-height: 85vh;
-  opacity: 1;
-  overflow-y: auto;
-}
-
-/* Keep glass effect even when drawer is open */
-header[data-mobile-open].header-root {
-  background-color: rgba(255, 255, 255, 0.85);
-  border-bottom-color: rgba(228, 228, 231, 0.6);
 }
 
 /* ─── Page Transitions ────────────────────────────────────────────────────── */
 
 @keyframes page-fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-enter {
   animation: page-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ─── Product Card ────────────────────────────────────────────────────────── */
-
-.product-card-image {
-  transition: transform var(--transition-slow);
-}
-.product-card:hover .product-card-image {
-  transform: scale(1.06);
-}
-
 /* ─── Skeleton Loading ────────────────────────────────────────────────────── */
 
 @keyframes skeleton-shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    #f4f4f5 25%,
-    #e4e4e7 50%,
-    #f4f4f5 75%
-  );
+  background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s infinite;
   border-radius: var(--radius-sm);
@@ -241,8 +112,14 @@ header[data-mobile-open].header-root {
 /* ─── Search ──────────────────────────────────────────────────────────────── */
 
 @keyframes search-slide-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .search-popover {
@@ -252,9 +129,17 @@ header[data-mobile-open].header-root {
 /* ─── Newsletter ──────────────────────────────────────────────────────────── */
 
 @keyframes success-pop {
-  0%   { transform: scale(0.95); opacity: 0; }
-  60%  { transform: scale(1.02); }
-  100% { transform: scale(1);    opacity: 1; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .newsletter-success {
@@ -264,28 +149,40 @@ header[data-mobile-open].header-root {
 /* ─── Section Fade Up ─────────────────────────────────────────────────────── */
 
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fade-up {
   animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ─── Badge Pulse ─────────────────────────────────────────────────────────── */
-
-@keyframes badge-pulse {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.15); }
-}
-
-.badge-new { animation: badge-pulse 2s ease-in-out infinite; }
-
 /* ─── Utilities ───────────────────────────────────────────────────────────── */
 
-.line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
-.line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
 
 .accent-underline {
   text-decoration: underline;
@@ -293,59 +190,14 @@ header[data-mobile-open].header-root {
   text-underline-offset: 4px;
 }
 
-/* ─── Cart Drawer ─────────────────────────────────────────────────────────── */
-
-/* Backdrop overlay */
-.cart-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0);
-  z-index: 48;
-  pointer-events: none;
-  transition: background-color var(--transition-slow);
-}
-
-.cart-backdrop--open {
-  background-color: rgba(0, 0, 0, 0.4);
-  pointer-events: auto;
-  backdrop-filter: blur(2px);
-}
-
-/* Drawer panel */
-.cart-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  max-width: 400px;
-  background: #fff;
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.12);
-  z-index: 49;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform var(--transition-slow);
-}
-
-.cart-drawer--open {
-  transform: translateX(0);
-}
-
-/* Cart item count badge on the header icon */
-.cart-badge {
-  animation: badge-pulse 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-  width: 1.125rem;
-  height: 1.125rem;
-  font-size: 9px;
-  line-height: 1;
-}
-
 /* ─── Checkout ────────────────────────────────────────────────────────────── */
 
 /* Smooth focus rings for form inputs */
 @keyframes checkout-field-focus {
-  from { box-shadow: 0 0 0 0 rgba(9, 9, 11, 0); }
-  to   { box-shadow: 0 0 0 3px rgba(9, 9, 11, 0.08); }
+  from {
+    box-shadow: 0 0 0 0 rgba(9, 9, 11, 0);
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(9, 9, 11, 0.08);
+  }
 }
-

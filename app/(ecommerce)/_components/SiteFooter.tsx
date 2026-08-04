@@ -1,12 +1,10 @@
 import Link from "next/link";
-import type {
-  StorefrontConfig,
-  NavCategory,
-  StorefrontShippingMethod,
-} from "@/lib/storefront";
+import type { FooterData } from "@/lib/storefront";
 import NewsletterForm from "./NewsletterForm";
 
-// ─── Social icon SVGs ─────────────────────────────────────────────────────────
+export interface SiteFooterProps {
+  content: FooterData;
+}
 
 const SOCIAL_ICONS: Record<string, React.ReactNode> = {
   instagram: (
@@ -36,62 +34,77 @@ const SOCIAL_ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-const HELP_LINKS = [
+const CUSTOMER_CARE_LINKS = [
   { label: "About Us", href: "/about" },
   { label: "Contact Us", href: "/contact" },
   { label: "FAQ", href: "/faq" },
-  { label: "Shipping Policy", href: "/shipping-policy" },
-  { label: "Payment Policy", href: "/payment-policy" },
   { label: "Order Cancellation", href: "/order-cancellation-policy" },
   { label: "Return & Refund Policy", href: "/return-and-refund-policy" },
 ];
 
-const LEGAL_LINKS = [
-  { label: "Legal Disclaimer", href: "/legal-disclaimer" },
-  { label: "Cookie Policy", href: "/cookie-policy" },
-  { label: "Copyright Notice", href: "/copyright-notice" },
+const LEGAL_POLICY_LINKS = [
+  { label: "Shipping Policy", href: "/shipping-policy" },
+  { label: "Payment Policy", href: "/payment-policy" },
   { label: "Terms & Conditions", href: "/terms-and-conditions" },
   { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Cookie Policy", href: "/cookie-policy" },
+  { label: "Legal Disclaimer", href: "/legal-disclaimer" },
 ];
 
-interface SiteFooterProps {
-  siteConfig: StorefrontConfig;
-  shopCategories: NavCategory[];
-  shippingMethods: StorefrontShippingMethod[];
-}
+const BOTTOM_BAR_LINKS = [
+  { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Terms & Conditions", href: "/terms-and-conditions" },
+  { label: "Cookie Policy", href: "/cookie-policy" },
+];
 
-export default function SiteFooter({
-  siteConfig,
-  shopCategories,
-  shippingMethods,
-}: SiteFooterProps) {
-  const {
-    name,
-    description,
-    social_links,
-    currency_symbol,
-    email,
-    phone,
-    address,
-  } = siteConfig;
+const footerScopedStyles = `
+  .footer-social-btn {
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .footer-link {
+    transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+`;
 
-  const socialEntries = social_links
-    ? (Object.entries(social_links).filter(
-        ([key, url]) => url && key in SOCIAL_ICONS,
-      ) as [string, string][])
-    : [];
+/**
+ * SiteFooter — Consolidated Dynamic Semantic Footer Component.
+ *
+ * Micro data fetched dynamically from DB via `getFooterData()`.
+ * Organized cleanly into Shop, Customer Care, Legal Policies, and Newsletter,
+ * with concise, non-overlapping bottom bar legal links and dynamic payment badges.
+ */
+export default function SiteFooter({ content }: SiteFooterProps) {
+  // Dynamic DB extraction with fallbacks
+  const siteName = content?.siteName || "Store";
+  const description =
+    content?.description ||
+    "Discover high-quality products at unbeatable prices.";
+  const email = content?.email || null;
+  const phone = content?.phone || null;
+  const address = content?.address || null;
+  const socialLinks = content?.socialLinks || {};
+  const currencySymbol = content?.currencySymbol || "$";
+  const shopCategories = content?.shopCategories || [];
+  const shippingMethods = content?.shippingMethods || [];
+  const paymentMethods = content?.paymentMethods || [];
 
-  const currentYear = "2026"; // new Date().getFullYear();
+  const socialEntries = Object.entries(socialLinks).filter(
+    ([key, url]) => url && key in SOCIAL_ICONS,
+  ) as [string, string][];
+
+  const currentYear = new Date().getFullYear();
 
   return (
     <footer className="bg-zinc-950 text-zinc-400">
-      {/* ── Shipping options strip ──────────────────────────────────────── */}
+      <style dangerouslySetInnerHTML={{ __html: footerScopedStyles }} />
+
+      {/* ── Shipping Methods & Value Proposition Strip (Dynamic DB) ───────── */}
       {shippingMethods.length > 0 && (
         <div className="border-b border-zinc-900">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {shippingMethods.map((opt) => (
-                <div key={opt.name} className="flex items-start gap-3">
+                <div key={opt.id || opt.name} className="flex items-start gap-3">
                   <div className="mt-0.5 text-[var(--color-accent)] shrink-0">
                     <svg
                       className="w-5 h-5"
@@ -126,14 +139,14 @@ export default function SiteFooter({
                         Free Shipping
                         {opt.free_over !== null &&
                           opt.free_over > 0 &&
-                          ` on orders over ${currency_symbol}${opt.free_over}`}
+                          ` on orders over ${currencySymbol}${opt.free_over}`}
                       </p>
                     ) : (
                       <p className="text-zinc-500 text-xs mt-0.5">
-                        {currency_symbol}
+                        {currencySymbol}
                         {opt.price.toFixed(2)}
                         {opt.free_over !== null &&
-                          ` · Free over ${currency_symbol}${opt.free_over}`}
+                          ` · Free over ${currencySymbol}${opt.free_over}`}
                       </p>
                     )}
                   </div>
@@ -144,23 +157,22 @@ export default function SiteFooter({
         </div>
       )}
 
-      {/* ── Main footer columns ─────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-2 md:grid-cols-5 gap-8 sm:gap-10">
-        {/* Brand + contact + socials */}
-        <div className="col-span-2 md:col-span-2 flex flex-col gap-5">
+      {/* ── Main Footer Columns & Links ─────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 md:grid-cols-6 gap-8 sm:gap-10">
+        {/* Brand, Info & Social Links */}
+        <div className="md:col-span-2 flex flex-col gap-5">
           <Link
             href="/"
             className="text-white text-xl font-bold tracking-tight"
           >
-            {name}
+            {siteName}
           </Link>
-          {description && (
-            <p className="text-zinc-500 text-sm leading-relaxed max-w-xs line-clamp-3">
-              {description}
-            </p>
-          )}
 
-          {/* Contact info */}
+          <p className="text-zinc-500 text-sm leading-relaxed max-w-xs line-clamp-3">
+            {description}
+          </p>
+
+          {/* Contact Details */}
           <div className="flex flex-col gap-2 text-xs text-zinc-500">
             {email && (
               <a
@@ -181,7 +193,7 @@ export default function SiteFooter({
             {address && <p className="leading-snug">{address}</p>}
           </div>
 
-          {/* Social links */}
+          {/* Social Media Links */}
           {socialEntries.length > 0 && (
             <div className="flex gap-3 mt-1">
               {socialEntries.map(([platform, url]) => (
@@ -193,7 +205,7 @@ export default function SiteFooter({
                   aria-label={
                     platform.charAt(0).toUpperCase() + platform.slice(1)
                   }
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all duration-200"
+                  className="footer-social-btn w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white"
                 >
                   {SOCIAL_ICONS[platform]}
                 </a>
@@ -202,7 +214,7 @@ export default function SiteFooter({
           )}
         </div>
 
-        {/* Shop categories — dynamic from DB */}
+        {/* Shop Categories Column (Dynamic DB) */}
         <div>
           <h3 className="text-white text-xs font-semibold uppercase tracking-widest mb-4">
             Shop
@@ -212,7 +224,7 @@ export default function SiteFooter({
               <li key={cat.slug}>
                 <Link
                   href={`/category/${cat.slug}`}
-                  className="text-zinc-500 hover:text-zinc-200 text-sm transition-colors duration-200"
+                  className="footer-link text-zinc-500 hover:text-zinc-200 text-sm"
                 >
                   {cat.name}
                 </Link>
@@ -221,17 +233,17 @@ export default function SiteFooter({
           </ul>
         </div>
 
-        {/* Customer Care */}
+        {/* Customer Care Column */}
         <div>
           <h3 className="text-white text-xs font-semibold uppercase tracking-widest mb-4">
             Customer Care
           </h3>
           <ul className="flex flex-col gap-2.5">
-            {HELP_LINKS.map((l) => (
+            {CUSTOMER_CARE_LINKS.map((l) => (
               <li key={l.href}>
                 <Link
                   href={l.href}
-                  className="text-zinc-500 hover:text-zinc-200 text-sm transition-colors duration-200"
+                  className="footer-link text-zinc-500 hover:text-zinc-200 text-sm"
                 >
                   {l.label}
                 </Link>
@@ -240,17 +252,17 @@ export default function SiteFooter({
           </ul>
         </div>
 
-        {/* Legal & Policies */}
+        {/* Legal & Policies Column */}
         <div>
           <h3 className="text-white text-xs font-semibold uppercase tracking-widest mb-4">
             Legal & Policies
           </h3>
           <ul className="flex flex-col gap-2.5">
-            {LEGAL_LINKS.map((l) => (
+            {LEGAL_POLICY_LINKS.map((l) => (
               <li key={l.href}>
                 <Link
                   href={l.href}
-                  className="text-zinc-500 hover:text-zinc-200 text-sm transition-colors duration-200"
+                  className="footer-link text-zinc-500 hover:text-zinc-200 text-sm"
                 >
                   {l.label}
                 </Link>
@@ -258,17 +270,29 @@ export default function SiteFooter({
             ))}
           </ul>
         </div>
+
+        {/* Newsletter Subscription Column */}
+        <div>
+          <h3 className="text-white text-xs font-semibold uppercase tracking-widest mb-4">
+            Stay Connected
+          </h3>
+          <p className="text-zinc-500 text-xs mb-3">
+            Subscribe for exclusive offers and update notifications.
+          </p>
+          <NewsletterForm />
+        </div>
       </div>
 
-      {/* ── Bottom bar ──────────────────────────────────────────────────── */}
+      {/* ── Bottom Bar & Dynamic Payment Badges ──────────────────────────── */}
       <div className="border-t border-zinc-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-600">
           <span>
-            © {currentYear} {name}. All rights reserved.
+            © {currentYear} {siteName}. All rights reserved.
           </span>
 
+          {/* Clean, Non-Crowded Primary Legal Links */}
           <div className="flex gap-5 flex-wrap justify-center">
-            {LEGAL_LINKS.map((l) => (
+            {BOTTOM_BAR_LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -279,19 +303,30 @@ export default function SiteFooter({
             ))}
           </div>
 
-          {/* Payment badges */}
+          {/* Dynamic DB Payment Method Badges */}
           <div
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-1.5 flex-wrap"
             aria-label="Accepted payment methods"
           >
-            {["Visa", "Mastercard", "Stripe", "Apple Pay"].map((method) => (
-              <span
-                key={method}
-                className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
-              >
-                {method}
-              </span>
-            ))}
+            {paymentMethods.length > 0 ? (
+              paymentMethods.map((method) => (
+                <span
+                  key={method.id}
+                  className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
+                >
+                  {method.name}
+                </span>
+              ))
+            ) : (
+              ["Cash on Delivery"].map((method) => (
+                <span
+                  key={method}
+                  className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
+                >
+                  {method}
+                </span>
+              ))
+            )}
           </div>
         </div>
       </div>
