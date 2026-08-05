@@ -9,6 +9,7 @@ export async function createProductVariantInDB(data: {
   stock_quantity?: number;
   options: object;
   image_url?: string | null;
+  image_url_alt_text?: string | null;
   is_active?: boolean;
   sort_order?: number;
   created_by: number;
@@ -26,6 +27,7 @@ export async function createManyProductVariantsInDB(data: {
   stock_quantity?: number;
   options: any;
   image_url?: string | null;
+  image_url_alt_text?: string | null;
   is_active?: boolean;
   sort_order?: number;
   created_by: number;
@@ -44,6 +46,7 @@ export async function updateProductVariantInDB(
     stock_quantity?: number;
     options?: object;
     image_url?: string | null;
+    image_url_alt_text?: string | null;
     is_active?: boolean;
     sort_order?: number;
     updated_by: number;

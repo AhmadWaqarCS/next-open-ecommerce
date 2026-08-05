@@ -17,6 +17,10 @@ export async function createSiteConfigInDB(data: {
   primary_color?: string;
   secondary_color?: string;
   accent_color?: string;
+  font_family?: string;
+  custom_css?: string | null;
+  header_config?: object;
+  footer_config?: object;
   currency?: string;
   currency_symbol?: string;
   email?: string | null;
@@ -52,6 +56,10 @@ export async function updateSiteConfigInDB(
     primary_color?: string;
     secondary_color?: string;
     accent_color?: string;
+    font_family?: string;
+    custom_css?: string | null;
+    header_config?: object;
+    footer_config?: object;
     currency?: string;
     currency_symbol?: string;
     email?: string | null;

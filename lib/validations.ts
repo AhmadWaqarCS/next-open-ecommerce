@@ -371,6 +371,15 @@ export const siteConfigCreateSchema = z.object({
   require_phone: z.boolean().default(false),
   allow_order_notes: z.boolean().default(true),
 
+  header_config: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .default({}),
+  footer_config: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .default({}),
+
   meta_info: metaInfoSchema,
 });
 export type SiteConfigCreateInput = z.infer<typeof siteConfigCreateSchema>;
@@ -394,12 +403,67 @@ export const sitePageCreateSchema = z.object({
     .min(1, "Page content is required")
     .max(500000, "Page content cannot exceed 500KB"),
   is_active: z.boolean().default(true),
+  show_in_header: z.boolean().default(false),
+  show_in_footer: z.boolean().default(true),
+  sort_order: z.number().int().min(-10000).max(10000).default(0),
+  theme_config: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .default({}),
+  components_config: z
+    .array(z.record(z.string().max(100), z.unknown()))
+    .optional()
+    .default([]),
   meta_info: metaInfoSchema,
 });
 export type SitePageCreateInput = z.infer<typeof sitePageCreateSchema>;
 
 export const sitePageUpdateSchema = sitePageCreateSchema.partial();
 export type SitePageUpdateInput = z.infer<typeof sitePageUpdateSchema>;
+
+// ============================================================
+// SITE COMPONENTS (site_component)
+// ============================================================
+
+export const siteComponentCreateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Component name is required")
+    .max(255, "Component name cannot exceed 255 characters"),
+  component_key: z
+    .string()
+    .trim()
+    .min(1, "Component key is required")
+    .max(100, "Component key cannot exceed 100 characters")
+    .regex(/^[a-z0-9_]+$/, "Component key must be lowercase with underscores"),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category is required")
+    .max(50, "Category cannot exceed 50 characters")
+    .default("section"),
+  description: z
+    .string()
+    .trim()
+    .max(1000, "Description cannot exceed 1000 characters")
+    .optional()
+    .nullable(),
+  default_props: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .default({}),
+  thumbnail_url: urlSchema.optional().nullable(),
+  is_active: z.boolean().default(true),
+});
+export type SiteComponentCreateInput = z.infer<
+  typeof siteComponentCreateSchema
+>;
+
+export const siteComponentUpdateSchema = siteComponentCreateSchema.partial();
+export type SiteComponentUpdateInput = z.infer<
+  typeof siteComponentUpdateSchema
+>;
 
 // ============================================================
 // EMAIL CONFIG
@@ -993,6 +1057,9 @@ export const categoryCreateSchema = z.object({
     .optional()
     .or(z.literal("")),
   bg_color: colorHexSchema.optional().or(z.literal("")),
+  show_in_header: z.boolean().default(true),
+  show_in_footer: z.boolean().default(true),
+  show_in_home: z.boolean().default(true),
   parent_id: z.number().int().positive().max(2147483647).optional(),
   sort_order: z.number().int().min(-10000).max(10000).default(0),
   is_active: z.boolean().default(true),
@@ -1132,6 +1199,12 @@ export const productVariantCreateSchema = z.object({
   stock_quantity: z.number().int().min(0).max(1000000).default(0),
   options: z.record(z.string().trim().max(50), z.string().trim().max(100)),
   image_url: urlSchema.optional().or(z.literal("")),
+  image_url_alt_text: z
+    .string()
+    .trim()
+    .max(255, "Alt text cannot exceed 255 characters")
+    .optional()
+    .or(z.literal("")),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(-10000).max(10000).default(0),
 });
@@ -1162,11 +1235,59 @@ export const productVariantUpdateSchema = z.object({
     .record(z.string().trim().max(50), z.string().trim().max(100))
     .optional(),
   image_url: urlSchema.optional().or(z.literal("")),
+  image_url_alt_text: z
+    .string()
+    .trim()
+    .max(255, "Alt text cannot exceed 255 characters")
+    .optional()
+    .or(z.literal("")),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().min(-10000).max(10000).optional(),
 });
 export type ProductVariantUpdateInput = z.infer<
   typeof productVariantUpdateSchema
+>;
+
+// ============================================================
+// PAYMENT TRANSACTIONS (payment_transaction)
+// ============================================================
+
+export const paymentTransactionCreateSchema = z.object({
+  order_id: z.number().int().positive("Order ID is required").max(2147483647),
+  provider: z
+    .string()
+    .trim()
+    .min(1, "Provider is required")
+    .max(50, "Provider cannot exceed 50 characters"),
+  provider_transaction_id: z.string().trim().max(255).optional().nullable(),
+  provider_session_id: z.string().trim().max(255).optional().nullable(),
+  provider_status: z.string().trim().max(50).optional().nullable(),
+  amount: z.number().positive("Amount must be positive").max(100000000),
+  currency: z.string().trim().length(3).toUpperCase().default("USD"),
+  status: z
+    .enum(["pending", "completed", "failed", "cancelled"])
+    .default("pending"),
+  raw_response: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .nullable(),
+  confirmed_by: z
+    .number()
+    .int()
+    .positive()
+    .max(2147483647)
+    .optional()
+    .nullable(),
+  confirmed_at: z.string().datetime().optional().nullable(),
+});
+export type PaymentTransactionCreateInput = z.infer<
+  typeof paymentTransactionCreateSchema
+>;
+
+export const paymentTransactionUpdateSchema =
+  paymentTransactionCreateSchema.partial();
+export type PaymentTransactionUpdateInput = z.infer<
+  typeof paymentTransactionUpdateSchema
 >;
 
 // ============================================================

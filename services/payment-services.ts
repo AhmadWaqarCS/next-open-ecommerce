@@ -63,6 +63,10 @@ export async function updatePaymentTransactionInDB(
   });
 }
 
+export async function deletePaymentTransactionPermanentlyInDB(id: number) {
+  return await prisma.payment_transaction.delete({ where: { id } });
+}
+
 export async function getOrderRefundsByOrderFromDB(orderId: number) {
   return await prisma.order_refund.findMany({
     where: { order_id: orderId },
@@ -93,4 +97,8 @@ export async function updateOrderRefundInDB(
   },
 ) {
   return await prisma.order_refund.update({ where: { id }, data });
+}
+
+export async function deleteOrderRefundPermanentlyInDB(id: number) {
+  return await prisma.order_refund.delete({ where: { id } });
 }

@@ -8,6 +8,9 @@ export async function createCategoryInDB(data: {
   image_url?: string | null;
   image_alt_text?: string | null;
   bg_color?: string | null;
+  show_in_header?: boolean;
+  show_in_footer?: boolean;
+  show_in_home?: boolean;
   parent_id?: number | null;
   sort_order?: number;
   is_active?: boolean;
@@ -27,6 +30,9 @@ export async function updateCategoryInDB(
     image_url?: string | null;
     image_alt_text?: string | null;
     bg_color?: string | null;
+    show_in_header?: boolean;
+    show_in_footer?: boolean;
+    show_in_home?: boolean;
     parent_id?: number | null;
     sort_order?: number;
     is_active?: boolean;

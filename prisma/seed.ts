@@ -86,6 +86,12 @@ async function main() {
     },
     { name: "Pages", path: "/dashboard/pages", enabled: true, is_super: false },
     {
+      name: "Site Components",
+      path: "/dashboard/site-components",
+      enabled: true,
+      is_super: false,
+    },
+    {
       name: "Invoices",
       path: "/dashboard/invoices",
       enabled: true,

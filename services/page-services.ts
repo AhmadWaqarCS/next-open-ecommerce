@@ -5,7 +5,12 @@ export async function createSitePageInDB(data: {
   title: string;
   content: string;
   is_active?: boolean;
+  show_in_header?: boolean;
+  show_in_footer?: boolean;
+  sort_order?: number;
   meta_info?: object;
+  theme_config?: object;
+  components_config?: object;
   created_by: number;
   updated_by: number;
 }) {
@@ -19,7 +24,12 @@ export async function updateSitePageInDB(
     title?: string;
     content?: string;
     is_active?: boolean;
+    show_in_header?: boolean;
+    show_in_footer?: boolean;
+    sort_order?: number;
     meta_info?: object;
+    theme_config?: object;
+    components_config?: object;
     updated_by: number;
     deleted_at?: Date | null;
     deleted_by?: number | null;

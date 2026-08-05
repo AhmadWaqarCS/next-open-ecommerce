@@ -38,6 +38,9 @@ export default function PageForm({ initialData, permissions }: PageFormProps) {
       slug: initialData.slug || "",
       content: initialData.content || "",
       is_active: initialData.is_active ?? true,
+      show_in_header: initialData.show_in_header ?? false,
+      show_in_footer: initialData.show_in_footer ?? true,
+      sort_order: initialData.sort_order ?? 0,
       meta_info: {
         title: initialData.meta_info?.title || "",
         description: initialData.meta_info?.description || "",
@@ -360,20 +363,70 @@ export default function PageForm({ initialData, permissions }: PageFormProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-2.5 py-1 md:col-span-2">
-            <input
-              type="checkbox"
-              id="is_active"
-              disabled={!permissions.update}
-              {...register("is_active")}
-              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
-            />
-            <label
-              htmlFor="is_active"
-              className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
-            >
-              Page Active (Visible on Storefront — if unchecked, URL will return a 404 page)
-            </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 py-1 md:col-span-2">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="is_active"
+                disabled={!permissions.update}
+                {...register("is_active")}
+                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
+              />
+              <label
+                htmlFor="is_active"
+                className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
+              >
+                Page Active
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="show_in_header"
+                disabled={!permissions.update}
+                {...register("show_in_header")}
+                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
+              />
+              <label
+                htmlFor="show_in_header"
+                className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
+              >
+                Show in Header
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="show_in_footer"
+                disabled={!permissions.update}
+                {...register("show_in_footer")}
+                className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
+              />
+              <label
+                htmlFor="show_in_footer"
+                className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
+              >
+                Show in Footer
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="sort_order"
+                className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 shrink-0"
+              >
+                Sort Order:
+              </label>
+              <input
+                type="number"
+                id="sort_order"
+                disabled={!permissions.update}
+                {...register("sort_order", { valueAsNumber: true })}
+                className="w-20 px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-semibold"
+              />
+            </div>
           </div>
         </div>
 

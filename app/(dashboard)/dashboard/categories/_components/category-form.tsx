@@ -80,6 +80,9 @@ export default function CategoryForm({
       parent_id: initialData?.parent_id ?? undefined,
       sort_order: initialData?.sort_order ?? 0,
       is_active: initialData?.is_active ?? true,
+      show_in_header: initialData?.show_in_header ?? true,
+      show_in_footer: initialData?.show_in_footer ?? true,
+      show_in_home: initialData?.show_in_home ?? true,
       meta_info: {
         title: meta.title || "",
         description: meta.description || "",
@@ -414,8 +417,8 @@ export default function CategoryForm({
             )}
           </div>
 
-          {/* Active Status */}
-          <div className="pt-2">
+          {/* Active Status & Visibility Options */}
+          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <label className="inline-flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -423,7 +426,40 @@ export default function CategoryForm({
                 className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
               />
               <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                Active Category (visible on storefront)
+                Active Category
+              </span>
+            </label>
+
+            <label className="inline-flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("show_in_header")}
+                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Show in Header
+              </span>
+            </label>
+
+            <label className="inline-flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("show_in_footer")}
+                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Show in Footer
+              </span>
+            </label>
+
+            <label className="inline-flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("show_in_home")}
+                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                Show on Home
               </span>
             </label>
           </div>

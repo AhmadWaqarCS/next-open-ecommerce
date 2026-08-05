@@ -30,7 +30,7 @@ export async function createProductVariant(
   }
 
   const { product_id, name, sku, price, compare_at_price, stock_quantity,
-    options, image_url, is_active, sort_order } = validatedFields.data;
+    options, image_url, image_url_alt_text, is_active, sort_order } = validatedFields.data;
 
   try {
     await createProductVariantInDB({
@@ -42,6 +42,7 @@ export async function createProductVariant(
       stock_quantity,
       options,
       image_url: image_url || null,
+      image_url_alt_text: image_url_alt_text || null,
       is_active,
       sort_order,
       created_by: Number(user.id),
@@ -73,7 +74,7 @@ export async function updateProductVariant(
   }
 
   const { name, sku, price, compare_at_price, stock_quantity,
-    options, image_url, is_active, sort_order } = validatedFields.data;
+    options, image_url, image_url_alt_text, is_active, sort_order } = validatedFields.data;
 
   try {
     await updateProductVariantInDB(id, {
@@ -84,6 +85,7 @@ export async function updateProductVariant(
       stock_quantity,
       options,
       image_url: image_url !== undefined ? image_url || null : undefined,
+      image_url_alt_text: image_url_alt_text !== undefined ? image_url_alt_text || null : undefined,
       is_active,
       sort_order,
       updated_by: Number(user.id),

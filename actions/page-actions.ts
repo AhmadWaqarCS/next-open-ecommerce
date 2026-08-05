@@ -29,7 +29,18 @@ export async function createSitePage(
     };
   }
 
-  const { slug, title, content, is_active, meta_info } = validatedFields.data;
+  const {
+    slug,
+    title,
+    content,
+    is_active,
+    show_in_header,
+    show_in_footer,
+    sort_order,
+    theme_config,
+    components_config,
+    meta_info,
+  } = validatedFields.data;
 
   try {
     await createSitePageInDB({
@@ -37,6 +48,11 @@ export async function createSitePage(
       title,
       content,
       is_active,
+      show_in_header,
+      show_in_footer,
+      sort_order,
+      theme_config,
+      components_config,
       meta_info,
       created_by: Number(user.id),
       updated_by: Number(user.id),
@@ -69,7 +85,18 @@ export async function updateSitePage(
     };
   }
 
-  const { slug, title, content, is_active, meta_info } = validatedFields.data;
+  const {
+    slug,
+    title,
+    content,
+    is_active,
+    show_in_header,
+    show_in_footer,
+    sort_order,
+    theme_config,
+    components_config,
+    meta_info,
+  } = validatedFields.data;
 
   try {
     const result = await updateSitePageInDB(id, {
@@ -77,6 +104,11 @@ export async function updateSitePage(
       title,
       content,
       is_active,
+      show_in_header,
+      show_in_footer,
+      sort_order,
+      theme_config,
+      components_config,
       meta_info,
       updated_by: Number(user.id),
     });

@@ -70,6 +70,10 @@ export type category = {
   image_url: string | null;
   image_alt_text: string | null;
   bg_color: string | null;
+  show_in_header?: boolean;
+  show_in_footer?: boolean;
+  show_in_home?: boolean;
+  product_count?: number;
   meta_info: any;
   parent_id: number | null;
   sort_order: number;
