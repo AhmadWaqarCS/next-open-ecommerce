@@ -44,7 +44,7 @@ export default async function HeroBanner() {
       <style dangerouslySetInnerHTML={{ __html: heroScopedStyles }} />
 
       {/* Background Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/20 to-zinc-950/80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/40 to-zinc-950/80" />
 
       {/* Subtle Animated Orb */}
       <div

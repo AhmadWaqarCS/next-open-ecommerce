@@ -162,8 +162,8 @@ export async function placeOrder(
       const cleanEmail = customer_email.toLowerCase();
 
       // ── RATE LIMIT CHECK: Prevent constant OTP email spamming (60s cooldown) ──
-      const existingRecord = await prisma.cod_otp_verification.findFirst({
-        where: { email: cleanEmail },
+      const existingRecord = await prisma.order_otp_verification.findFirst({
+        where: { email: cleanEmail, type: "cod_confirmation" },
         orderBy: { created_at: "desc" },
       });
 
@@ -264,7 +264,7 @@ export async function verifyCodOtpAndPlaceOrder(params: {
 
   const cleanOtp = otpCode.trim();
 
-  const otpRecord = await prisma.cod_otp_verification.findUnique({
+  const otpRecord = await prisma.order_otp_verification.findUnique({
     where: { id: verificationId },
   });
 
@@ -338,7 +338,7 @@ export async function resendCodOtp(params: {
 }): Promise<{ success: boolean; message: string; newVerificationId?: number }> {
   const { verificationId } = params;
 
-  const otpRecord = await prisma.cod_otp_verification.findUnique({
+  const otpRecord = await prisma.order_otp_verification.findUnique({
     where: { id: verificationId },
   });
 

@@ -668,12 +668,14 @@ model sent_email {
   @@map("sent_emails")
 }
 
-model cod_otp_verification {
+model order_otp_verification {
   id Int @id @default(autoincrement())
 
+  type          String   @default("cod_confirmation")
   email         String
+  order_number  String?
   otp_code      String
-  order_payload Json
+  order_payload Json?
   attempts      Int      @default(0)
   expires_at    DateTime
 
@@ -681,7 +683,8 @@ model cod_otp_verification {
   updated_at DateTime @updatedAt
 
   @@index([email])
+  @@index([order_number])
+  @@index([type])
   @@index([expires_at])
-  @@map("cod_otp_verifications")
+  @@map("order_otp_verifications")
 }
-

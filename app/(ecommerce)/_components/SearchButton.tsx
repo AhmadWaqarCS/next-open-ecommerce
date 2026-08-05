@@ -59,7 +59,7 @@ export default function SearchButton() {
       </button>
 
       {open && (
-        <div className="search-popover absolute right-0 top-full mt-2 w-72 bg-white rounded-xl border border-zinc-200 shadow-xl p-2 z-50">
+        <div className="search-popover absolute right-0 top-full mt-2 w-72 bg-zinc-900 rounded-xl border border-zinc-800 shadow-xl p-2 z-50">
           <form onSubmit={handleSubmit} className="flex items-center gap-2">
             <input
               ref={inputRef}
@@ -68,11 +68,11 @@ export default function SearchButton() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search products…"
               maxLength={100}
-              className="flex-1 px-3 py-2 text-sm text-zinc-900 bg-zinc-50 rounded-lg border border-zinc-200 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10 transition"
+              className="flex-1 px-3 py-2 text-sm text-white bg-zinc-800 rounded-lg border border-zinc-700 outline-none focus:border-zinc-500 transition placeholder:text-zinc-400"
             />
             <button
               type="submit"
-              className="bg-zinc-900 hover:bg-zinc-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-white hover:bg-zinc-200 text-zinc-900 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               Go
             </button>

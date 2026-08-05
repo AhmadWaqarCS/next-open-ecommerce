@@ -189,10 +189,12 @@ export interface SitePage {
 }
 
 export interface PublicOrder {
+  id: number;
   order_number: string;
   customer_first_name: string;
   customer_last_name: string;
   customer_email: string;
+  customer_phone: string | null;
   shipping_address_line1: string;
   shipping_address_line2: string | null;
   shipping_city: string;
@@ -210,6 +212,12 @@ export interface PublicOrder {
   payment_method_name: string;
   payment_status: string;
   fulfillment_status: string;
+  tracking_number: string | null;
+  tracking_url: string | null;
+  carrier_name: string | null;
+  shipped_at: Date | null;
+  delivered_at: Date | null;
+  cancelled_at: Date | null;
   customer_notes: string | null;
   placed_at: Date;
   items: {
@@ -221,6 +229,19 @@ export interface PublicOrder {
     image_url: string | null;
     options: unknown;
   }[];
+  invoice: {
+    invoice_number: string;
+    status: string;
+    issued_at: Date;
+    paid_at: Date | null;
+    subtotal: string;
+    tax_amount: string;
+    shipping_cost: string;
+    discount_amount: string;
+    total: string;
+    currency: string;
+    notes: string | null;
+  } | null;
 }
 
 export interface CheckoutConfig {
@@ -814,18 +835,20 @@ export async function getAllCategoriesPageData(): Promise<{
   };
 }
 
-// ─── 13. Order Confirmation Page Data ────────────────────────────────────────
+// ─── 13. Order Page Data (Confirmation, Tracking, Invoice & Cancellation Hub) ──
 
-export async function getOrderConfirmationPageData(
+export async function getOrderPageData(
   orderNumber: string,
 ): Promise<{ order: PublicOrder | null }> {
   const row = await prisma.order.findUnique({
-    where: { order_number: orderNumber, deleted_at: null },
+    where: { order_number: orderNumber.trim(), deleted_at: null },
     select: {
+      id: true,
       order_number: true,
       customer_first_name: true,
       customer_last_name: true,
       customer_email: true,
+      customer_phone: true,
       shipping_address_line1: true,
       shipping_address_line2: true,
       shipping_city: true,
@@ -843,6 +866,12 @@ export async function getOrderConfirmationPageData(
       payment_method_name: true,
       payment_status: true,
       fulfillment_status: true,
+      tracking_number: true,
+      tracking_url: true,
+      carrier_name: true,
+      shipped_at: true,
+      delivered_at: true,
+      cancelled_at: true,
       customer_notes: true,
       placed_at: true,
       items: {
@@ -854,6 +883,21 @@ export async function getOrderConfirmationPageData(
           line_total: true,
           image_url: true,
           options: true,
+        },
+      },
+      invoice: {
+        select: {
+          invoice_number: true,
+          status: true,
+          issued_at: true,
+          paid_at: true,
+          subtotal: true,
+          tax_amount: true,
+          shipping_cost: true,
+          discount_amount: true,
+          total: true,
+          currency: true,
+          notes: true,
         },
       },
     },
@@ -874,9 +918,21 @@ export async function getOrderConfirmationPageData(
         unit_price: String(i.unit_price),
         line_total: String(i.line_total),
       })),
+      invoice: row.invoice
+        ? {
+            ...row.invoice,
+            subtotal: String(row.invoice.subtotal),
+            tax_amount: String(row.invoice.tax_amount),
+            shipping_cost: String(row.invoice.shipping_cost),
+            discount_amount: String(row.invoice.discount_amount),
+            total: String(row.invoice.total),
+          }
+        : null,
     },
   };
 }
+
+export const getOrderConfirmationPageData = getOrderPageData;
 
 // ─── 14. Checkout Page Data ───────────────────────────────────────────────────
 

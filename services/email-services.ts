@@ -423,6 +423,15 @@ export function renderInvoiceEmailHtml(params: {
       `
           : ""
       }
+
+      <!-- Order Action Buttons -->
+      <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e4e4e7; text-align: center;">
+        <p style="font-size: 14px; color: #52525b; margin-bottom: 16px;">Track your delivery or manage your order details online:</p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}" style="display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">View Order Status</a>
+          <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}?action=cancel" style="display: inline-block; padding: 12px 24px; background-color: #f4f4f5; color: #dc2626; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; border: 1px solid #fee2e2;">Cancel Order</a>
+        </div>
+      </div>
     </div>
 
     <div class="footer">
@@ -664,3 +673,156 @@ export async function sendCodOtpEmail(options: {
     bodyHtml,
   });
 }
+
+// ─── ORDER CANCELLATION EMAILS ───────────────────────────────────────────────
+
+export function renderOrderCancellationOtpEmailHtml(params: {
+  storeName: string;
+  customerName?: string;
+  orderNumber: string;
+  otpCode: string;
+  expiresMinutes?: number;
+}): string {
+  const { storeName, customerName, orderNumber, otpCode, expiresMinutes = 10 } = params;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cancel Order ${orderNumber} Verification Code — ${storeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #dc2626; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    .body { padding: 32px 28px; text-align: center; }
+    .greeting { font-size: 15px; color: #3f3f46; margin-bottom: 20px; }
+    .otp-card { background-color: #fef2f2; border: 2px dashed #fca5a5; border-radius: 12px; padding: 24px; margin: 24px 0; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #991b1b; }
+    .expiry { font-size: 13px; color: #71717a; margin-top: 12px; }
+    .notice { font-size: 12px; color: #a1a1aa; line-height: 1.5; margin-top: 24px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Order Cancellation Request</h1>
+    </div>
+    <div class="body">
+      <div class="greeting">
+        Hi ${customerName || "there"},<br/>
+        You requested to cancel order <strong>#${orderNumber}</strong> at <strong>${storeName}</strong>. Please use the verification code below to authorize this cancellation.
+      </div>
+      <div class="otp-card">
+        <div class="otp-code">${otpCode}</div>
+        <div class="expiry">Expires in ${expiresMinutes} minutes</div>
+      </div>
+      <div class="notice">
+        If you did not request to cancel your order, please ignore this email and your order will remain active.<br/>
+        Do not share this verification code with anyone.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+export async function sendOrderCancellationOtpEmail(options: {
+  toEmail: string;
+  customerName?: string;
+  orderNumber: string;
+  otpCode: string;
+  expiresMinutes?: number;
+}) {
+  const { toEmail, customerName, orderNumber, otpCode, expiresMinutes = 10 } = options;
+  const siteConfig = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: { name: true },
+  });
+  const storeName = siteConfig?.name || "Our Store";
+
+  const bodyHtml = renderOrderCancellationOtpEmailHtml({
+    storeName,
+    customerName,
+    orderNumber,
+    otpCode,
+    expiresMinutes,
+  });
+
+  return await sendEmailWithNodemailer({
+    type: "order_cancellation_otp",
+    toEmail,
+    toName: customerName,
+    subject: `${otpCode} is your cancellation code for Order #${orderNumber} — ${storeName}`,
+    bodyHtml,
+    orderNumber,
+  });
+}
+
+export async function sendOrderCancelledConfirmationEmail(options: {
+  toEmail: string;
+  customerName?: string;
+  orderNumber: string;
+}) {
+  const { toEmail, customerName, orderNumber } = options;
+  const siteConfig = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: { name: true },
+  });
+  const storeName = siteConfig?.name || "Our Store";
+
+  const bodyHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Order #${orderNumber} Cancelled — ${storeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    .body { padding: 32px 28px; text-align: center; }
+    .status-badge { display: inline-block; padding: 6px 16px; background-color: #fef2f2; color: #991b1b; font-size: 13px; font-weight: 700; border-radius: 9999px; text-transform: uppercase; margin-bottom: 20px; }
+    .message { font-size: 15px; color: #3f3f46; line-height: 1.6; margin-bottom: 24px; }
+    .btn { display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${storeName}</h1>
+    </div>
+    <div class="body">
+      <div class="status-badge">Order Cancelled</div>
+      <div class="message">
+        Hi ${customerName || "there"},<br/>
+        Your order <strong>#${orderNumber}</strong> has been successfully cancelled. If any payment was collected, a refund process will be initiated shortly.
+      </div>
+      <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}" class="btn">View Order Details</a>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return await sendEmailWithNodemailer({
+    type: "order_cancelled_confirmation",
+    toEmail,
+    toName: customerName,
+    subject: `Order #${orderNumber} Has Been Cancelled — ${storeName}`,
+    bodyHtml,
+    orderNumber,
+  });
+}
+

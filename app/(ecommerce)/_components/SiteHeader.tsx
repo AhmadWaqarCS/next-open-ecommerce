@@ -15,19 +15,6 @@ export interface SiteHeaderProps {
 }
 
 const headerScopedStyles = `
-  @keyframes header-bar-solidify {
-    from {
-      background-color: transparent;
-      border-bottom-color: transparent;
-      box-shadow: none;
-    }
-    to {
-      background-color: rgba(255, 255, 255, 0.85);
-      border-bottom-color: rgba(228, 228, 231, 0.6);
-      box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
-    }
-  }
-
   @keyframes header-topbar-hide {
     from {
       max-height: 40px;
@@ -44,36 +31,13 @@ const headerScopedStyles = `
     }
   }
 
-  @keyframes header-logo-darken {
-    from { color: #ffffff; }
-    to { color: #09090b; }
-  }
-
-  @keyframes header-nav-link-darken {
-    from { color: rgba(255, 255, 255, 0.9); }
-    to { color: #3f3f46; }
-  }
-
-  @keyframes header-icon-darken {
-    from { color: rgba(255, 255, 255, 0.8); }
-    to { color: #52525b; }
-  }
-
-  /* Main Navigation Bar — Glassmorphism applies only to nav bar, eliminating white topbar shadow */
+  /* Main Navigation Bar — Solid Black Glassmorphism Header */
   .header-bar {
-    backdrop-filter: none;
-    animation: header-bar-solidify linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0px 80px;
-    border-bottom: 1px solid transparent;
+    background-color: rgba(9, 9, 11, 0.95);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid rgba(39, 39, 42, 0.6);
     transition: background-color 200ms ease;
-  }
-
-  @supports (animation-timeline: scroll()) {
-    .header-bar {
-      backdrop-filter: blur(16px) saturate(180%);
-      -webkit-backdrop-filter: blur(16px) saturate(180%);
-    }
   }
 
   .header-topbar {
@@ -84,20 +48,16 @@ const headerScopedStyles = `
   }
 
   .header-logo-text {
-    animation: header-logo-darken linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0px 80px;
+    color: #ffffff;
   }
 
   .header-nav-link {
     position: relative;
-    animation: header-nav-link-darken linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0px 80px;
+    color: rgba(255, 255, 255, 0.85);
   }
 
   .header-nav-link:hover {
-    color: #09090b;
+    color: #ffffff;
   }
 
   .header-nav-link::after {
@@ -116,13 +76,11 @@ const headerScopedStyles = `
   }
 
   .header-icon-btn {
-    animation: header-icon-darken linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0px 80px;
+    color: rgba(255, 255, 255, 0.85);
   }
 
   .header-icon-btn:hover {
-    color: #09090b;
+    color: #ffffff;
   }
 
   .mobile-drawer {
@@ -130,10 +88,10 @@ const headerScopedStyles = `
     overflow: hidden;
     opacity: 0;
     transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
-    background-color: rgba(255, 255, 255, 0.97);
+    background-color: rgba(9, 9, 11, 0.97);
     backdrop-filter: blur(16px) saturate(180%);
-    border-top: 1px solid rgba(228, 228, 231, 0.6);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-top: 1px solid rgba(39, 39, 42, 0.6);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
   header[data-mobile-open] .mobile-drawer {
@@ -143,8 +101,8 @@ const headerScopedStyles = `
   }
 
   header[data-mobile-open] .header-bar {
-    background-color: rgba(255, 255, 255, 0.85);
-    border-bottom-color: rgba(228, 228, 231, 0.6);
+    background-color: rgba(9, 9, 11, 0.98);
+    border-bottom-color: rgba(39, 39, 42, 0.6);
   }
 `;
 
@@ -162,7 +120,7 @@ export default async function SiteHeader() {
   const sitePages = content?.sitePages || [];
 
   return (
-    <header className="header-root fixed top-0 inset-x-0 z-50 pointer-events-none">
+    <header className="header-root sticky top-0 z-50 bg-zinc-950">
       {/* Scoped Header Animations & Glassmorphism Styles */}
       <style dangerouslySetInnerHTML={{ __html: headerScopedStyles }} />
 
@@ -170,7 +128,7 @@ export default async function SiteHeader() {
       {topbarMessage && (
         <div
           id="header-topbar"
-          className="header-topbar bg-zinc-900 text-zinc-100 text-xs text-center py-2 tracking-wide px-4 font-medium pointer-events-auto"
+          className="header-topbar bg-zinc-950 text-zinc-200 text-xs text-center py-2 tracking-wide px-4 font-medium pointer-events-auto border-b border-zinc-800/40"
         >
           <span>{topbarMessage}</span>
         </div>
@@ -224,10 +182,10 @@ export default async function SiteHeader() {
                     </button>
 
                     {/* CSS Hover Flyout Menu */}
-                    <div className="absolute top-full left-0 w-52 rounded-xl bg-white border border-zinc-200/60 shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 z-50 py-2 mt-0">
+                    <div className="absolute top-full left-0 w-52 rounded-xl bg-zinc-900 border border-zinc-800 shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 z-50 py-2 mt-0">
                       <Link
                         href={`/category/${cat.slug}`}
-                        className="block px-4 py-2 text-sm text-zinc-500 font-medium hover:bg-zinc-50 hover:text-zinc-900 transition-colors border-b border-zinc-100 mb-1"
+                        className="block px-4 py-2 text-sm text-zinc-400 font-medium hover:bg-zinc-800 hover:text-white transition-colors border-b border-zinc-800/60 mb-1"
                       >
                         All {cat.name}
                       </Link>
@@ -235,7 +193,7 @@ export default async function SiteHeader() {
                         <Link
                           key={child.slug}
                           href={`/category/${child.slug}`}
-                          className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+                          className="block px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                         >
                           {child.name}
                         </Link>
@@ -282,24 +240,24 @@ export default async function SiteHeader() {
         className="mobile-drawer md:hidden pointer-events-auto"
       >
         <nav
-          className="flex flex-col px-6 py-4 gap-1 divide-y divide-zinc-100/80"
+          className="flex flex-col px-6 py-4 gap-1 divide-y divide-zinc-800/80"
           aria-label="Mobile navigation"
         >
           {navCategories.map((cat) => (
             <div key={cat.slug} className="py-3 first:pt-0 last:pb-0">
               <Link
                 href={`/category/${cat.slug}`}
-                className="text-zinc-900 font-semibold text-sm hover:text-[var(--color-accent)] transition-colors block"
+                className="text-white font-semibold text-sm hover:text-[var(--color-accent)] transition-colors block"
               >
                 {cat.name}
               </Link>
               {cat.children && cat.children.length > 0 && (
-                <div className="flex flex-col pl-4 gap-2 mt-2 border-l-2 border-zinc-100">
+                <div className="flex flex-col pl-4 gap-2 mt-2 border-l-2 border-zinc-800">
                   {cat.children.map((child) => (
                     <Link
                       key={child.slug}
                       href={`/category/${child.slug}`}
-                      className="text-zinc-500 font-medium text-xs hover:text-zinc-900 transition-colors"
+                      className="text-zinc-400 font-medium text-xs hover:text-white transition-colors"
                     >
                       {child.name}
                     </Link>

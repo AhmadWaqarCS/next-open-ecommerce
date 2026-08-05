@@ -481,7 +481,7 @@ export async function getOrderDetailsDataInDB(orderId: number) {
   });
 }
 
-// ─── COD OTP VERIFICATION DB TRANSACTIONS ──────────────────────────────────────
+// ─── UNIFIED UNIFIED OTP & ORDER CANCELLATION DB TRANSACTIONS ──────────────────
 
 export async function createCodOtpTransaction(data: {
   email: string;
@@ -493,14 +493,18 @@ export async function createCodOtpTransaction(data: {
     const cleanEmail = data.email.toLowerCase();
 
     // Clean up any old pending OTPs for this email and expired OTPs system-wide
-    await tx.cod_otp_verification.deleteMany({
+    await tx.order_otp_verification.deleteMany({
       where: {
-        OR: [{ email: cleanEmail }, { expires_at: { lte: new Date() } }],
+        OR: [
+          { email: cleanEmail, type: "cod_confirmation" },
+          { expires_at: { lte: new Date() } },
+        ],
       },
     });
 
-    return await tx.cod_otp_verification.create({
+    return await tx.order_otp_verification.create({
       data: {
+        type: "cod_confirmation",
         email: cleanEmail,
         otp_code: data.otp_code,
         order_payload: data.order_payload,
@@ -510,22 +514,148 @@ export async function createCodOtpTransaction(data: {
   });
 }
 
-export async function incrementCodOtpAttemptTransaction(id: number) {
+export async function createCancellationOtpTransaction(data: {
+  order_number: string;
+  email: string;
+  otp_code: string;
+  expires_at: Date;
+}) {
   return await prisma.$transaction(async (tx) => {
-    return await tx.cod_otp_verification.update({
+    const cleanEmail = data.email.toLowerCase();
+
+    // Clean up any pending cancellation OTPs for this order number & email
+    await tx.order_otp_verification.deleteMany({
+      where: {
+        OR: [
+          { order_number: data.order_number, type: "order_cancellation" },
+          { expires_at: { lte: new Date() } },
+        ],
+      },
+    });
+
+    return await tx.order_otp_verification.create({
+      data: {
+        type: "order_cancellation",
+        order_number: data.order_number,
+        email: cleanEmail,
+        otp_code: data.otp_code,
+        expires_at: data.expires_at,
+      },
+    });
+  });
+}
+
+export async function incrementOtpAttemptTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.order_otp_verification.update({
       where: { id },
       data: { attempts: { increment: 1 } },
     });
   });
 }
 
-export async function deleteCodOtpTransaction(id: number) {
+export async function deleteOtpTransaction(id: number) {
   return await prisma.$transaction(async (tx) => {
-    return await tx.cod_otp_verification.delete({
+    return await tx.order_otp_verification.delete({
       where: { id },
     });
   });
 }
+
+// Retain legacy aliases for backwards compatibility with existing actions
+export const incrementCodOtpAttemptTransaction = incrementOtpAttemptTransaction;
+export const deleteCodOtpTransaction = deleteOtpTransaction;
+
+export async function cancelOrderInDB(input: {
+  order_number: string;
+  email: string;
+  reason?: string | null;
+}) {
+  return await prisma.$transaction(async (tx) => {
+    const cleanEmail = input.email.trim().toLowerCase();
+    const order = await tx.order.findFirst({
+      where: {
+        order_number: input.order_number.trim(),
+        customer_email: { equals: cleanEmail, mode: "insensitive" },
+        deleted_at: null,
+      },
+      include: {
+        items: true,
+        invoice: true,
+      },
+    });
+
+    if (!order) {
+      throw new Error("ORDER_NOT_FOUND");
+    }
+
+    if (order.cancelled_at || order.fulfillment_status === "cancelled") {
+      throw new Error("ORDER_ALREADY_CANCELLED");
+    }
+
+    if (
+      order.fulfillment_status === "shipped" ||
+      order.fulfillment_status === "delivered"
+    ) {
+      throw new Error("ORDER_CANNOT_BE_CANCELLED_SHIPPED");
+    }
+
+    const now = new Date();
+
+    // 1. Update order record
+    const updatedOrder = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        cancelled_at: now,
+        fulfillment_status: "cancelled",
+        payment_status:
+          order.payment_status === "paid" ? "refund_pending" : "cancelled",
+        admin_notes: input.reason
+          ? `${order.admin_notes ? order.admin_notes + "\n" : ""}Customer cancellation reason: ${input.reason}`
+          : order.admin_notes,
+      },
+    });
+
+    // 2. Update related invoice status if exists
+    if (order.invoice) {
+      await tx.invoice.update({
+        where: { id: order.invoice.id },
+        data: { status: "cancelled" },
+      });
+    }
+
+    // 3. Restore inventory stock for product & variants
+    for (const item of order.items) {
+      if (item.product_id) {
+        const prod = await tx.product.findUnique({
+          where: { id: item.product_id },
+          select: { track_inventory: true },
+        });
+
+        if (prod?.track_inventory) {
+          await tx.product.update({
+            where: { id: item.product_id },
+            data: {
+              stock_quantity: { increment: item.quantity },
+            },
+          });
+        }
+      }
+
+      if (item.variant_id) {
+        await tx.product_variant.update({
+          where: { id: item.variant_id },
+          data: {
+            stock_quantity: { increment: item.quantity },
+          },
+        });
+      }
+    }
+
+    return updatedOrder;
+  });
+}
+
 
 
 

@@ -238,7 +238,7 @@ export default function CheckoutForm({
       if (result.orderNumber) {
         setIsSubmitted(true); // prevent the empty-cart redirect from firing
         clearCart();
-        router.push(`/order-confirmation/${result.orderNumber}`);
+        router.push(`/order/${result.orderNumber}?new=1`);
         return;
       }
     }
@@ -260,7 +260,7 @@ export default function CheckoutForm({
     if (res.success && res.orderNumber) {
       setIsSubmitted(true);
       clearCart();
-      router.push(`/order-confirmation/${res.orderNumber}`);
+      router.push(`/order/${res.orderNumber}?new=1`);
     } else {
       setOtpError(res.message ?? "Invalid verification code.");
       setIsVerifyingOtp(false);

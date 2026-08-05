@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const passwordSchema = z
   .string()
-  .min(6, "Password must be at least 6 characters long")
+  .min(8, "Password must be at least 6 characters long")
   .max(128, "Password cannot exceed 128 characters");
 
 const emailSchema = z
@@ -1727,3 +1727,51 @@ export const sentEmailUpdateSchema = z.object({
     .optional(),
 });
 export type SentEmailUpdateInput = z.infer<typeof sentEmailUpdateSchema>;
+
+// ============================================================
+// ORDER TRACKING & ORDER CANCELLATION
+// ============================================================
+
+export const trackOrderLookupSchema = z.object({
+  order_number: z
+    .string()
+    .trim()
+    .min(1, "Order number is required")
+    .max(50, "Order number cannot exceed 50 characters"),
+});
+export type TrackOrderLookupInput = z.infer<typeof trackOrderLookupSchema>;
+
+export const requestCancellationOtpSchema = z.object({
+  order_number: z
+    .string()
+    .trim()
+    .min(1, "Order number is required")
+    .max(50, "Order number cannot exceed 50 characters"),
+  email: emailSchema,
+});
+export type RequestCancellationOtpInput = z.infer<
+  typeof requestCancellationOtpSchema
+>;
+
+export const confirmCancellationOtpSchema = z.object({
+  order_number: z
+    .string()
+    .trim()
+    .min(1, "Order number is required")
+    .max(50, "Order number cannot exceed 50 characters"),
+  email: emailSchema,
+  otp_code: z
+    .string()
+    .trim()
+    .length(6, "Verification code must be exactly 6 digits")
+    .regex(/^\d{6}$/, "Verification code must contain only numbers"),
+  reason: z
+    .string()
+    .trim()
+    .max(500, "Cancellation reason cannot exceed 500 characters")
+    .optional()
+    .nullable(),
+});
+export type ConfirmCancellationOtpInput = z.infer<
+  typeof confirmCancellationOtpSchema
+>;
