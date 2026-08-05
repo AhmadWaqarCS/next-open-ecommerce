@@ -92,7 +92,9 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
 
   const fromName = emailConfig?.from_name || siteConfig?.name || "Store";
   const fromEmail =
-    emailConfig?.from_email || siteConfig?.email || "noreply@store.com";
+    process.env.SMTP_USER && process.env.SMTP_USER.includes("@")
+      ? process.env.SMTP_USER
+      : emailConfig?.from_email || siteConfig?.email || "noreply@store.com";
 
   const sentEmailRecord = await createSentEmailInDB({
     type,
@@ -210,7 +212,8 @@ export async function verifySmtpConnectionService(): Promise<{
     await transporter.verify();
     return {
       success: true,
-      message: "SMTP server connection verified successfully via environment variables!",
+      message:
+        "SMTP server connection verified successfully via environment variables!",
     };
   } catch (error: any) {
     console.error("[verifySmtpConnectionService] Verification error:", error);
@@ -575,3 +578,89 @@ export async function getSentEmailDetailsDataInDB(id: number) {
   });
 }
 
+// ─── COD OTP EMAIL TEMPLATES & SENDER ────────────────────────────────────────
+
+export function renderCodOtpEmailHtml(params: {
+  storeName: string;
+  customerName?: string;
+  otpCode: string;
+  expiresMinutes?: number;
+}): string {
+  const { storeName, customerName, otpCode, expiresMinutes = 10 } = params;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Order Verification Code — ${storeName}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .body { padding: 32px 28px; text-align: center; }
+    .greeting { font-size: 15px; color: #3f3f46; margin-bottom: 20px; }
+    .otp-card { background-color: #fafafa; border: 2px dashed #e4e4e7; border-radius: 12px; padding: 24px; margin: 24px 0; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #09090b; }
+    .expiry { font-size: 13px; color: #71717a; margin-top: 12px; }
+    .notice { font-size: 12px; color: #a1a1aa; line-height: 1.5; margin-top: 24px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${storeName}</h1>
+    </div>
+    <div class="body">
+      <div class="greeting">
+        Hi ${customerName || "there"},<br/>
+        Please use the verification code below to confirm your Cash on Delivery order.
+      </div>
+      <div class="otp-card">
+        <div class="otp-code">${otpCode}</div>
+        <div class="expiry">Expires in ${expiresMinutes} minutes</div>
+      </div>
+      <div class="notice">
+        If you did not initiate this order, please disregard this email.<br/>
+        Do not share this verification code with anyone.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+export async function sendCodOtpEmail(options: {
+  toEmail: string;
+  customerName?: string;
+  otpCode: string;
+  expiresMinutes?: number;
+}) {
+  const { toEmail, customerName, otpCode, expiresMinutes = 10 } = options;
+  const siteConfig = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: { name: true },
+  });
+  const storeName = siteConfig?.name || "Our Store";
+
+  const bodyHtml = renderCodOtpEmailHtml({
+    storeName,
+    customerName,
+    otpCode,
+    expiresMinutes,
+  });
+
+  return await sendEmailWithNodemailer({
+    type: "cod_otp",
+    toEmail,
+    toName: customerName,
+    subject: `${otpCode} is your order verification code — ${storeName}`,
+    bodyHtml,
+  });
+}

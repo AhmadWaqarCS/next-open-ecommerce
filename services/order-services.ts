@@ -481,3 +481,51 @@ export async function getOrderDetailsDataInDB(orderId: number) {
   });
 }
 
+// ─── COD OTP VERIFICATION DB TRANSACTIONS ──────────────────────────────────────
+
+export async function createCodOtpTransaction(data: {
+  email: string;
+  otp_code: string;
+  order_payload: any;
+  expires_at: Date;
+}) {
+  return await prisma.$transaction(async (tx) => {
+    const cleanEmail = data.email.toLowerCase();
+
+    // Clean up any old pending OTPs for this email and expired OTPs system-wide
+    await tx.cod_otp_verification.deleteMany({
+      where: {
+        OR: [{ email: cleanEmail }, { expires_at: { lte: new Date() } }],
+      },
+    });
+
+    return await tx.cod_otp_verification.create({
+      data: {
+        email: cleanEmail,
+        otp_code: data.otp_code,
+        order_payload: data.order_payload,
+        expires_at: data.expires_at,
+      },
+    });
+  });
+}
+
+export async function incrementCodOtpAttemptTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.cod_otp_verification.update({
+      where: { id },
+      data: { attempts: { increment: 1 } },
+    });
+  });
+}
+
+export async function deleteCodOtpTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.cod_otp_verification.delete({
+      where: { id },
+    });
+  });
+}
+
+
+

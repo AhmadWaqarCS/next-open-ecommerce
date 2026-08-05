@@ -667,3 +667,21 @@ model sent_email {
   @@index([order_id])
   @@map("sent_emails")
 }
+
+model cod_otp_verification {
+  id Int @id @default(autoincrement())
+
+  email         String
+  otp_code      String
+  order_payload Json
+  attempts      Int      @default(0)
+  expires_at    DateTime
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([email])
+  @@index([expires_at])
+  @@map("cod_otp_verifications")
+}
+

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +12,11 @@ import type {
   StorefrontPaymentMethod,
 } from "@/lib/storefront";
 import { checkoutFormSchema, type CheckoutFormInput } from "@/lib/validations";
-import { placeOrder } from "@/actions/checkout-action";
+import {
+  placeOrder,
+  verifyCodOtpAndPlaceOrder,
+  resendCodOtp,
+} from "@/actions/checkout-action";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -87,9 +92,26 @@ export default function CheckoutForm({
   const { state, itemCount, subtotal, clearCart, hydrated } = useCart();
   const { items } = state;
 
+  const [mounted, setMounted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // ── COD OTP State ────────────────────────────────────────────────────────────
+  const [otpState, setOtpState] = useState<{
+    active: boolean;
+    verificationId: number;
+    email: string;
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Auto-select first shipping & payment method
   const defaultShipping = shippingMethods[0];
@@ -134,13 +156,36 @@ export default function CheckoutForm({
     );
   }, [items, setValue]);
 
+  // Resend Cooldown Timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((c) => (c > 0 ? c - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Escape key listener for closing modal
+  useEffect(() => {
+    if (!otpState?.active) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOtpState(null);
+        setOtpCode("");
+        setOtpError(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [otpState?.active]);
+
   // Redirect to home if cart is empty — only after hydration is done and we
   // haven't just placed an order (clearCart fires before router.push completes)
   useEffect(() => {
-    if (hydrated && !isSubmitted && itemCount === 0) {
+    if (hydrated && !isSubmitted && itemCount === 0 && !otpState?.active) {
       router.replace("/");
     }
-  }, [hydrated, isSubmitted, itemCount, router]);
+  }, [hydrated, isSubmitted, itemCount, otpState?.active, router]);
 
   const billingSame = watch("billing_same_as_shipping");
   const selectedMethodId = watch("shipping_method_id");
@@ -178,20 +223,74 @@ export default function CheckoutForm({
 
     const result = await placeOrder(dataWithCost);
 
-    if (result.success && result.orderNumber) {
-      setIsSubmitted(true); // prevent the empty-cart redirect from firing
-      clearCart();
-      router.push(`/order-confirmation/${result.orderNumber}`);
-    } else {
-      setServerError(result.message ?? "An error occurred. Please try again.");
-      setIsSubmitting(false);
+    if (result.success) {
+      if (result.requiresOtp && result.verificationId) {
+        setOtpState({
+          active: true,
+          verificationId: result.verificationId,
+          email: result.email ?? data.customer_email,
+        });
+        setResendCooldown(60);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (result.orderNumber) {
+        setIsSubmitted(true); // prevent the empty-cart redirect from firing
+        clearCart();
+        router.push(`/order-confirmation/${result.orderNumber}`);
+        return;
+      }
     }
+
+    setServerError(result.message ?? "An error occurred. Please try again.");
+    setIsSubmitting(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpState || !otpCode.trim()) return;
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    const res = await verifyCodOtpAndPlaceOrder({
+      verificationId: otpState.verificationId,
+      otpCode: otpCode.trim(),
+    });
+
+    if (res.success && res.orderNumber) {
+      setIsSubmitted(true);
+      clearCart();
+      router.push(`/order-confirmation/${res.orderNumber}`);
+    } else {
+      setOtpError(res.message ?? "Invalid verification code.");
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!otpState || resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    setOtpError(null);
+
+    const res = await resendCodOtp({ verificationId: otpState.verificationId });
+
+    if (res.success) {
+      if (res.newVerificationId) {
+        setOtpState((prev) =>
+          prev ? { ...prev, verificationId: res.newVerificationId! } : null,
+        );
+      }
+      setResendCooldown(60);
+    } else {
+      setOtpError(res.message);
+    }
+    setIsResending(false);
   };
 
   // While cart is still being read from localStorage, show nothing
   if (!hydrated) return null;
 
-  if (itemCount === 0) {
+  if (itemCount === 0 && !isSubmitted && !otpState?.active) {
     return null; // Will redirect in useEffect
   }
 
@@ -631,7 +730,6 @@ export default function CheckoutForm({
                         src={item.imageUrl}
                         alt={item.productName}
                         fill
-                        // unoptimized
                         className="object-cover"
                         sizes="48px"
                       />
@@ -746,7 +844,7 @@ export default function CheckoutForm({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                       />
                     </svg>
-                    Placing Order…
+                    Processing…
                   </span>
                 ) : (
                   `Place Order — ${config.currency_symbol}${total.toFixed(2)}`
@@ -772,6 +870,154 @@ export default function CheckoutForm({
           </button>
         </aside>
       </form>
+
+      {/* ─── COD OTP Verification Modal (React Portal to document.body for true screen centering) ── */}
+      {mounted &&
+        otpState?.active &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setOtpState(null);
+                setOtpCode("");
+                setOtpError(null);
+              }
+            }}
+          >
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-zinc-100 text-center relative overflow-hidden my-auto">
+              {/* Top decorative accent line */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-zinc-900 via-amber-500 to-zinc-900" />
+
+              {/* Email Icon Badge */}
+              <div className="w-14 h-14 rounded-2xl bg-zinc-900 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-zinc-900/20">
+                <svg
+                  className="w-7 h-7 text-amber-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 002-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+
+              <h3 className="text-xl font-bold text-zinc-900 tracking-tight">
+                Verify Your Order
+              </h3>
+              <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
+                We sent a 6-digit verification code to{" "}
+                <span className="font-semibold text-zinc-900">{otpState.email}</span>.
+                Enter it below to complete your Cash on Delivery order.
+              </p>
+
+              {/* OTP Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleVerifyOtp();
+                }}
+                className="mt-6 flex flex-col gap-4"
+              >
+                <div>
+                  <input
+                    id="cod-otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      setOtpCode(val);
+                      if (otpError) setOtpError(null);
+                    }}
+                    placeholder="123456"
+                    className="w-full text-center font-mono text-3xl font-extrabold tracking-[0.4em] py-3.5 px-4 rounded-2xl border-2 border-zinc-200 bg-zinc-50 text-zinc-900 focus:bg-white focus:border-zinc-900 focus:ring-4 focus:ring-zinc-100 outline-none transition-all placeholder:text-zinc-300 placeholder:tracking-normal placeholder:font-sans placeholder:text-sm placeholder:font-normal"
+                    autoFocus
+                  />
+                </div>
+
+                {otpError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-600 animate-in fade-in">
+                    {otpError}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <button
+                  id="confirm-otp-btn"
+                  type="submit"
+                  disabled={isVerifyingOtp || otpCode.trim().length !== 6}
+                  className={`w-full font-bold py-3.5 rounded-xl text-sm transition-all duration-200 ${
+                    isVerifyingOtp || otpCode.trim().length !== 6
+                      ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+                      : "bg-zinc-900 text-white hover:bg-zinc-800 active:scale-[0.98] shadow-md"
+                  }`}
+                >
+                  {isVerifyingOtp ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg
+                        className="animate-spin w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      Verifying Code…
+                    </span>
+                  ) : (
+                    "Confirm & Place Order"
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={resendCooldown > 0 || isResending}
+                    className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 disabled:text-zinc-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isResending
+                      ? "Sending code…"
+                      : resendCooldown > 0
+                      ? `Resend code in ${resendCooldown}s`
+                      : "Resend code"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpState(null);
+                      setOtpCode("");
+                      setOtpError(null);
+                    }}
+                    className="text-xs text-zinc-400 hover:text-zinc-700 transition-colors"
+                  >
+                    Edit details
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
