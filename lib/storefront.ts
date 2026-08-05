@@ -32,7 +32,6 @@ export interface StorefrontConfig {
   currency_symbol: string;
   meta_info: Record<string, string>;
   topbar_message: string | null;
-  home_tagline_label: string | null;
   require_phone: boolean;
   allow_order_notes: boolean;
   tax_rate: number | null;
@@ -106,7 +105,6 @@ export interface ShopCategory {
 }
 
 export interface HeroBannerData {
-  homeTaglineLabel: string | null;
   tagline: string | null;
   description: string | null;
   accentColor: string;
@@ -292,7 +290,6 @@ export async function getSiteConfig(): Promise<StorefrontConfig | null> {
       currency_symbol: true,
       meta_info: true,
       topbar_message: true,
-      home_tagline_label: true,
       require_phone: true,
       allow_order_notes: true,
       tax_rate: true,
@@ -782,7 +779,6 @@ export async function getHeroBannerData(): Promise<HeroBannerData> {
   ]);
 
   return {
-    homeTaglineLabel: config?.home_tagline_label || null,
     tagline: config?.tagline || "Wear what you love.",
     description: config?.description || "Curated fashion for every occasion.",
     accentColor: config?.accent_color || "#e8c98e",

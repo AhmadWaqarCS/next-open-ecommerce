@@ -80,7 +80,6 @@ model site_config {
   site_url    String?
 
   topbar_message     String?
-  home_tagline_label String?
 
   light_logo_url  String?
   dark_logo_url   String?

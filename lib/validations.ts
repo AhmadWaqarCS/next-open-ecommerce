@@ -301,12 +301,6 @@ export const siteConfigCreateSchema = z.object({
     .max(500, "Topbar message cannot exceed 500 characters")
     .optional()
     .or(z.literal("")),
-  home_tagline_label: z
-    .string()
-    .trim()
-    .max(255, "Tagline label cannot exceed 255 characters")
-    .optional()
-    .or(z.literal("")),
 
   // Branding
   light_logo_url: urlSchema.optional().or(z.literal("")),

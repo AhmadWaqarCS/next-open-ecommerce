@@ -7,7 +7,6 @@ export async function createSiteConfigTransaction(
     description?: string | null;
     site_url?: string | null;
     topbar_message?: string | null;
-    home_tagline_label?: string | null;
     light_logo_url?: string | null;
     dark_logo_url?: string | null;
     favicon_url?: string | null;
@@ -55,7 +54,6 @@ export async function updateSiteConfigTransaction(
     description?: string | null;
     site_url?: string | null;
     topbar_message?: string | null;
-    home_tagline_label?: string | null;
     light_logo_url?: string | null;
     dark_logo_url?: string | null;
     favicon_url?: string | null;
@@ -159,7 +157,6 @@ export async function getSiteConfigDashboardDataInDB() {
       description: true,
       site_url: true,
       topbar_message: true,
-      home_tagline_label: true,
       light_logo_url: true,
       dark_logo_url: true,
       favicon_url: true,

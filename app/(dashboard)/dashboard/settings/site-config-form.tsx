@@ -84,7 +84,6 @@ export default function SiteConfigForm({
       description: initialData.description || "",
       site_url: initialData.site_url || "",
       topbar_message: initialData.topbar_message || "",
-      home_tagline_label: initialData.home_tagline_label || "",
       light_logo_url: initialData.light_logo_url || "",
       dark_logo_url: initialData.dark_logo_url || "",
       favicon_url: initialData.favicon_url || "",
@@ -403,19 +402,6 @@ export default function SiteConfigForm({
                       {...register("topbar_message")}
                       className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
                       placeholder="Free shipping on orders over $75 · Use code WELCOME10 for 10% off"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                      Home Hero Tagline Label
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!permissions.update}
-                      {...register("home_tagline_label")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                      placeholder="Summer Collection 2025"
                     />
                   </div>
                 </div>

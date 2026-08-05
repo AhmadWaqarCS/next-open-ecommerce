@@ -60,7 +60,6 @@ export async function createSiteConfig(
     allow_order_notes,
     meta_info,
     topbar_message,
-    home_tagline_label,
   } = validatedFields.data;
 
   try {
@@ -71,7 +70,6 @@ export async function createSiteConfig(
         description: description || null,
         site_url: site_url || null,
         topbar_message: topbar_message || null,
-        home_tagline_label: home_tagline_label || null,
         light_logo_url: light_logo_url || null,
         dark_logo_url: dark_logo_url || null,
         favicon_url: favicon_url || null,
@@ -148,7 +146,6 @@ export async function updateSiteConfig(
     allow_order_notes,
     meta_info,
     topbar_message,
-    home_tagline_label,
   } = validatedFields.data;
 
   try {
@@ -161,10 +158,6 @@ export async function updateSiteConfig(
         site_url: site_url !== undefined ? site_url || null : undefined,
         topbar_message:
           topbar_message !== undefined ? topbar_message || null : undefined,
-        home_tagline_label:
-          home_tagline_label !== undefined
-            ? home_tagline_label || null
-            : undefined,
         light_logo_url:
           light_logo_url !== undefined ? light_logo_url || null : undefined,
         dark_logo_url:
@@ -214,7 +207,6 @@ export async function updateSiteConfig(
     if (footerChanged) revalidateTag("site-footer", "max");
 
     const heroChanged =
-      home_tagline_label !== undefined ||
       tagline !== undefined ||
       description !== undefined ||
       accent_color !== undefined ||

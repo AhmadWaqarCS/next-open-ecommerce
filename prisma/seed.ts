@@ -46,6 +46,12 @@ async function main() {
   console.log(`  ✓ Superadmin Account: ${adminUser.email}`);
 
   // 3. Dashboard Features & Permissions
+  await prisma.site_feature.deleteMany({
+    where: {
+      path: { in: ["/dashboard/secrets-vault", "/dashboard/secrets"] },
+    },
+  });
+
   const featuresData = [
     { name: "Dashboard", path: "/dashboard", enabled: true, is_super: false },
     {
@@ -169,7 +175,6 @@ async function main() {
       description:
         "Dynamic open-source e-commerce platform built with Next.js.",
       topbar_message: "Welcome to our store!",
-      home_tagline_label: "Featured Product",
       primary_color: "#09090b",
       secondary_color: "#18181b",
       accent_color: "#f59e0b",

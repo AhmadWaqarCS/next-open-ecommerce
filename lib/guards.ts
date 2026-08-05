@@ -9,6 +9,13 @@ export async function assertPermission(action: keyof CRUD, path: string) {
     redirect("/login");
   }
 
+  if (session.user.role === "superadmin") {
+    return {
+      permissions: { create: true, read: true, update: true, delete: true },
+      user: session.user,
+    };
+  }
+
   const { accessPaths } = await getRolePermissions(session.user.role);
   const match = accessPaths.find((r) => r.path === path && r.crud[action]);
 
@@ -18,3 +25,4 @@ export async function assertPermission(action: keyof CRUD, path: string) {
 
   return { permissions: match.crud, user: session.user };
 }
+

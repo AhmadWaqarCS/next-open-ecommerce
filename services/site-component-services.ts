@@ -67,7 +67,10 @@ export async function updateSiteComponentTransaction(
   });
 }
 
-export async function deleteSiteComponentTransaction(id: number, userId: number) {
+export async function deleteSiteComponentTransaction(
+  id: number,
+  userId: number,
+) {
   return await prisma.$transaction(async (tx) => {
     return await tx.site_component.update({
       where: { id },
@@ -166,9 +169,33 @@ export async function bulkPermanentlyDeleteSiteComponentsTransaction(
   });
 }
 
-export async function getSiteComponentsDashboardDataInDB() {
-  return await prisma.site_component.findMany({
-    orderBy: { name: "asc" },
+export async function getSiteComponentsDashboardDataInDB(
+  where: Prisma.site_componentWhereInput,
+  skipCount: number = 0,
+  pageSize: number = 10,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const components = await tx.site_component.findMany({
+      where,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { id: "asc" },
+    });
+
+    const totalComponents = await tx.site_component.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { components, totalComponents, dashboardUsers };
   });
 }
 
+export async function getSiteComponentEditDataInDB(id: number) {
+  return await prisma.site_component.findUnique({
+    where: { id, deleted_at: null },
+  });
+}

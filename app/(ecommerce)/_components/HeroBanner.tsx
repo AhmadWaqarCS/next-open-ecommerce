@@ -23,7 +23,6 @@ export default async function HeroBanner() {
   cacheLife("max");
   const content = await getHeroBannerData();
 
-  const label = content?.homeTaglineLabel || null;
   const tagline = content?.tagline || "Wear what you love.";
   const description =
     content?.description || "Curated fashion for every occasion.";
@@ -54,15 +53,6 @@ export default async function HeroBanner() {
       />
 
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto py-24">
-        {/* Label */}
-        {label && (
-          <p
-            className="text-xs font-semibold uppercase tracking-[0.3em] mb-6"
-            style={{ color: accentColor }}
-          >
-            {label}
-          </p>
-        )}
 
         {/* Tagline */}
         <h1 className="text-white text-5xl sm:text-7xl font-bold tracking-tighter leading-[0.95] mb-6">

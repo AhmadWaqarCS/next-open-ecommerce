@@ -6,16 +6,16 @@ import {
   SiteComponentFilterParams,
 } from "@/lib/filters/site-component-filters";
 import { getSiteComponentsDashboardDataInDB } from "@/services/site-component-services";
-import SiteComponentTable from "./site-component-table";
+import SiteComponentTrashTable from "./site-component-trash-table";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Site Components",
-  description: "Manage system and custom UI components registered for dynamic storefront pages.",
+  title: "Trash — Site Components",
+  description: "View and manage deleted site UI components",
 };
 
-export default async function DashboardSiteComponentsPage({
+export default async function DashboardSiteComponentsTrashPage({
   searchParams,
 }: {
   searchParams?: Promise<{
@@ -23,14 +23,10 @@ export default async function DashboardSiteComponentsPage({
   }>;
 }) {
   const { permissions } = await assertPermission(
-    "read",
+    "delete",
     "/dashboard/site-components",
   );
   const params = (await searchParams) || {};
-
-  const currentPage = Math.max(1, Number(params.page ?? 1));
-  const pageSize = Math.max(1, Number(params.size ?? 10));
-  const skipCount = (currentPage - 1) * pageSize;
 
   const filterParams: SiteComponentFilterParams = {
     id: typeof params.id === "string" ? params.id : undefined,
@@ -58,19 +54,23 @@ export default async function DashboardSiteComponentsPage({
       typeof params.updated_to === "string" ? params.updated_to : undefined,
   };
 
-  const where = buildSiteComponentWhereInput(filterParams, false);
+  const currentPage = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.max(1, Number(params.size ?? 10));
+  const skipCount = (currentPage - 1) * pageSize;
+
+  const whereCondition = buildSiteComponentWhereInput(filterParams, true);
 
   const { components, totalComponents, dashboardUsers } =
-    await getSiteComponentsDashboardDataInDB(where, skipCount, pageSize);
+    await getSiteComponentsDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const userIds = components.flatMap((c) =>
-    [c.created_by, c.updated_by].filter((id): id is number => id !== null),
+    [c.created_by, c.updated_by, c.deleted_by].filter((id): id is number => id !== null),
   );
   const userNames = await resolveUserNames(userIds);
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">
-      <SiteComponentTable
+      <SiteComponentTrashTable
         components={components as any}
         dashboardUsers={dashboardUsers}
         filterParams={filterParams}
