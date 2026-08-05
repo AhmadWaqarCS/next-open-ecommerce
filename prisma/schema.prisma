@@ -205,27 +205,6 @@ model email_config {
   @@map("email_config")
 }
 
-model secret_vault {
-  id Int @id @default(autoincrement())
-
-  key_name        String @unique
-  encrypted_value String
-  iv              String
-  auth_tag        String
-
-  description  String?
-  last_rotated DateTime?
-
-  created_at DateTime  @default(now())
-  created_by Int
-  updated_at DateTime  @updatedAt
-  updated_by Int
-  deleted_at DateTime?
-  deleted_by Int?
-
-  @@map("secret_vault")
-}
-
 model shipping_method {
   id          Int      @id @default(autoincrement())
   name        String
@@ -488,8 +467,8 @@ model category {
   show_in_footer Boolean @default(true)
   show_in_home   Boolean @default(true)
 
-  product_count  Int     @default(0)
-  meta_info      Json    @default("{}")
+  product_count Int  @default(0)
+  meta_info     Json @default("{}")
 
   parent_id Int?
   parent    category?  @relation("SubCategories", fields: [parent_id], references: [id])

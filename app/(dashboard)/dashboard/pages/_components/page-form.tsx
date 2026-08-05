@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import { updateSitePage } from "@/actions/page-actions";
+import MetaInput from "@/app/(dashboard)/_components/meta-input";
 import {
   SitePageUpdateInput,
   sitePageUpdateSchema,
@@ -44,10 +45,6 @@ export default function PageForm({ initialData, permissions }: PageFormProps) {
         og_title: initialData.meta_info?.og_title || "",
         og_description: initialData.meta_info?.og_description || "",
         og_image: initialData.meta_info?.og_image || "",
-        twitter_card: initialData.meta_info?.twitter_card || "",
-        twitter_title: initialData.meta_info?.twitter_title || "",
-        twitter_description: initialData.meta_info?.twitter_description || "",
-        twitter_image: initialData.meta_info?.twitter_image || "",
       },
     },
   });
@@ -380,57 +377,17 @@ export default function PageForm({ initialData, permissions }: PageFormProps) {
           </div>
         </div>
 
-        {/* SEO Section */}
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
-          <div>
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-              SEO & Social Metadata
-            </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Override search engine titles and OpenGraph card tags for this specific page.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                Meta Title
-              </label>
-              <input
-                type="text"
-                disabled={!permissions.update}
-                {...register("meta_info.title")}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                placeholder="Meta title"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                Keywords
-              </label>
-              <input
-                type="text"
-                disabled={!permissions.update}
-                {...register("meta_info.keywords")}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                placeholder="policy, legal, shipping"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                Meta Description
-              </label>
-              <textarea
-                disabled={!permissions.update}
-                rows={3}
-                {...register("meta_info.description")}
-                className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                placeholder="Summary snippet for search results..."
-              />
-            </div>
-          </div>
+        {/* SEO & OpenGraph Section */}
+        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+          <MetaInput
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            errors={errors}
+            disabled={!permissions.update}
+            uploadFolder="pages"
+            defaultTitle={watch("title") || initialData.title}
+          />
         </div>
       </div>
     </form>

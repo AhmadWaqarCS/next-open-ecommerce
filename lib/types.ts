@@ -18,9 +18,12 @@ export type user = {
 };
 
 export type meta_info = {
-  title: string;
-  description: string;
-  keywords: string;
+  title?: string;
+  description?: string;
+  keywords?: string;
+  og_title?: string;
+  og_description?: string;
+  og_image?: string;
 };
 
 // ─── ROLES ────────────────────────────────────────────────────────────────────

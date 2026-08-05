@@ -6,12 +6,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "../../_components/toast-context";
 import { updateSiteConfig, generateSitemapAction } from "@/actions/site-actions";
 import { uploadMediaImage } from "@/actions/media-actions";
+import MetaInput from "@/app/(dashboard)/_components/meta-input";
 import {
   SiteConfigUpdateInput,
   siteConfigUpdateSchema,
 } from "@/lib/validations";
 import { CRUD } from "@/lib/types";
-import ImageField from "../../_components/image-field";
+import ImageInput from "../../_components/image-input";
+import ImageInputGroup from "../../_components/image-input-group";
 
 interface SiteConfigFormProps {
   initialData: any;
@@ -116,10 +118,6 @@ export default function SiteConfigForm({
         og_title: initialData.meta_info?.og_title || "",
         og_description: initialData.meta_info?.og_description || "",
         og_image: initialData.meta_info?.og_image || "",
-        twitter_card: initialData.meta_info?.twitter_card || "",
-        twitter_title: initialData.meta_info?.twitter_title || "",
-        twitter_description: initialData.meta_info?.twitter_description || "",
-        twitter_image: initialData.meta_info?.twitter_image || "",
       },
     },
   });
@@ -428,67 +426,63 @@ export default function SiteConfigForm({
           {/* TAB 2: BRANDING & STYLE */}
           {activeTab === "style" && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Logos & Assets
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Specify public URLs for storefront branding images.
-                </p>
-              </div>
+              <ImageInputGroup
+                title="Logos & Assets"
+                description="Specify public URLs for storefront branding images."
+              >
+                <div className="grid grid-cols-1 gap-6">
+                  <ImageInput
+                    label="Light Logo"
+                    value={lightLogoValue || ""}
+                    onChange={(url) =>
+                      setValue("light_logo_url", url, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                    file={pendingLightLogo}
+                    onFileSelect={setPendingLightLogo}
+                    error={errors.light_logo_url?.message}
+                    disabled={!permissions.update}
+                    uploadFolder="branding"
+                    showAltField={false}
+                  />
 
-              <div className="grid grid-cols-1 gap-6">
-                <ImageField
-                  label="Light Logo"
-                  value={lightLogoValue || ""}
-                  onChange={(url) =>
-                    setValue("light_logo_url", url, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  pendingFile={pendingLightLogo}
-                  onFileSelect={setPendingLightLogo}
-                  error={errors.light_logo_url?.message}
-                  disabled={!permissions.update}
-                  uploadFolder="branding"
-                  showAltField={false}
-                />
+                  <ImageInput
+                    label="Dark Logo"
+                    value={darkLogoValue || ""}
+                    onChange={(url) =>
+                      setValue("dark_logo_url", url, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                    file={pendingDarkLogo}
+                    onFileSelect={setPendingDarkLogo}
+                    error={errors.dark_logo_url?.message}
+                    disabled={!permissions.update}
+                    uploadFolder="branding"
+                    showAltField={false}
+                  />
 
-                <ImageField
-                  label="Dark Logo"
-                  value={darkLogoValue || ""}
-                  onChange={(url) =>
-                    setValue("dark_logo_url", url, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  pendingFile={pendingDarkLogo}
-                  onFileSelect={setPendingDarkLogo}
-                  error={errors.dark_logo_url?.message}
-                  disabled={!permissions.update}
-                  uploadFolder="branding"
-                  showAltField={false}
-                />
-
-                <ImageField
-                  label="Favicon"
-                  value={faviconValue || ""}
-                  onChange={(url) =>
-                    setValue("favicon_url", url, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  pendingFile={pendingFavicon}
-                  onFileSelect={setPendingFavicon}
-                  error={errors.favicon_url?.message}
-                  disabled={!permissions.update}
-                  uploadFolder="branding"
-                  showAltField={false}
-                />
-              </div>
+                  <ImageInput
+                    label="Favicon"
+                    value={faviconValue || ""}
+                    onChange={(url) =>
+                      setValue("favicon_url", url, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                    file={pendingFavicon}
+                    onFileSelect={setPendingFavicon}
+                    error={errors.favicon_url?.message}
+                    disabled={!permissions.update}
+                    uploadFolder="branding"
+                    showAltField={false}
+                  />
+                </div>
+              </ImageInputGroup>
 
               <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
                 <div>
@@ -857,56 +851,17 @@ export default function SiteConfigForm({
                 </div>
               </div>
 
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    Global SEO Metadata
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Configure storefront metadata for bots and shared links.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                      Meta Title
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!permissions.update}
-                      {...register("meta_info.title")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                      placeholder="My Premium Online E-Commerce"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                      Meta Description
-                    </label>
-                    <textarea
-                      disabled={!permissions.update}
-                      rows={3}
-                      {...register("meta_info.description")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                      placeholder="Describe what your online shop does for web spiders..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                      Meta Keywords
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!permissions.update}
-                      {...register("meta_info.keywords")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                      placeholder="ecommerce, store, fashion, clothing"
-                    />
-                  </div>
-                </div>
+              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                <MetaInput
+                  register={register}
+                  watch={watch}
+                  setValue={setValue}
+                  errors={errors}
+                  disabled={!permissions.update}
+                  uploadFolder="branding"
+                  defaultTitle={watch("name") || initialData.name}
+                  defaultDescription={watch("description") || initialData.description}
+                />
               </div>
 
               {/* Dynamic Sitemap & Saved Static Rendering */}

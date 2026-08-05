@@ -48,22 +48,82 @@ async function main() {
   // 3. Dashboard Features & Permissions
   const featuresData = [
     { name: "Dashboard", path: "/dashboard", enabled: true, is_super: false },
-    { name: "Orders", path: "/dashboard/orders", enabled: true, is_super: false },
-    { name: "Products", path: "/dashboard/products", enabled: true, is_super: false },
-    { name: "Categories", path: "/dashboard/categories", enabled: true, is_super: false },
-    { name: "Coupons", path: "/dashboard/coupons", enabled: true, is_super: false },
-    { name: "Shipping", path: "/dashboard/shipping", enabled: true, is_super: false },
-    { name: "Payment Methods", path: "/dashboard/payment-methods", enabled: true, is_super: false },
+    {
+      name: "Orders",
+      path: "/dashboard/orders",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Products",
+      path: "/dashboard/products",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Categories",
+      path: "/dashboard/categories",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Coupons",
+      path: "/dashboard/coupons",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Shipping",
+      path: "/dashboard/shipping",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Payment Methods",
+      path: "/dashboard/payment-methods",
+      enabled: true,
+      is_super: false,
+    },
     { name: "Pages", path: "/dashboard/pages", enabled: true, is_super: false },
-    { name: "Invoices", path: "/dashboard/invoices", enabled: true, is_super: false },
-    { name: "Sent Emails", path: "/dashboard/sent-emails", enabled: true, is_super: false },
-    { name: "Email Config", path: "/dashboard/email-config", enabled: true, is_super: false },
-    { name: "Newsletter", path: "/dashboard/newsletter", enabled: true, is_super: false },
-    { name: "Settings", path: "/dashboard/settings", enabled: true, is_super: false },
+    {
+      name: "Invoices",
+      path: "/dashboard/invoices",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Sent Emails",
+      path: "/dashboard/sent-emails",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Email Config",
+      path: "/dashboard/email-config",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Newsletter",
+      path: "/dashboard/newsletter",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Settings",
+      path: "/dashboard/settings",
+      enabled: true,
+      is_super: false,
+    },
     { name: "Media", path: "/dashboard/media", enabled: true, is_super: false },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
-    { name: "Secret Vault", path: "/dashboard/secret-vault", enabled: true, is_super: true },
+    {
+      name: "Secret Vault",
+      path: "/dashboard/secret-vault",
+      enabled: true,
+      is_super: true,
+    },
   ];
 
   const features = [];
@@ -93,7 +153,9 @@ async function main() {
       },
     });
   }
-  console.log(`  ✓ Dashboard Features (${features.length}) & Permissions linked`);
+  console.log(
+    `  ✓ Dashboard Features (${features.length}) & Permissions linked`,
+  );
 
   // 4. Singleton Site Config
   await prisma.site_config.upsert({
@@ -104,7 +166,8 @@ async function main() {
       name: STORE_NAME,
       tagline: "Simple open-source e-commerce.",
       site_url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-      description: "Dynamic open-source e-commerce platform built with Next.js.",
+      description:
+        "Dynamic open-source e-commerce platform built with Next.js.",
       topbar_message: "Welcome to our store!",
       home_tagline_label: "Featured Product",
       primary_color: "#09090b",
@@ -450,7 +513,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       name: "General",
       slug: "general",
       description: "Default product category.",
-      image_url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
       bg_color: "from-zinc-800 to-zinc-950",
       show_in_header: true,
       show_in_footer: true,
@@ -478,7 +542,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         stock_quantity: 50,
         category_id: category.id,
         category_name: category.name,
-        feature_image_url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
+        feature_image_url:
+          "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
         feature_image_alt_text: "Sample Product",
         is_featured: true,
         is_active: true,

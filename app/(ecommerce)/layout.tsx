@@ -24,11 +24,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase:
       config.site_url ||
-      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
       "http://localhost:3000",
     title: {
       default: meta.title ?? config.name,
-      template: `%s | ${config.name}`,
+      template: `%s | ${meta.title ?? config.name}`,
     },
     description: meta.description ?? config.description ?? undefined,
     keywords: meta.keywords ?? undefined,
@@ -68,7 +68,11 @@ export default async function EcommerceRootLayout({
   `;
 
   return (
-    <html lang="en" className={`${inter.variable} h-full`}>
+    <html
+      lang="en"
+      className={`${inter.variable} h-full`}
+      data-scroll-behavior="smooth"
+    >
       <head>
         <style dangerouslySetInnerHTML={{ __html: colorStyle }} />
       </head>

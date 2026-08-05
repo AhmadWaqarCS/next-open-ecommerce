@@ -2,8 +2,9 @@
 
 import { useId, useState, useEffect, ChangeEvent } from "react";
 import Image from "next/image";
+import { useImageGroupContext } from "./image-input-group";
 
-export interface ImageFieldProps {
+export interface ImageInputProps {
   /** Optional header label for the field (string or ReactNode) */
   label?: string | React.ReactNode;
   /** Optional right-aligned header elements (e.g. badges, remove button) */
@@ -21,6 +22,8 @@ export interface ImageFieldProps {
   /** Callback when user selects a file for upload */
   onFileSelect?: (file: File | null) => void;
   /** Currently staged file (if managed externally) */
+  file?: File | null;
+  /** Legacy alias for staged file */
   pendingFile?: File | null;
   /** Callback when image size is fetched */
   onSizeFetch?: (size: number) => void;
@@ -40,16 +43,7 @@ export interface ImageFieldProps {
   className?: string;
 }
 
-export function formatBytes(bytes: number, decimals = 2): string {
-  if (!bytes || bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-}
-
-export default function ImageField({
+export function ImageInput({
   label,
   headerRight,
   value,
@@ -58,6 +52,7 @@ export default function ImageField({
   onAltChange,
   showAltField = true,
   onFileSelect,
+  file: externalFile,
   pendingFile: externalPendingFile,
   onSizeFetch,
   onPreviewFetch,
@@ -67,30 +62,30 @@ export default function ImageField({
   required = false,
   uploadFolder = "uploads",
   className = "",
-}: ImageFieldProps) {
+}: ImageInputProps) {
   const fileInputId = useId();
   const urlInputId = useId();
   const altInputId = useId();
 
-  const [internalPendingFile, setInternalPendingFile] = useState<File | null>(
-    null,
-  );
+  const groupCtx = useImageGroupContext();
+
   const activeFile =
-    externalPendingFile !== undefined
-      ? externalPendingFile
-      : internalPendingFile;
+    externalFile !== undefined
+      ? externalFile
+      : externalPendingFile !== undefined
+        ? externalPendingFile
+        : null;
+
+  const [internalFile, setInternalFile] = useState<File | null>(null);
+  const currentFile = activeFile || internalFile;
 
   const [previewUrl, setPreviewUrl] = useState<string>(value || "");
   const [fetchedSize, setFetchedSize] = useState<number | null>(null);
+  const [fetchedFormat, setFetchedFormat] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Client-side image optimization pipeline placeholder
-  const optimizeImageBeforeStaging = async (rawFile: File): Promise<File> => {
-    return rawFile;
-  };
-
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -101,122 +96,86 @@ export default function ImageField({
 
     setFetchError(null);
 
-    const processedFile = await optimizeImageBeforeStaging(selectedFile);
+    // Delegate client-side size calculation and format derivation to ImageInputGroup context
+    setFetchedSize(selectedFile.size);
+    onSizeFetch?.(selectedFile.size);
+    setFetchedFormat(groupCtx.deriveFormat(selectedFile));
 
-    // Calculate file size on client-side directly
-    setFetchedSize(processedFile.size);
-    onSizeFetch?.(processedFile.size);
-
-    // Create instant local Blob URL for UI preview
-    const objectUrl = URL.createObjectURL(processedFile);
+    // Delegate object URL preview creation to ImageInputGroup context
+    const objectUrl = groupCtx.createObjectUrl(selectedFile);
     setPreviewUrl(objectUrl);
 
     if (onFileSelect) {
-      onFileSelect(processedFile);
+      onFileSelect(selectedFile);
     } else {
-      setInternalPendingFile(processedFile);
+      setInternalFile(selectedFile);
     }
-
-    const ext = processedFile.name.split(".").pop()?.toLowerCase() || "webp";
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const predictedFileName = `${Date.now()}_${randomDigits}.${ext}`;
-    const predictedPath = `/uploads/${uploadFolder}/${year}/${month}/${predictedFileName}`;
-    onChange(predictedPath);
   };
 
-  const fetchImageInfo = async (targetUrl: string) => {
-    if (!targetUrl || targetUrl.startsWith("blob:") || activeFile) return;
+  const handleFetchClick = async () => {
+    if (!value || value.startsWith("blob:") || currentFile || isFetching) return;
 
     setIsFetching(true);
     setFetchError(null);
+    setPreviewUrl(value);
+    onPreviewFetch?.(value);
 
-    setPreviewUrl(targetUrl);
-    onPreviewFetch?.(targetUrl);
-
-    try {
-      const res = await fetch(targetUrl, { method: "HEAD" });
-      if (res.ok) {
-        const cl = res.headers.get("content-length");
-        if (cl) {
-          const sz = parseInt(cl, 10);
-          setFetchedSize(sz);
-          onSizeFetch?.(sz);
-          setIsFetching(false);
-          return;
-        }
-      }
-      const getRes = await fetch(targetUrl);
-      if (getRes.ok) {
-        const blob = await getRes.blob();
-        setFetchedSize(blob.size);
-        onSizeFetch?.(blob.size);
-      } else {
-        if (!activeFile && !targetUrl.startsWith("/uploads/")) {
-          setFetchError("Image not found");
-          setFetchedSize(null);
-        }
-      }
-    } catch {
-      if (!activeFile && !targetUrl.startsWith("/uploads/")) {
-        setFetchError("Failed to fetch");
+    // Delegate image spec fetching logic to ImageInputGroup context
+    const res = await groupCtx.fetchImageSpecs(value);
+    setIsFetching(false);
+    if (res.error) {
+      if (!value.startsWith("/uploads/")) {
+        setFetchError(res.error);
         setFetchedSize(null);
       }
-    } finally {
-      setIsFetching(false);
+    } else {
+      if (res.size !== null) {
+        setFetchedSize(res.size);
+        onSizeFetch?.(res.size);
+      }
+      if (res.format) {
+        setFetchedFormat(res.format);
+      }
     }
   };
 
   useEffect(() => {
-    if (activeFile) {
-      const objectUrl = URL.createObjectURL(activeFile);
+    if (currentFile) {
+      const objectUrl = groupCtx.createObjectUrl(currentFile);
       setPreviewUrl(objectUrl);
-      setFetchedSize(activeFile.size);
-      onSizeFetch?.(activeFile.size);
+      setFetchedSize(currentFile.size);
+      onSizeFetch?.(currentFile.size);
+      setFetchedFormat(groupCtx.deriveFormat(currentFile));
       setFetchError(null);
       return () => URL.revokeObjectURL(objectUrl);
     } else if (value) {
       setPreviewUrl(value);
       setFetchError(null);
+      setFetchedFormat(groupCtx.deriveFormat(null, value));
       if (!value.startsWith("blob:")) {
-        fetchImageInfo(value);
+        handleFetchClick();
       }
     } else {
       setPreviewUrl("");
       setFetchedSize(null);
+      setFetchedFormat(null);
       setFetchError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFile, value]);
-
-  const isExternalUrl = Boolean(
-    value && (value.startsWith("http://") || value.startsWith("https://")),
-  );
+  }, [currentFile, value]);
 
   const isUploadedFile = Boolean(
-    activeFile || (value && value.startsWith("/uploads/")),
+    currentFile || (value && value.startsWith("/uploads/")),
   );
 
-  const fileName = activeFile
-    ? activeFile.name
-    : value
-      ? value.split("/").pop() || "Image"
-      : "No file selected";
+  const fileFormat = currentFile
+    ? groupCtx.deriveFormat(currentFile)
+    : fetchedFormat || groupCtx.deriveFormat(null, value);
 
-  const fileExt = activeFile
-    ? activeFile.name.split(".").pop()?.toUpperCase() || "IMG"
-    : isExternalUrl
-      ? "URL"
-      : value
-        ? value.split(".").pop()?.toUpperCase() || "IMG"
-        : "N/A";
-
-  const fileSize = activeFile
-    ? formatBytes(activeFile.size)
+  const fileSize = currentFile
+    ? groupCtx.formatBytes(currentFile.size)
     : fetchedSize != null
-      ? formatBytes(fetchedSize)
+      ? groupCtx.formatBytes(fetchedSize)
       : value
         ? "Click Fetch"
         : "0 Bytes";
@@ -238,7 +197,7 @@ export default function ImageField({
         </div>
       )}
 
-      {/* Top Row: Left Action Box + Right Specifications Box */}
+      {/* Top Row: File Picker Box + Display Specifications Box (Format & Size ONLY) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
         {/* Left Side: Upload Button & Preview Thumbnail */}
         <div className="relative border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl p-2.5 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors flex items-center gap-2.5">
@@ -260,7 +219,6 @@ export default function ImageField({
                   (typeof label === "string" ? label : "Image preview")
                 }
                 fill
-                // unoptimized
                 className="object-cover"
               />
             </div>
@@ -312,7 +270,7 @@ export default function ImageField({
           </div>
         </div>
 
-        {/* Right Side: Image Specifications */}
+        {/* Right Side: Image Display Specifications (Format & Size ONLY) */}
         <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 bg-zinc-50/80 dark:bg-zinc-800/50 flex flex-col justify-between text-xs space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -320,24 +278,13 @@ export default function ImageField({
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
-            <div className="truncate">
-              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">
-                Name
-              </span>
-              <span
-                className="truncate block font-semibold text-[10px]"
-                title={fileName}
-              >
-                {fileName}
-              </span>
-            </div>
+          <div className="grid grid-cols-2 gap-2 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
             <div>
               <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">
                 Format
               </span>
-              <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200">
-                {fileExt}
+              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200">
+                {fileFormat}
               </span>
             </div>
             <div className="truncate">
@@ -355,14 +302,14 @@ export default function ImageField({
         </div>
       </div>
 
-      {/* Bottom Section: Image URL/Path and Alt Text Underneath */}
+      {/* Bottom Section: Image Path and Alt Text */}
       <div className="space-y-3 pt-1">
         <div>
           <label
             htmlFor={urlInputId}
             className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
           >
-            Image URL / Path
+            Image Path / URL
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -385,7 +332,7 @@ export default function ImageField({
             <button
               type="button"
               disabled={!value || disabled || isFetching}
-              onClick={() => fetchImageInfo(value)}
+              onClick={handleFetchClick}
               className="px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5"
             >
               {isFetching ? (
@@ -469,3 +416,5 @@ export default function ImageField({
     </div>
   );
 }
+
+export default ImageInput;

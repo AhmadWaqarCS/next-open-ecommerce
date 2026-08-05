@@ -5,7 +5,9 @@ import {
   updateCategory,
   uploadCategoryImage,
 } from "@/actions/category-actions";
-import ImageField from "@/app/(dashboard)/_components/image-field";
+import ImageInput from "@/app/(dashboard)/_components/image-input";
+import ImageInputGroup from "@/app/(dashboard)/_components/image-input-group";
+import MetaInput from "@/app/(dashboard)/_components/meta-input";
 import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import { setFormErrors } from "@/lib/client-utils";
 import { category } from "@/lib/types";
@@ -82,6 +84,9 @@ export default function CategoryForm({
         title: meta.title || "",
         description: meta.description || "",
         keywords: meta.keywords || "",
+        og_title: meta.og_title || "",
+        og_description: meta.og_description || "",
+        og_image: meta.og_image || "",
       },
     },
   });
@@ -427,92 +432,59 @@ export default function CategoryForm({
 
       {/* TAB 2: META & SEO */}
       {activeTab === "meta" && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          <div>
-            <label
-              htmlFor="meta_title"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-            >
-              Meta Title
-            </label>
-            <input
-              id="meta_title"
-              type="text"
-              placeholder="Custom Search Engine Title"
-              {...register("meta_info.title")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="meta_description"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-            >
-              Meta Description
-            </label>
-            <textarea
-              id="meta_description"
-              rows={3}
-              placeholder="Custom snippet for search engines..."
-              {...register("meta_info.description")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="meta_keywords"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-            >
-              Meta Keywords
-            </label>
-            <input
-              id="meta_keywords"
-              type="text"
-              placeholder="comma, separated, keywords"
-              {...register("meta_info.keywords")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
-            />
-          </div>
+        <div className="animate-in fade-in duration-150">
+          <MetaInput
+            register={register}
+            watch={watch}
+            setValue={setValue}
+            errors={errors}
+            uploadFolder="categories"
+            defaultTitle={nameValue || initialData?.name}
+            defaultDescription={watch("description") || initialData?.description}
+          />
         </div>
       )}
 
       {/* TAB 3: MEDIA & STYLING */}
       {activeTab === "media" && (
         <div className="space-y-6 animate-in fade-in duration-150">
-          {/* Reusable Image Field */}
-          <ImageField
-            label="Category Image File & Details"
-            value={imageUrlValue || ""}
-            onChange={(url) =>
-              setValue("image_url", url, {
-                shouldValidate: true,
-                shouldDirty: true,
-              })
-            }
-            altValue={imageAltValue || ""}
-            onAltChange={(alt) =>
-              setValue("image_alt_text", alt, {
-                shouldValidate: true,
-                shouldDirty: true,
-              })
-            }
-            pendingFile={pendingFile}
-            onFileSelect={(file) => {
-              setPendingFile(file);
-              if (file) {
-                toast(
-                  "Image staged. It will be saved when you submit the category.",
-                  "info",
-                );
+          {/* Category Image Field */}
+          <ImageInputGroup
+            title="Category Media"
+            description="Upload or specify the featured showcase image for this category."
+          >
+            <ImageInput
+              label="Category Image File & Details"
+              value={imageUrlValue || ""}
+              onChange={(url) =>
+                setValue("image_url", url, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
               }
-            }}
-            error={errors.image_url?.message}
-            altError={errors.image_alt_text?.message}
-            uploadFolder="categories"
-            showAltField={true}
-          />
+              altValue={imageAltValue || ""}
+              onAltChange={(alt) =>
+                setValue("image_alt_text", alt, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
+              file={pendingFile}
+              onFileSelect={(file) => {
+                setPendingFile(file);
+                if (file) {
+                  toast(
+                    "Image staged. It will be saved when you submit the category.",
+                    "info",
+                  );
+                }
+              }}
+              error={errors.image_url?.message}
+              altError={errors.image_alt_text?.message}
+              uploadFolder="categories"
+              showAltField={true}
+            />
+          </ImageInputGroup>
 
           {/* Background Styling Picker */}
           <div className="space-y-3 pt-2">
