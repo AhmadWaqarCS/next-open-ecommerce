@@ -1,6 +1,9 @@
+"use cache";
+
 import Link from "next/link";
-import type { FooterData } from "@/lib/storefront";
+import { getFooterData, type FooterData } from "@/lib/storefront";
 import NewsletterForm from "./NewsletterForm";
+import { cacheLife, cacheTag } from "next/cache";
 
 export interface SiteFooterProps {
   content: FooterData;
@@ -73,18 +76,21 @@ const footerScopedStyles = `
  * Organized cleanly into Shop, Customer Care, Legal Policies, and Newsletter,
  * with concise, non-overlapping bottom bar legal links and dynamic payment badges.
  */
-export default function SiteFooter({ content }: SiteFooterProps) {
-  // Dynamic DB extraction with fallbacks
-  const siteName = content?.siteName || "Store";
+export default async function SiteFooter() {
+  cacheTag("site-footer");
+  cacheLife("max");
+
+  const content = await getFooterData();
+  const siteName = content?.siteConfig?.name || "Store";
   const description =
-    content?.description ||
+    content?.siteConfig?.description ||
     "Discover high-quality products at unbeatable prices.";
-  const email = content?.email || null;
-  const phone = content?.phone || null;
-  const address = content?.address || null;
+  const email = content?.siteConfig?.email || null;
+  const phone = content?.siteConfig?.phone || null;
+  const address = content?.siteConfig?.address || null;
   const socialLinks = content?.socialLinks || {};
-  const currencySymbol = content?.currencySymbol || "$";
-  const shopCategories = content?.shopCategories || [];
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
+  const shopCategories = content?.categories || [];
   const shippingMethods = content?.shippingMethods || [];
   const paymentMethods = content?.paymentMethods || [];
 
@@ -92,7 +98,7 @@ export default function SiteFooter({ content }: SiteFooterProps) {
     ([key, url]) => url && key in SOCIAL_ICONS,
   ) as [string, string][];
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = "2026"; // new Date().getFullYear();
 
   return (
     <footer className="bg-zinc-950 text-zinc-400">
@@ -104,7 +110,10 @@ export default function SiteFooter({ content }: SiteFooterProps) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {shippingMethods.map((opt) => (
-                <div key={opt.id || opt.name} className="flex items-start gap-3">
+                <div
+                  key={opt.id || opt.name}
+                  className="flex items-start gap-3"
+                >
                   <div className="mt-0.5 text-[var(--color-accent)] shrink-0">
                     <svg
                       className="w-5 h-5"
@@ -308,25 +317,23 @@ export default function SiteFooter({ content }: SiteFooterProps) {
             className="flex items-center gap-1.5 flex-wrap"
             aria-label="Accepted payment methods"
           >
-            {paymentMethods.length > 0 ? (
-              paymentMethods.map((method) => (
-                <span
-                  key={method.id}
-                  className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
-                >
-                  {method.name}
-                </span>
-              ))
-            ) : (
-              ["Cash on Delivery"].map((method) => (
-                <span
-                  key={method}
-                  className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
-                >
-                  {method}
-                </span>
-              ))
-            )}
+            {paymentMethods.length > 0
+              ? paymentMethods.map((method) => (
+                  <span
+                    key={method.id}
+                    className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
+                  >
+                    {method.name}
+                  </span>
+                ))
+              : ["Cash on Delivery"].map((method) => (
+                  <span
+                    key={method}
+                    className="bg-zinc-900 text-zinc-400 border border-zinc-800 rounded px-2 py-0.5 text-[10px] font-bold tracking-wide"
+                  >
+                    {method}
+                  </span>
+                ))}
           </div>
         </div>
       </div>

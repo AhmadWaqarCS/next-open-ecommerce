@@ -1,13 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ProductPageData } from "@/lib/storefront";
+import type { ProductFull } from "@/lib/storefront";
 import AddToCartButton from "../../_components/AddToCartButton";
 import CartProvider from "../../_components/CartProvider";
 import FeaturedProducts from "../../_components/FeaturedProducts";
 
 export interface ProductDetailMainProps {
-  content: ProductPageData;
+  content: { product: ProductFull | null };
 }
 
 const productDetailScopedStyles = `
@@ -24,7 +24,8 @@ const productDetailScopedStyles = `
  * Located beside `app/(ecommerce)/product/[slug]/page.tsx`.
  */
 export default function ProductDetailMain({ content }: ProductDetailMainProps) {
-  const { product, currencySymbol = "$" } = content;
+  const { product } = content;
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   if (!product) {
     notFound();
@@ -90,9 +91,7 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
                 </>
               )}
               <li className="text-white/40">/</li>
-              <li className="text-white/80 font-medium line-clamp-1">
-                {name}
-              </li>
+              <li className="text-white/80 font-medium line-clamp-1">{name}</li>
             </ol>
           </nav>
         </div>
@@ -249,7 +248,7 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
 
       {/* ── Featured Products Block ("You Might Also Like") ──────────────── */}
       <div className="border-t border-zinc-100">
-        <FeaturedProducts title="You Might Also Like" limit={4} />
+        <FeaturedProducts />
       </div>
     </div>
   );

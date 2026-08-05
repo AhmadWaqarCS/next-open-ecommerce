@@ -1,8 +1,11 @@
 // lib/storefront.ts
-// All queries use explicit select: {} — no include: {} on hot paths.
-// React cache() deduplicates within a single request.
+// Clean, minimal storefront API layer.
+// Exclusively exports types, getSiteConfig (cached), and 14 page/component data functions.
+
+import { cacheLife, cacheTag } from "next/cache";
 import prisma from "./prisma";
-import { cache } from "react";
+
+const CURRENCY_SYMBOL = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -17,6 +20,10 @@ export interface StorefrontConfig {
   primary_color: string;
   secondary_color: string;
   accent_color: string;
+  font_family: string;
+  custom_css: string | null;
+  header_config: Record<string, unknown>;
+  footer_config: Record<string, unknown>;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -26,75 +33,11 @@ export interface StorefrontConfig {
   meta_info: Record<string, string>;
   topbar_message: string | null;
   home_tagline_label: string | null;
-}
-
-export interface HeaderData {
-  siteName: string;
-  lightLogoUrl: string | null;
-  darkLogoUrl: string | null;
-  topbarMessage: string | null;
-  currencySymbol: string;
-  navCategories: NavCategory[];
-}
-
-export interface FooterData {
-  siteName: string;
-  description: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  socialLinks: Record<string, string | null>;
-  currencySymbol: string;
-  shopCategories: NavCategory[];
-  shippingMethods: StorefrontShippingMethod[];
-  paymentMethods: StorefrontPaymentMethod[];
-  sitePages: { title: string; slug: string }[];
-}
-
-export interface HeroBannerData {
-  homeTaglineLabel: string | null;
-  tagline: string | null;
-  description: string | null;
-  accentColor: string;
-  primaryColor: string;
-  categories: ShopCategory[];
-}
-
-export interface SiteFeaturesData {
-  accentColor: string;
-  features: {
-    icon: string;
-    title: string;
-    desc: string;
-  }[];
-}
-
-export interface CategoryPageData {
-  category: {
-    name: string;
-    description: string | null;
-    image_url: string | null;
-    bg_color: string | null;
-    meta_info: Record<string, string>;
-  } | null;
-  products: ProductCard[];
-  total: number;
-  page: number;
-  pageSize: number;
-  pageCount: number;
-  currencySymbol: string;
-}
-
-export interface ProductPageData {
-  product: ProductFull | null;
-  currencySymbol: string;
-}
-
-export interface SearchPageData {
-  products: ProductCard[];
-  total: number;
-  pageCount: number;
-  currencySymbol: string;
+  require_phone: boolean;
+  allow_order_notes: boolean;
+  tax_rate: number | null;
+  tax_inclusive: boolean;
+  tax_label: string;
 }
 
 export interface NavCategory {
@@ -104,13 +47,19 @@ export interface NavCategory {
   children: { id: number; name: string; slug: string }[];
 }
 
-export interface ShopCategory {
+export interface FooterCategory {
   id: number;
   name: string;
   slug: string;
-  image_url: string | null;
-  bg_color: string | null;
-  product_count: number;
+}
+
+export interface HeaderData {
+  siteName: string;
+  lightLogoUrl: string | null;
+  darkLogoUrl: string | null;
+  topbarMessage: string | null;
+  categories: NavCategory[];
+  sitePages: { title: string; slug: string }[];
 }
 
 export interface StorefrontShippingMethod {
@@ -132,49 +81,37 @@ export interface StorefrontPaymentMethod {
   instructions: string | null;
 }
 
-export interface CheckoutConfig {
-  currency: string;
-  currency_symbol: string;
-  require_phone: boolean;
-  allow_order_notes: boolean;
-  tax_rate: number | null;
-  tax_inclusive: boolean;
-  tax_label: string;
+export interface FooterData {
+  siteConfig: {
+    name: string;
+    description: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+  };
+  categories: FooterCategory[];
+  sitePages: { title: string; slug: string }[];
+  shippingMethods: StorefrontShippingMethod[];
+  paymentMethods: StorefrontPaymentMethod[];
+  socialLinks: Record<string, string | null>;
 }
 
-export interface PublicOrder {
-  order_number: string;
-  customer_first_name: string;
-  customer_last_name: string;
-  customer_email: string;
-  shipping_address_line1: string;
-  shipping_address_line2: string | null;
-  shipping_city: string;
-  shipping_state: string | null;
-  shipping_postal_code: string;
-  shipping_country: string;
-  shipping_method_name: string;
-  shipping_cost: string;
-  subtotal: string;
-  tax_amount: string;
-  discount_amount: string;
-  total: string;
-  currency: string;
-  payment_method: string;
-  payment_method_name: string;
-  payment_status: string;
-  fulfillment_status: string;
-  customer_notes: string | null;
-  placed_at: Date;
-  items: {
-    product_name: string;
-    variant_name: string | null;
-    quantity: number;
-    unit_price: string;
-    line_total: string;
-    image_url: string | null;
-    options: unknown;
-  }[];
+export interface ShopCategory {
+  id: number;
+  name: string;
+  slug: string;
+  image_url: string | null;
+  bg_color: string | null;
+  product_count: number;
+}
+
+export interface HeroBannerData {
+  homeTaglineLabel: string | null;
+  tagline: string | null;
+  description: string | null;
+  accentColor: string;
+  primaryColor: string;
+  categories: ShopCategory[];
 }
 
 export interface ProductCard {
@@ -222,290 +159,7 @@ export interface ProductFull {
   }[];
 }
 
-export interface SitePage {
-  title: string;
-  content: string;
-  meta_info: Record<string, string>;
-}
-
-// ─── Site Config ──────────────────────────────────────────────────────────────
-
-export const getSiteConfig = cache(
-  async (): Promise<StorefrontConfig | null> => {
-    const row = await prisma.site_config.findFirst({
-      where: { deleted_at: null },
-      select: {
-        name: true,
-        tagline: true,
-        description: true,
-        site_url: true,
-        light_logo_url: true,
-        dark_logo_url: true,
-        favicon_url: true,
-        primary_color: true,
-        secondary_color: true,
-        accent_color: true,
-        email: true,
-        phone: true,
-        address: true,
-        social_links: true,
-        currency: true,
-        currency_symbol: true,
-        meta_info: true,
-        topbar_message: true,
-        home_tagline_label: true,
-      },
-    });
-    if (!row) return null;
-    return {
-      ...row,
-      social_links: (row.social_links ?? {}) as Record<string, string | null>,
-      meta_info: (row.meta_info ?? {}) as Record<string, string>,
-    };
-  },
-);
-
-// ─── Navigation Categories (header nav) ───────────────────────────────────────
-// Only top-level + their children — no product count needed.
-
-export const getCategories = cache(async (): Promise<NavCategory[]> => {
-  return prisma.category.findMany({
-    where: { is_active: true, parent_id: null, deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      children: {
-        where: { is_active: true, deleted_at: null },
-        select: { id: true, name: true, slug: true },
-        orderBy: { sort_order: "asc" },
-      },
-    },
-    orderBy: { sort_order: "asc" },
-  });
-});
-
-// ─── Header Micro Data Fetcher ───────────────────────────────────────────────
-
-export const getHeaderData = cache(async (): Promise<HeaderData> => {
-  const [config, navCategories] = await Promise.all([
-    getSiteConfig(),
-    getCategories(),
-  ]);
-
-  return {
-    siteName: config?.name || "Store",
-    lightLogoUrl: config?.light_logo_url || null,
-    darkLogoUrl: config?.dark_logo_url || null,
-    topbarMessage: config?.topbar_message || null,
-    currencySymbol: config?.currency_symbol || "$",
-    navCategories: navCategories || [],
-  };
-});
-
-// ─── Footer Micro Data Fetcher ───────────────────────────────────────────────
-
-export const getFooterData = cache(async (): Promise<FooterData> => {
-  const [config, shopCategories, shippingMethods, paymentMethods, sitePages] =
-    await Promise.all([
-      getSiteConfig(),
-      getCategories(),
-      getShippingMethods(),
-      getPaymentMethods(),
-      prisma.site_page.findMany({
-        where: { is_active: true, deleted_at: null },
-        select: { title: true, slug: true },
-        orderBy: { title: "asc" },
-      }),
-    ]);
-
-  return {
-    siteName: config?.name || "Store",
-    description: config?.description || null,
-    email: config?.email || null,
-    phone: config?.phone || null,
-    address: config?.address || null,
-    socialLinks: config?.social_links || {},
-    currencySymbol: config?.currency_symbol || "$",
-    shopCategories: shopCategories || [],
-    shippingMethods: shippingMethods || [],
-    paymentMethods: paymentMethods || [],
-    sitePages: sitePages || [],
-  };
-});
-
-// ─── Home Page Hero Micro Data Fetcher ───────────────────────────────────────
-
-export const getHeroBannerData = cache(async (): Promise<HeroBannerData> => {
-  const [config, categories] = await Promise.all([
-    getSiteConfig(),
-    getShopCategoriesWithCount(),
-  ]);
-
-  return {
-    homeTaglineLabel: config?.home_tagline_label || null,
-    tagline: config?.tagline || "Wear what you love.",
-    description: config?.description || "Curated fashion for every occasion.",
-    accentColor: config?.accent_color || "#e8c98e",
-    primaryColor: config?.primary_color || "#0f0f0f",
-    categories: categories || [],
-  };
-});
-
-// ─── Site Features Micro Data Fetcher ───────────────────────────────────────
-
-export const getSiteFeaturesData = cache(async (): Promise<SiteFeaturesData> => {
-  const config = await getSiteConfig();
-  return {
-    accentColor: config?.accent_color || "#e8c98e",
-    features: [
-      {
-        icon: "M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4",
-        title: "Free Returns",
-        desc: "Easy 30-day returns. No questions asked.",
-      },
-      {
-        icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-        title: "Secure Checkout",
-        desc: "256-bit SSL encryption on every order.",
-      },
-      {
-        icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z",
-        title: "24/7 Support",
-        desc: "We're here whenever you need us.",
-      },
-    ],
-  };
-});
-
-// ─── Shop Categories (home page grid) ─────────────────────────────────────────
-// Includes product count and bg_color — no include: {} needed.
-
-export const getShopCategoriesWithCount = cache(
-  async (): Promise<ShopCategory[]> => {
-    const rows = await prisma.category.findMany({
-      where: { is_active: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        image_url: true,
-        bg_color: true,
-        _count: {
-          select: {
-            products: {
-              where: { is_active: true, deleted_at: null },
-            },
-          },
-        },
-      },
-      orderBy: { sort_order: "asc" },
-    });
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      image_url: r.image_url,
-      bg_color: r.bg_color,
-      product_count: r._count.products,
-    }));
-  },
-);
-
-// ─── Shipping Methods ─────────────────────────────────────────────────────────
-
-export const getShippingMethods = cache(
-  async (): Promise<StorefrontShippingMethod[]> => {
-    const methods = await prisma.shipping_method.findMany({
-      where: { is_active: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        free_over: true,
-        estimated_days_min: true,
-        estimated_days_max: true,
-      },
-      orderBy: { sort_order: "asc" },
-    });
-    return methods.map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      price: Number(m.price),
-      free_over: m.free_over !== null ? Number(m.free_over) : null,
-      estimated_days_min: m.estimated_days_min,
-      estimated_days_max: m.estimated_days_max,
-    }));
-  },
-);
-
-// ─── Payment Methods ──────────────────────────────────────────────────────────
-
-export const getPaymentMethods = cache(
-  async (): Promise<StorefrontPaymentMethod[]> => {
-    const methods = await prisma.payment_method.findMany({
-      where: { is_active: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        provider: true,
-        extra_charge: true,
-        instructions: true,
-      },
-      orderBy: { sort_order: "asc" },
-    });
-    return methods.map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: m.provider,
-      extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
-      instructions: m.instructions,
-    }));
-  },
-);
-
-// ─── Featured Products ────────────────────────────────────────────────────────
-// Uses feature_image_url directly — no join to product_images.
-
-export const getFeaturedProducts = cache(
-  async (limit = 8): Promise<ProductCard[]> => {
-    const rows = await prisma.product.findMany({
-      where: { is_active: true, is_featured: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        feature_image_url: true,
-        feature_image_alt_text: true,
-        price: true,
-        compare_at_price: true,
-        category_name: true,
-        is_featured: true,
-      },
-      orderBy: { sort_order: "asc" },
-      take: limit,
-    });
-    return rows.map((r) => ({
-      ...r,
-      price: String(r.price),
-      compare_at_price:
-        r.compare_at_price !== null ? String(r.compare_at_price) : null,
-    }));
-  },
-);
-
-// ─── Category Products (paginated) ───────────────────────────────────────────
-
-const CATEGORY_PAGE_SIZE = 24;
-
-export async function getCategoryProducts(
-  slug: string,
-  page = 1,
-): Promise<{
+export interface CategoryPageData {
   category: {
     name: string;
     description: string | null;
@@ -518,9 +172,294 @@ export async function getCategoryProducts(
   page: number;
   pageSize: number;
   pageCount: number;
-}> {
-  const skip = (page - 1) * CATEGORY_PAGE_SIZE;
+}
 
+export interface SitePage {
+  title: string;
+  content: string | null;
+  meta_info: Record<string, string>;
+  theme_config: Record<string, unknown>;
+  components_config: {
+    component_key: string;
+    enabled: boolean;
+    sort_order: number;
+    props?: Record<string, unknown>;
+  }[];
+}
+
+export interface PublicOrder {
+  order_number: string;
+  customer_first_name: string;
+  customer_last_name: string;
+  customer_email: string;
+  shipping_address_line1: string;
+  shipping_address_line2: string | null;
+  shipping_city: string;
+  shipping_state: string | null;
+  shipping_postal_code: string;
+  shipping_country: string;
+  shipping_method_name: string;
+  shipping_cost: string;
+  subtotal: string;
+  tax_amount: string;
+  discount_amount: string;
+  total: string;
+  currency: string;
+  payment_method: string;
+  payment_method_name: string;
+  payment_status: string;
+  fulfillment_status: string;
+  customer_notes: string | null;
+  placed_at: Date;
+  items: {
+    product_name: string;
+    variant_name: string | null;
+    quantity: number;
+    unit_price: string;
+    line_total: string;
+    image_url: string | null;
+    options: unknown;
+  }[];
+}
+
+export interface CheckoutConfig {
+  currency: string;
+  currency_symbol: string;
+  require_phone: boolean;
+  allow_order_notes: boolean;
+  tax_rate: number | null;
+  tax_inclusive: boolean;
+  tax_label: string;
+}
+
+export interface CheckoutPageData {
+  shippingMethods: StorefrontShippingMethod[];
+  paymentMethods: StorefrontPaymentMethod[];
+  checkoutConfig: CheckoutConfig | null;
+}
+
+// ─── Central Site Config Fetcher (Cached) ────────────────────────────────────
+
+export async function getSiteConfig(): Promise<StorefrontConfig | null> {
+  "use cache";
+  cacheTag("site-config");
+  cacheLife("max");
+
+  const row = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: {
+      name: true,
+      tagline: true,
+      description: true,
+      site_url: true,
+      light_logo_url: true,
+      dark_logo_url: true,
+      favicon_url: true,
+      primary_color: true,
+      secondary_color: true,
+      accent_color: true,
+      font_family: true,
+      custom_css: true,
+      header_config: true,
+      footer_config: true,
+      email: true,
+      phone: true,
+      address: true,
+      social_links: true,
+      currency: true,
+      currency_symbol: true,
+      meta_info: true,
+      topbar_message: true,
+      home_tagline_label: true,
+      require_phone: true,
+      allow_order_notes: true,
+      tax_rate: true,
+      tax_inclusive: true,
+      tax_label: true,
+    },
+  });
+
+  if (!row) return null;
+  return {
+    ...row,
+    header_config: (row.header_config ?? {}) as Record<string, unknown>,
+    footer_config: (row.footer_config ?? {}) as Record<string, unknown>,
+    social_links: (row.social_links ?? {}) as Record<string, string | null>,
+    meta_info: (row.meta_info ?? {}) as Record<string, string>,
+    tax_rate: row.tax_rate !== null ? Number(row.tax_rate) : null,
+  };
+}
+
+// ─── 1. Header Data ───────────────────────────────────────────────────────────
+
+export async function getHeaderData(): Promise<HeaderData> {
+  const [config, navCategories, sitePages] = await Promise.all([
+    getSiteConfig(),
+    prisma.category.findMany({
+      where: {
+        is_active: true,
+        show_in_header: true,
+        parent_id: null,
+        deleted_at: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        children: {
+          where: { is_active: true, show_in_header: true, deleted_at: null },
+          select: { id: true, name: true, slug: true },
+          orderBy: { sort_order: "asc" },
+        },
+      },
+      orderBy: { sort_order: "asc" },
+    }),
+    prisma.site_page.findMany({
+      where: { is_active: true, show_in_header: true, deleted_at: null },
+      select: { title: true, slug: true },
+      orderBy: { sort_order: "asc" },
+    }),
+  ]);
+
+  return {
+    siteName: config?.name || "Store",
+    lightLogoUrl: config?.light_logo_url || null,
+    darkLogoUrl: config?.dark_logo_url || null,
+    topbarMessage: config?.topbar_message || null,
+    categories: navCategories || [],
+    sitePages: sitePages || [],
+  };
+}
+
+// ─── 2. Footer Data ───────────────────────────────────────────────────────────
+
+export async function getFooterData(): Promise<FooterData> {
+  const [config, categories, sitePages, shippingMethods, paymentMethods] =
+    await Promise.all([
+      getSiteConfig(),
+      prisma.category.findMany({
+        where: {
+          is_active: true,
+          show_in_footer: true,
+          parent_id: null,
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+        orderBy: { sort_order: "asc" },
+      }),
+      prisma.site_page.findMany({
+        where: { is_active: true, show_in_footer: true, deleted_at: null },
+        select: { title: true, slug: true },
+        orderBy: { sort_order: "asc" },
+      }),
+      prisma.shipping_method.findMany({
+        where: { is_active: true, deleted_at: null },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          price: true,
+          free_over: true,
+          estimated_days_min: true,
+          estimated_days_max: true,
+        },
+        orderBy: { sort_order: "asc" },
+      }),
+      prisma.payment_method.findMany({
+        where: { is_active: true, deleted_at: null },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          provider: true,
+          extra_charge: true,
+          instructions: true,
+        },
+        orderBy: { sort_order: "asc" },
+      }),
+    ]);
+
+  return {
+    siteConfig: {
+      name: config?.name || "Store",
+      description: config?.description || null,
+      email: config?.email || null,
+      phone: config?.phone || null,
+      address: config?.address || null,
+    },
+    categories: categories || [],
+    sitePages: sitePages || [],
+    shippingMethods: (shippingMethods || []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      price: Number(m.price),
+      free_over: m.free_over !== null ? Number(m.free_over) : null,
+      estimated_days_min: m.estimated_days_min,
+      estimated_days_max: m.estimated_days_max,
+    })),
+    paymentMethods: (paymentMethods || []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      provider: m.provider,
+      extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
+      instructions: m.instructions,
+    })),
+    socialLinks: (config?.social_links ?? {}) as Record<string, string | null>,
+  };
+}
+
+// ─── 4. Home Page Data ────────────────────────────────────────────────────────
+
+export async function getHomePageData(): Promise<{}> {
+  return {};
+}
+
+// ─── 5. Featured Products ─────────────────────────────────────────────────────
+
+export async function getFeaturedProducts(
+  limit = 4,
+): Promise<{ products: ProductCard[] }> {
+  const rows = await prisma.product.findMany({
+    where: { is_active: true, is_featured: true, deleted_at: null },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      feature_image_url: true,
+      feature_image_alt_text: true,
+      price: true,
+      compare_at_price: true,
+      category_name: true,
+      is_featured: true,
+    },
+    orderBy: { sort_order: "asc" },
+    take: limit,
+  });
+
+  return {
+    products: rows.map((r) => ({
+      ...r,
+      price: String(r.price),
+      compare_at_price:
+        r.compare_at_price !== null ? String(r.compare_at_price) : null,
+    })),
+  };
+}
+
+// ─── 6. Category Page Data ────────────────────────────────────────────────────
+
+const CATEGORY_PAGE_SIZE = 24;
+
+export async function getCategoryPageData(
+  slug: string,
+  page = 1,
+): Promise<CategoryPageData> {
   const categoryRow = await prisma.category.findUnique({
     where: { slug, is_active: true, deleted_at: null },
     select: {
@@ -553,6 +492,8 @@ export async function getCategoryProducts(
     ...categoryRow.children.map((child) => child.id),
   ];
 
+  const skip = (page - 1) * CATEGORY_PAGE_SIZE;
+
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where: {
@@ -584,15 +525,14 @@ export async function getCategoryProducts(
     }),
   ]);
 
-  const pageCount = Math.ceil(total / CATEGORY_PAGE_SIZE);
-
   return {
-    category: categoryRow
-      ? {
-          ...categoryRow,
-          meta_info: (categoryRow.meta_info ?? {}) as Record<string, string>,
-        }
-      : null,
+    category: {
+      name: categoryRow.name,
+      description: categoryRow.description,
+      image_url: categoryRow.image_url,
+      bg_color: categoryRow.bg_color,
+      meta_info: (categoryRow.meta_info ?? {}) as Record<string, string>,
+    },
     products: products.map((r) => ({
       ...r,
       price: String(r.price),
@@ -602,73 +542,74 @@ export async function getCategoryProducts(
     total,
     page,
     pageSize: CATEGORY_PAGE_SIZE,
-    pageCount,
+    pageCount: Math.ceil(total / CATEGORY_PAGE_SIZE),
   };
 }
 
-export const getCategoryPageData = cache(
-  async (slug: string, page = 1): Promise<CategoryPageData> => {
-    const [result, config] = await Promise.all([
-      getCategoryProducts(slug, page),
-      getSiteConfig(),
-    ]);
+// ─── 7. Category Slugs ────────────────────────────────────────────────────────
 
-    return {
-      ...result,
-      currencySymbol: config?.currency_symbol || "$",
-    };
-  },
-);
+export async function getCategorySlugs(limit = 1): Promise<string[]> {
+  const rows = await prisma.category.findMany({
+    where: { is_active: true, deleted_at: null },
+    select: { slug: true },
+    take: limit,
+  });
+  return rows.map((r) => r.slug);
+}
 
-// ─── Single Product (full detail) ─────────────────────────────────────────────
+// ─── 8. Product Page Data ─────────────────────────────────────────────────────
 
-export const getProductBySlug = cache(
-  async (slug: string): Promise<ProductFull | null> => {
-    const row = await prisma.product.findUnique({
-      where: { slug, is_active: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        short_description: true,
-        category_name: true,
-        category_id: true,
-        feature_image_url: true,
-        feature_image_alt_text: true,
-        price: true,
-        compare_at_price: true,
-        sku: true,
-        stock_quantity: true,
-        track_inventory: true,
-        low_stock_threshold: true,
-        is_featured: true,
-        meta_info: true,
-        images: {
-          where: { deleted_at: null },
-          select: { url: true, alt_text: true, sort_order: true },
-          orderBy: { sort_order: "asc" },
-        },
-        variants: {
-          where: { is_active: true, deleted_at: null },
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            price: true,
-            compare_at_price: true,
-            stock_quantity: true,
-            options: true,
-            image_url: true,
-            is_active: true,
-            sort_order: true,
-          },
-          orderBy: { sort_order: "asc" },
-        },
+export async function getProductPageData(
+  slug: string,
+): Promise<{ product: ProductFull | null }> {
+  const row = await prisma.product.findUnique({
+    where: { slug, is_active: true, deleted_at: null },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      short_description: true,
+      category_name: true,
+      category_id: true,
+      feature_image_url: true,
+      feature_image_alt_text: true,
+      price: true,
+      compare_at_price: true,
+      sku: true,
+      stock_quantity: true,
+      track_inventory: true,
+      low_stock_threshold: true,
+      is_featured: true,
+      meta_info: true,
+      images: {
+        where: { deleted_at: null },
+        select: { url: true, alt_text: true, sort_order: true },
+        orderBy: { sort_order: "asc" },
       },
-    });
-    if (!row) return null;
-    return {
+      variants: {
+        where: { is_active: true, deleted_at: null },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          price: true,
+          compare_at_price: true,
+          stock_quantity: true,
+          options: true,
+          image_url: true,
+          is_active: true,
+          sort_order: true,
+        },
+        orderBy: { sort_order: "asc" },
+      },
+    },
+  });
+
+  if (!row) return { product: null };
+
+  return {
+    product: {
       ...row,
       price: String(row.price),
       compare_at_price:
@@ -680,62 +621,24 @@ export const getProductBySlug = cache(
         compare_at_price:
           v.compare_at_price !== null ? String(v.compare_at_price) : null,
       })),
-    };
-  },
-);
-
-export const getProductPageData = cache(
-  async (slug: string): Promise<ProductPageData> => {
-    const [product, config] = await Promise.all([
-      getProductBySlug(slug),
-      getSiteConfig(),
-    ]);
-
-    return {
-      product,
-      currencySymbol: config?.currency_symbol || "$",
-    };
-  },
-);
-
-// ─── Static Page (about, contact) ─────────────────────────────────────────────
-
-import type { Metadata } from "next";
-
-export const getPageBySlug = cache(
-  async (slug: string): Promise<SitePage | null> => {
-    const row = await prisma.site_page.findUnique({
-      where: { slug, is_active: true, deleted_at: null },
-      select: { title: true, content: true, meta_info: true },
-    });
-    if (!row) return null;
-    return {
-      ...row,
-      meta_info: (row.meta_info ?? {}) as Record<string, string>,
-    };
-  },
-);
-
-export async function getPolicyMetadata(slug: string): Promise<Metadata> {
-  const [config, page] = await Promise.all([
-    getSiteConfig(),
-    getPageBySlug(slug),
-  ]);
-
-  if (!page) {
-    return { title: "Page Not Found" };
-  }
-
-  const meta = page.meta_info ?? {};
-  return {
-    title: meta.title ?? `${page.title} | ${config?.name ?? "Store"}`,
-    description: meta.description ?? undefined,
+    },
   };
 }
 
-// ─── Search (no cache — called dynamically) ───────────────────────────────────
+// ─── 9. Product Page Slugs ────────────────────────────────────────────────────
 
-export async function searchProducts(
+export async function getProductPageSlugs(limit = 1): Promise<string[]> {
+  const rows = await prisma.product.findMany({
+    where: { is_active: true, deleted_at: null },
+    select: { slug: true },
+    take: limit,
+  });
+  return rows.map((r) => r.slug);
+}
+
+// ─── 10. Search Page Products ─────────────────────────────────────────────────
+
+export async function getSearchPageProducts(
   query: string,
   page = 1,
   pageSize = 24,
@@ -793,83 +696,126 @@ export async function searchProducts(
   };
 }
 
-export async function getSearchPageData(
-  query: string,
-  page = 1,
-): Promise<SearchPageData> {
-  const [searchResult, config] = await Promise.all([
-    searchProducts(query, page),
-    getSiteConfig(),
-  ]);
+// ─── 11. Page Data ────────────────────────────────────────────────────────────
+
+export async function getPageData(
+  slug: string,
+): Promise<{ page: SitePage | null }> {
+  const row = await prisma.site_page.findUnique({
+    where: { slug, is_active: true, deleted_at: null },
+    select: {
+      title: true,
+      content: true,
+      meta_info: true,
+      theme_config: true,
+      components_config: true,
+    },
+  });
+
+  if (!row) return { page: null };
 
   return {
-    ...searchResult,
-    currencySymbol: config?.currency_symbol || "$",
+    page: {
+      ...row,
+      meta_info: (row.meta_info ?? {}) as Record<string, string>,
+      theme_config: (row.theme_config ?? {}) as Record<string, unknown>,
+      components_config: (Array.isArray(row.components_config)
+        ? row.components_config
+        : []) as {
+        component_key: string;
+        enabled: boolean;
+        sort_order: number;
+        props?: Record<string, unknown>;
+      }[],
+    },
   };
 }
 
-// ─── All active category slugs (for generateStaticParams) ────────────────────
+// ─── 12. Hero Banner Data ─────────────────────────────────────────────────────
 
-export async function getAllCategorySlugs(limit = 1): Promise<string[]> {
-  const rows = await prisma.category.findMany({
-    where: { is_active: true, deleted_at: null },
-    select: { slug: true },
-    take: limit,
-  });
-  return rows.map((r) => r.slug);
-}
-
-// ─── All active product slugs (for generateStaticParams) ─────────────────────
-
-export async function getAllProductSlugs(): Promise<string[]> {
-  const rows = await prisma.product.findMany({
-    where: { is_active: true, deleted_at: null },
-    select: { slug: true },
-  });
-  return rows.map((r) => r.slug);
-}
-
-export async function getTopProductSlugs(limit = 30): Promise<string[]> {
-  const rows = await prisma.product.findMany({
-    where: { is_active: true, deleted_at: null },
-    select: { slug: true },
-    orderBy: { is_featured: "desc" }, // or popular sales
-    take: limit,
-  });
-  return rows.map((r) => r.slug);
-}
-
-// ─── Checkout Config ──────────────────────────────────────────────────────────
-// Fetches only checkout-relevant fields. Always fresh (called at checkout time).
-
-export const getCheckoutConfig = cache(
-  async (): Promise<CheckoutConfig | null> => {
-    const row = await prisma.site_config.findFirst({
-      where: { deleted_at: null },
+export async function getHeroBannerData(): Promise<HeroBannerData> {
+  const [config, categoryRows] = await Promise.all([
+    getSiteConfig(),
+    prisma.category.findMany({
+      where: { is_active: true, show_in_home: true, deleted_at: null },
       select: {
-        currency: true,
-        currency_symbol: true,
-        require_phone: true,
-        allow_order_notes: true,
-        tax_rate: true,
-        tax_inclusive: true,
-        tax_label: true,
+        id: true,
+        name: true,
+        slug: true,
+        image_url: true,
+        bg_color: true,
+        product_count: true,
+        _count: {
+          select: {
+            products: {
+              where: { is_active: true, deleted_at: null },
+            },
+          },
+        },
       },
-    });
-    if (!row) return null;
-    return {
-      ...row,
-      tax_rate: row.tax_rate !== null ? Number(row.tax_rate) : null,
-    };
-  },
-);
+      orderBy: { sort_order: "asc" },
+    }),
+  ]);
 
-// ─── Public Order (confirmation page) ────────────────────────────────────────
-// Safe subset of order — no admin fields, no internal notes.
+  return {
+    homeTaglineLabel: config?.home_tagline_label || null,
+    tagline: config?.tagline || "Wear what you love.",
+    description: config?.description || "Curated fashion for every occasion.",
+    accentColor: config?.accent_color || "#e8c98e",
+    primaryColor: config?.primary_color || "#0f0f0f",
+    categories: categoryRows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      image_url: r.image_url,
+      bg_color: r.bg_color,
+      product_count: r._count.products,
+    })),
+  };
+}
 
-export async function getOrderByNumberPublic(
+// ─── 12b. All Categories Page Data ───────────────────────────────────────────
+
+export async function getAllCategoriesPageData(): Promise<{
+  categories: ShopCategory[];
+}> {
+  const categoryRows = await prisma.category.findMany({
+    where: { is_active: true, deleted_at: null },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      image_url: true,
+      bg_color: true,
+      product_count: true,
+      _count: {
+        select: {
+          products: {
+            where: { is_active: true, deleted_at: null },
+          },
+        },
+      },
+    },
+    orderBy: { sort_order: "asc" },
+  });
+
+  return {
+    categories: categoryRows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      image_url: r.image_url,
+      bg_color: r.bg_color,
+      product_count: r._count.products,
+    })),
+  };
+}
+
+// ─── 13. Order Confirmation Page Data ────────────────────────────────────────
+
+export async function getOrderConfirmationPageData(
   orderNumber: string,
-): Promise<PublicOrder | null> {
+): Promise<{ order: PublicOrder | null }> {
   const row = await prisma.order.findUnique({
     where: { order_number: orderNumber, deleted_at: null },
     select: {
@@ -909,30 +855,86 @@ export async function getOrderByNumberPublic(
       },
     },
   });
-  if (!row) return null;
+
+  if (!row) return { order: null };
+
   return {
-    ...row,
-    shipping_cost: String(row.shipping_cost),
-    subtotal: String(row.subtotal),
-    tax_amount: String(row.tax_amount),
-    discount_amount: String(row.discount_amount),
-    total: String(row.total),
-    items: row.items.map((i) => ({
-      ...i,
-      unit_price: String(i.unit_price),
-      line_total: String(i.line_total),
-    })),
+    order: {
+      ...row,
+      shipping_cost: String(row.shipping_cost),
+      subtotal: String(row.subtotal),
+      tax_amount: String(row.tax_amount),
+      discount_amount: String(row.discount_amount),
+      total: String(row.total),
+      items: row.items.map((i) => ({
+        ...i,
+        unit_price: String(i.unit_price),
+        line_total: String(i.line_total),
+      })),
+    },
   };
 }
 
-export async function getCouponByCodeFromDB(code: string) {
-  return await prisma.coupon.findFirst({
-    where: {
-      code,
-      is_active: true,
-      deleted_at: null,
-      starts_at: { lte: new Date() },
-      OR: [{ expires_at: null }, { expires_at: { gte: new Date() } }],
-    },
-  });
+// ─── 14. Checkout Page Data ───────────────────────────────────────────────────
+
+export async function getCheckoutPageData(): Promise<CheckoutPageData> {
+  const [shippingMethods, paymentMethods, config] = await Promise.all([
+    prisma.shipping_method.findMany({
+      where: { is_active: true, deleted_at: null },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        price: true,
+        free_over: true,
+        estimated_days_min: true,
+        estimated_days_max: true,
+      },
+      orderBy: { sort_order: "asc" },
+    }),
+    prisma.payment_method.findMany({
+      where: { is_active: true, deleted_at: null },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        provider: true,
+        extra_charge: true,
+        instructions: true,
+      },
+      orderBy: { sort_order: "asc" },
+    }),
+    getSiteConfig(),
+  ]);
+
+  return {
+    shippingMethods: (shippingMethods || []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      price: Number(m.price),
+      free_over: m.free_over !== null ? Number(m.free_over) : null,
+      estimated_days_min: m.estimated_days_min,
+      estimated_days_max: m.estimated_days_max,
+    })),
+    paymentMethods: (paymentMethods || []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      provider: m.provider,
+      extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
+      instructions: m.instructions,
+    })),
+    checkoutConfig: config
+      ? {
+          currency: config.currency,
+          currency_symbol: config.currency_symbol,
+          require_phone: config.require_phone,
+          allow_order_notes: config.allow_order_notes,
+          tax_rate: config.tax_rate,
+          tax_inclusive: config.tax_inclusive,
+          tax_label: config.tax_label,
+        }
+      : null,
+  };
 }

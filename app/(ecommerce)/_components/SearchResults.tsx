@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSearchPageData } from "@/lib/storefront";
+import { getSearchPageProducts } from "@/lib/storefront";
 import ProductCard from "./ProductCard";
 
 interface SearchResultsProps {
@@ -11,8 +11,11 @@ export default async function SearchResults({
   query,
   page,
 }: SearchResultsProps) {
-  const { products, total, pageCount, currencySymbol } =
-    await getSearchPageData(query, page);
+  const { products, total, pageCount } = await getSearchPageProducts(
+    query,
+    page,
+  );
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   if (products.length === 0) {
     return (

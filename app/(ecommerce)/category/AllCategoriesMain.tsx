@@ -5,6 +5,8 @@ import type { ShopCategory } from "@/lib/storefront";
 export interface AllCategoriesMainProps {
   categories: ShopCategory[];
   siteName: string;
+  title?: string;
+  description?: string;
 }
 
 const allCategoriesScopedStyles = `
@@ -20,7 +22,13 @@ const allCategoriesScopedStyles = `
 export default function AllCategoriesMain({
   categories = [],
   siteName = "Store",
+  title,
+  description,
 }: AllCategoriesMainProps) {
+  const displayTitle = title || "All Categories";
+  const displayDescription =
+    description || `Browse everything ${siteName} has to offer.`;
+
   return (
     <div className="page-enter">
       <style dangerouslySetInnerHTML={{ __html: allCategoriesScopedStyles }} />
@@ -37,14 +45,14 @@ export default function AllCategoriesMain({
                 </Link>
               </li>
               <li className="text-white/40">/</li>
-              <li className="text-white/80 font-medium">All Categories</li>
+              <li className="text-white/80 font-medium">{displayTitle}</li>
             </ol>
           </nav>
           <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight mb-3">
-            All Categories
+            {displayTitle}
           </h1>
           <p className="text-white/60 text-lg">
-            Browse everything {siteName} has to offer.
+            {displayDescription}
           </p>
         </div>
       </div>

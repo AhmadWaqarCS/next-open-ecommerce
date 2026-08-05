@@ -88,6 +88,11 @@ model site_config {
   primary_color   String  @default("#18181b")
   secondary_color String  @default("#27272a")
   accent_color    String  @default("#f59e0b")
+  font_family     String  @default("Inter")
+  custom_css      String? @db.Text
+
+  header_config Json @default("{}")
+  footer_config Json @default("{}")
 
   currency        String @default("USD")
   currency_symbol String @default("$")
@@ -124,10 +129,16 @@ model site_page {
   slug  String @unique
   title String
 
-  content   String  @db.Text
+  content   String? @db.Text
   is_active Boolean @default(true)
 
-  meta_info Json @default("{}")
+  show_in_header Boolean @default(false)
+  show_in_footer Boolean @default(true)
+  sort_order     Int     @default(0)
+
+  meta_info         Json @default("{}")
+  theme_config      Json @default("{}")
+  components_config Json @default("[]")
 
   created_at DateTime  @default(now())
   created_by Int
@@ -136,7 +147,30 @@ model site_page {
   deleted_at DateTime?
   deleted_by Int?
 
+  @@index([is_active, show_in_header])
+  @@index([is_active, show_in_footer])
   @@map("site_pages")
+}
+
+model site_component {
+  id            Int     @id @default(autoincrement())
+  name          String
+  component_key String  @unique
+  category      String  @default("section")
+  description   String?
+  default_props Json    @default("{}")
+  thumbnail_url String?
+  is_active     Boolean @default(true)
+
+  created_at DateTime  @default(now())
+  created_by Int       @default(1)
+  updated_at DateTime  @updatedAt
+  updated_by Int       @default(1)
+  deleted_at DateTime?
+  deleted_by Int?
+
+  @@index([is_active])
+  @@map("site_components")
 }
 
 model email_config {
@@ -450,7 +484,12 @@ model category {
 
   bg_color String? @default("from-zinc-800 to-zinc-950")
 
-  meta_info Json @default("{}")
+  show_in_header Boolean @default(true)
+  show_in_footer Boolean @default(true)
+  show_in_home   Boolean @default(true)
+
+  product_count  Int     @default(0)
+  meta_info      Json    @default("{}")
 
   parent_id Int?
   parent    category?  @relation("SubCategories", fields: [parent_id], references: [id])
@@ -468,6 +507,9 @@ model category {
   deleted_by Int?
 
   @@index([parent_id])
+  @@index([is_active, show_in_header])
+  @@index([is_active, show_in_footer])
+  @@index([is_active, show_in_home])
   @@map("categories")
 }
 

@@ -84,7 +84,7 @@ export default function SearchPageMain({ query, page }: SearchPageMainProps) {
 
       {/* ── Featured Products Block ("Popular Products") ──────────────────── */}
       <div className="border-t border-zinc-100">
-        <FeaturedProducts title="Popular Products" limit={4} />
+        <FeaturedProducts />
       </div>
     </div>
   );

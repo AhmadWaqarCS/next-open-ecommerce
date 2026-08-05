@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cacheLife, cacheTag } from "next/cache";
-import { getFeaturedProducts, getSiteConfig } from "@/lib/storefront";
+import { getFeaturedProducts } from "@/lib/storefront";
 import ProductCard from "./ProductCard";
 
 export interface FeaturedProductsProps {
@@ -23,23 +23,22 @@ const featuredProductsScopedStyles = `
 export default async function FeaturedProducts({
   title = "Featured Products",
   viewAllHref,
-  limit = 8,
+  limit = 4,
 }: FeaturedProductsProps) {
   cacheTag("featured-products");
   cacheLife("max");
 
-  const [products, config] = await Promise.all([
-    getFeaturedProducts(limit),
-    getSiteConfig(),
-  ]);
+  const { products } = await getFeaturedProducts(limit);
 
   if (products.length === 0) return null;
 
-  const currencySymbol = config?.currency_symbol ?? "$";
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
-      <style dangerouslySetInnerHTML={{ __html: featuredProductsScopedStyles }} />
+      <style
+        dangerouslySetInnerHTML={{ __html: featuredProductsScopedStyles }}
+      />
 
       <div className="flex items-baseline justify-between mb-8">
         <h2 className="featured-products-title text-2xl font-bold tracking-tight text-zinc-900">

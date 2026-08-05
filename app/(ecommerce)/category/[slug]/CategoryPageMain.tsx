@@ -1,5 +1,3 @@
-"use cache";
-
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCategoryPageData, type CategoryPageData } from "@/lib/storefront";
@@ -29,11 +27,10 @@ export default async function CategoryPageMain({
   slug,
   page,
 }: CategoryPageMainProps) {
-  cacheTag("site-config", "categories", "shop-categories", `category-${slug}`);
-  cacheLife("max");
   const content = await getCategoryPageData(slug, page);
 
-  const { category, products, total, pageCount, currencySymbol } = content;
+  const { category, products, total, pageCount } = content;
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   if (!category) {
     notFound();
@@ -127,7 +124,11 @@ export default async function CategoryPageMain({
               >
                 {page > 1 && (
                   <Link
-                    href={`/category/${slug}?page=${page - 1}`}
+                    href={
+                      page - 1 === 1
+                        ? `/category/${slug}`
+                        : `/category/${slug}/page/${page - 1}`
+                    }
                     className="pagination-link px-4 py-2 text-sm border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50"
                   >
                     ← Previous
@@ -157,7 +158,11 @@ export default async function CategoryPageMain({
                       ) : (
                         <Link
                           key={item}
-                          href={`/category/${slug}?page=${item}`}
+                          href={
+                            item === 1
+                              ? `/category/${slug}`
+                              : `/category/${slug}/page/${item}`
+                          }
                           className={`pagination-link w-9 h-9 flex items-center justify-center text-sm rounded-lg ${
                             item === page
                               ? "bg-zinc-900 text-white font-medium"
@@ -172,7 +177,7 @@ export default async function CategoryPageMain({
 
                 {page < pageCount && (
                   <Link
-                    href={`/category/${slug}?page=${page + 1}`}
+                    href={`/category/${slug}/page/${page + 1}`}
                     className="pagination-link px-4 py-2 text-sm border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50"
                   >
                     Next →
@@ -186,7 +191,7 @@ export default async function CategoryPageMain({
 
       {/* ── Featured Products Block ("You Might Also Like") ──────────────── */}
       <div className="border-t border-zinc-100">
-        <FeaturedProducts title="You Might Also Like" limit={4} />
+        <FeaturedProducts />
       </div>
     </div>
   );

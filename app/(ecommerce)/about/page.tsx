@@ -4,14 +4,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cacheLife, cacheTag } from "next/cache";
-import { getSiteConfig, getPageBySlug } from "@/lib/storefront";
+import { getPageData } from "@/lib/storefront";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [config, page] = await Promise.all([
-    getSiteConfig(),
-    getPageBySlug("about"),
-  ]);
-  const meta = page?.meta_info ?? config?.meta_info ?? {};
+  const pageRes = await getPageData("about");
+  const page = pageRes?.page;
+  const meta = page?.meta_info ?? {};
   return {
     title:
       meta.title && meta.title !== "" ? meta.title : page?.title || "About Us",
@@ -20,13 +18,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  cacheTag("site-config", "site-pages", "page-about");
+  cacheTag("about-page");
   cacheLife("max");
 
-  const [config, page] = await Promise.all([
-    getSiteConfig(),
-    getPageBySlug("about"),
-  ]);
+  const pageRes = await getPageData("about");
+  const page = pageRes?.page;
 
   if (!page) {
     notFound();
@@ -63,60 +59,20 @@ export default async function AboutPage() {
           </div>
         )}
 
-        {/* Contact info */}
-        {config && (config.email || config.phone || config.address) && (
-          <div className="mt-16 pt-10 border-t border-zinc-100">
-            <h2 className="text-xl font-bold text-zinc-900 mb-6">
-              Get in touch
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {config.email && (
-                <div>
-                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">
-                    Email
-                  </p>
-                  <a
-                    href={`mailto:${config.email}`}
-                    className="text-zinc-700 hover:text-zinc-900 text-sm transition-colors"
-                  >
-                    {config.email}
-                  </a>
-                </div>
-              )}
-              {config.phone && (
-                <div>
-                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">
-                    Phone
-                  </p>
-                  <a
-                    href={`tel:${config.phone}`}
-                    className="text-zinc-700 hover:text-zinc-900 text-sm transition-colors"
-                  >
-                    {config.phone}
-                  </a>
-                </div>
-              )}
-              {config.address && (
-                <div>
-                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1">
-                    Address
-                  </p>
-                  <p className="text-zinc-700 text-sm leading-snug">
-                    {config.address}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="mt-8">
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 bg-zinc-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-zinc-700 transition-colors text-sm"
-              >
-                Send a message →
-              </Link>
-            </div>
-          </div>
-        )}
+        <div className="mt-16 pt-10 border-t border-zinc-100 text-center">
+          <h2 className="text-xl font-bold text-zinc-900 mb-4">
+            Have questions?
+          </h2>
+          <p className="text-zinc-500 text-sm mb-6">
+            We&apos;re here to help. Reach out to our customer care team.
+          </p>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-2 bg-zinc-900 text-white font-semibold px-6 py-3 rounded-xl hover:bg-zinc-700 transition-colors text-sm"
+          >
+            Contact Us →
+          </Link>
+        </div>
       </div>
     </div>
   );

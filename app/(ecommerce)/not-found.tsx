@@ -1,13 +1,7 @@
-"use cache";
-
 import { Suspense } from "react";
-import { cacheLife, cacheTag } from "next/cache";
 import NotFoundActions from "./_components/NotFoundActions";
 
 export default async function StorefrontNotFound() {
-  cacheTag("not-found-page");
-  cacheLife("max");
-
   return (
     <div className="min-h-[85vh] flex flex-col justify-between bg-zinc-900 text-white">
       <div className="flex-1 flex flex-col items-center justify-center pt-36 pb-20 px-4 text-center">

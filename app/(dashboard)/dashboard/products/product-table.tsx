@@ -137,7 +137,7 @@ export default function ProductTable({
                   : "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300"
               }`}
             >
-              {prod.stock_quantity} in stock
+              {prod.stock_quantity}
             </span>
           ) : (
             <span className="text-xs text-zinc-400 font-mono">∞ Unlimited</span>

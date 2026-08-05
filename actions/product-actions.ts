@@ -15,8 +15,14 @@ import {
   bulkUpdateProductsInDB,
   bulkDeleteProductsPermanentlyInDB,
 } from "@/services/product-services";
-import { createManyProductImagesInDB, syncProductImagesInDB } from "@/services/product-image-services";
-import { createManyProductVariantsInDB, syncProductVariantsInDB } from "@/services/product-variant-services";
+import {
+  createManyProductImagesInDB,
+  syncProductImagesInDB,
+} from "@/services/product-image-services";
+import {
+  createManyProductVariantsInDB,
+  syncProductVariantsInDB,
+} from "@/services/product-variant-services";
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -181,7 +187,7 @@ export async function createProduct(
           sort_order: img.sort_order ?? idx,
           created_by: Number(user.id),
           updated_by: Number(user.id),
-        }))
+        })),
       );
     }
 
@@ -205,7 +211,7 @@ export async function createProduct(
           sort_order: v.sort_order ?? idx,
           created_by: Number(user.id),
           updated_by: Number(user.id),
-        }))
+        })),
       );
     }
 
@@ -312,11 +318,8 @@ export async function updateProduct(
       await syncProductVariantsInDB(id, data.variants, Number(user.id));
     }
 
-    revalidateTag("products", "max");
+    revalidateTag(`product-${slug}`, "max");
     revalidateTag("featured-products", "max");
-    if (slug) revalidateTag(`product-${slug}`, "max");
-    if (updatedProduct.category_id)
-      revalidateTag(`category-products-${updatedProduct.category_id}`, "max");
     revalidatePath("/dashboard/products");
 
     return { success: true, message: "Product updated successfully." };

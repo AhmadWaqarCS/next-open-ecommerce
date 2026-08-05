@@ -1,16 +1,17 @@
+"use cache";
+
 import type { Metadata } from "next";
-import { cacheLife, cacheTag } from "next/cache";
-import { getAllCategorySlugs, getCategoryPageData } from "@/lib/storefront";
+import { getCategorySlugs, getCategoryPageData } from "@/lib/storefront";
 import CategoryPageMain from "./CategoryPageMain";
+import { cacheLife, cacheTag } from "next/cache";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ page?: string }>;
 }
 
 export async function generateStaticParams() {
-  const slugs = await getAllCategorySlugs(1);
-  return slugs.map((slug) => ({ slug }));
+  const slugs = await getCategorySlugs(1);
+  return slugs.map((slug: string) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -26,13 +27,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function CategoryPage({
-  params,
-  searchParams,
-}: CategoryPageProps) {
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
-  const { page: pageParam } = await searchParams;
-  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
-
-  return <CategoryPageMain slug={slug} page={page} />;
+  cacheTag(`category-${slug}`);
+  cacheLife("max");
+  return <CategoryPageMain slug={slug} page={1} />;
 }
+

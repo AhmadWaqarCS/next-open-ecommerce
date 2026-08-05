@@ -2,10 +2,7 @@
 
 import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
-import {
-  getProductPageData,
-  getTopProductSlugs,
-} from "@/lib/storefront";
+import { getProductPageData, getProductPageSlugs } from "@/lib/storefront";
 import ProductDetailMain from "./ProductDetailMain";
 
 interface ProductPageProps {
@@ -13,8 +10,8 @@ interface ProductPageProps {
 }
 
 export async function generateStaticParams() {
-  const slugs = await getTopProductSlugs(1);
-  return slugs.map((slug) => ({ slug }));
+  const slugs = await getProductPageSlugs(1);
+  return slugs.map((slug: string) => ({ slug }));
 }
 
 export async function generateMetadata({
@@ -40,7 +37,7 @@ export async function generateMetadata({
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
 
-  cacheTag(`product-${slug}`, "products");
+  cacheTag(`product-${slug}`);
   cacheLife("max");
 
   const productPageData = await getProductPageData(slug);

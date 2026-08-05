@@ -1,11 +1,7 @@
 "use cache";
 
 import type { Metadata } from "next";
-import {
-  getCheckoutConfig,
-  getShippingMethods,
-  getPaymentMethods,
-} from "@/lib/storefront";
+import { getCheckoutPageData } from "@/lib/storefront";
 import CheckoutForm from "./CheckoutForm";
 import { Suspense } from "react";
 import CartProvider from "../_components/CartProvider";
@@ -20,13 +16,10 @@ export default async function CheckoutPage() {
   cacheTag("checkout");
   cacheLife("max");
 
-  const [config, shippingMethods, paymentMethods] = await Promise.all([
-    getCheckoutConfig(),
-    getShippingMethods(),
-    getPaymentMethods(),
-  ]);
+  const { shippingMethods, paymentMethods, checkoutConfig } =
+    await getCheckoutPageData();
 
-  if (!config) {
+  if (!checkoutConfig) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-zinc-500">Store configuration not found.</p>
@@ -51,7 +44,7 @@ export default async function CheckoutPage() {
       <Suspense>
         <CartProvider>
           <CheckoutForm
-            config={config}
+            config={checkoutConfig}
             shippingMethods={shippingMethods}
             paymentMethods={paymentMethods}
           />

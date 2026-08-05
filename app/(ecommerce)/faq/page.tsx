@@ -3,25 +3,23 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cacheLife, cacheTag } from "next/cache";
-import { getSiteConfig, getPageBySlug } from "@/lib/storefront";
+import { getPageData } from "@/lib/storefront";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [config, page] = await Promise.all([
-    getSiteConfig(),
-    getPageBySlug("faq"),
-  ]);
+  const pageRes = await getPageData("faq");
+  const page = pageRes?.page;
   const meta = page?.meta_info ?? {};
   return {
-    title: meta.title ?? `${page?.title ?? "Frequently Asked Questions"} | ${config?.name ?? "Store"}`,
+    title: meta.title ?? page?.title ?? "FAQ",
     description: meta.description ?? undefined,
   };
 }
 
 export default async function FaqPage() {
-  cacheTag("site-config", "site-pages", "page-faq");
+  cacheTag("page-faq");
   cacheLife("max");
 
-  const page = await getPageBySlug("faq");
+  const { page } = await getPageData("faq");
 
   if (!page) {
     notFound();
@@ -48,7 +46,7 @@ export default async function FaqPage() {
           <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-3xl p-6 sm:p-12 shadow-2xl backdrop-blur-xs">
             <article
               className="prose prose-invert max-w-none text-zinc-300 leading-relaxed text-sm sm:text-base space-y-6 [&_h2]:text-xl [&_h2]:sm:text-2xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:border-b [&_h2]:border-zinc-800 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-zinc-100 [&_p]:text-zinc-400 [&_p]:leading-relaxed [&_strong]:text-white [&_a]:text-indigo-400 [&_a]:underline hover:[&_a]:text-indigo-300"
-              dangerouslySetInnerHTML={{ __html: page.content }}
+              dangerouslySetInnerHTML={{ __html: page.content || "" }}
             />
           </div>
         </div>

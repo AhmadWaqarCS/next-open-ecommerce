@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
 import { checkoutFormSchema, CheckoutFormInput } from "@/lib/validations";
-import { getCouponByCodeFromDB, getCheckoutConfig } from "@/lib/storefront";
+import prisma from "@/lib/prisma";
 import { sendInvoiceAndOrderEmailsForOrder } from "@/services/email-services";
 import { getCouponUsageCountInDB, createCheckoutOrderTransactionInDB } from "@/services/order-services";
 
@@ -99,7 +99,15 @@ export async function placeOrder(
   let discountAmount = 0;
 
   if (coupon_code && coupon_code.trim()) {
-    const coupon = await getCouponByCodeFromDB(coupon_code.trim().toUpperCase());
+    const coupon = await prisma.coupon.findFirst({
+      where: {
+        code: coupon_code.trim().toUpperCase(),
+        is_active: true,
+        deleted_at: null,
+        starts_at: { lte: new Date() },
+        OR: [{ expires_at: null }, { expires_at: { gte: new Date() } }],
+      },
+    });
     if (!coupon) {
       return {
         success: false,
@@ -162,7 +170,27 @@ export async function placeOrder(
   } catch {
   }
 
-  const checkoutConfig = await getCheckoutConfig();
+  const checkoutConfigRow = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: {
+      currency: true,
+      currency_symbol: true,
+      require_phone: true,
+      allow_order_notes: true,
+      tax_rate: true,
+      tax_inclusive: true,
+      tax_label: true,
+    },
+  });
+  const checkoutConfig = checkoutConfigRow
+    ? {
+        ...checkoutConfigRow,
+        tax_rate:
+          checkoutConfigRow.tax_rate !== null
+            ? Number(checkoutConfigRow.tax_rate)
+            : null,
+      }
+    : null;
   const currency = checkoutConfig?.currency || "USD";
 
   const subtotal = items.reduce(

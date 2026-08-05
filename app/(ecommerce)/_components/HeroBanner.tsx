@@ -1,9 +1,8 @@
-import Link from "next/link";
-import type { HeroBannerData } from "@/lib/storefront";
+"use cache";
 
-export interface HeroBannerProps {
-  content: HeroBannerData;
-}
+import Link from "next/link";
+import { getHeroBannerData } from "@/lib/storefront";
+import { cacheLife, cacheTag } from "next/cache";
 
 const heroScopedStyles = `
   @keyframes orb-float {
@@ -19,10 +18,15 @@ const heroScopedStyles = `
  * HeroBanner — Home Page First Impression Component.
  * Placed beside `app/(ecommerce)/page.tsx`.
  */
-export default function HeroBanner({ content }: HeroBannerProps) {
+export default async function HeroBanner() {
+  cacheTag("hero-banner");
+  cacheLife("max");
+  const content = await getHeroBannerData();
+
   const label = content?.homeTaglineLabel || null;
   const tagline = content?.tagline || "Wear what you love.";
-  const description = content?.description || "Curated fashion for every occasion.";
+  const description =
+    content?.description || "Curated fashion for every occasion.";
   const accentColor = content?.accentColor || "#e8c98e";
   const primaryColor = content?.primaryColor || "#0f0f0f";
   const categories = content?.categories || [];

@@ -1,28 +1,38 @@
 "use cache";
 
 import type { Metadata } from "next";
-import { cacheLife, cacheTag } from "next/cache";
-import { getShopCategoriesWithCount, getSiteConfig } from "@/lib/storefront";
+import { getAllCategoriesPageData, getPageData } from "@/lib/storefront";
 import AllCategoriesMain from "./AllCategoriesMain";
+import { cacheLife, cacheTag } from "next/cache";
 
-export const metadata: Metadata = {
-  title: "All Categories",
-  description: "Browse all product categories in our store.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { page } = await getPageData("category");
+  const meta = page?.meta_info;
+  return {
+    title: meta?.title ?? page?.title ?? "All Categories",
+    description:
+      meta?.description ?? "Browse all product categories in our store.",
+  };
+}
 
 export default async function CategoriesPage() {
-  cacheTag("site-config", "categories", "shop-categories");
+  cacheTag("page-categories");
   cacheLife("max");
 
-  const [categories, config] = await Promise.all([
-    getShopCategoriesWithCount(),
-    getSiteConfig(),
+  const [data, { page }] = await Promise.all([
+    getAllCategoriesPageData(),
+    getPageData("category"),
   ]);
+
+  const title = page?.title ?? "All Categories";
+  const description = page?.meta_info?.description;
 
   return (
     <AllCategoriesMain
-      categories={categories}
-      siteName={config?.name || "Store"}
+      categories={data.categories}
+      siteName="Store"
+      title={title}
+      description={description}
     />
   );
 }

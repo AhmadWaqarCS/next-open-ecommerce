@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
-import { getOrderByNumberPublic, getSiteConfig } from "@/lib/storefront";
+import { getOrderConfirmationPageData } from "@/lib/storefront";
 
 interface OrderConfirmationPageProps {
   params: Promise<{ orderNumber: string }>;
@@ -67,14 +67,11 @@ async function OrderConfirmationDetails({
 }: OrderConfirmationPageProps) {
   const { orderNumber } = await params;
 
-  const [order, config] = await Promise.all([
-    getOrderByNumberPublic(orderNumber),
-    getSiteConfig(),
-  ]);
+  const { order } = await getOrderConfirmationPageData(orderNumber);
 
   if (!order) notFound();
 
-  const currencySymbol = config?.currency_symbol ?? "$";
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
   const paymentStatus = formatPaymentStatus(order.payment_status);
 
   return (

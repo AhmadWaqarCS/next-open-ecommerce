@@ -2,25 +2,32 @@
 
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getFeaturedProducts, getSiteConfig } from "@/lib/storefront";
+import { getFeaturedProducts, getPageData } from "@/lib/storefront";
 import { cacheLife, cacheTag } from "next/cache";
 import ProductCard from "../_components/ProductCard";
 
-export const metadata: Metadata = {
-  title: "All Products",
-  description: "Browse all products in our store.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { page } = await getPageData("product");
+  const meta = page?.meta_info;
+  return {
+    title: meta?.title ?? page?.title ?? "All Products",
+    description: meta?.description ?? "Browse all products in our store.",
+  };
+}
 
 export default async function ProductsPage() {
-  cacheTag("featured-products", "site-config");
+  cacheTag("page-products");
   cacheLife("max");
 
-  const [products, config] = await Promise.all([
+  const [{ products }, { page }] = await Promise.all([
     getFeaturedProducts(24),
-    getSiteConfig(),
+    getPageData("product"),
   ]);
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
-  const currencySymbol = config?.currency_symbol ?? "$";
+  const title = page?.title ?? "All Products";
+  const description =
+    page?.meta_info?.description ?? "Browse our full collection.";
 
   return (
     <div className="page-enter">
@@ -37,13 +44,13 @@ export default async function ProductsPage() {
                 </Link>
               </li>
               <li className="text-white/40">/</li>
-              <li className="text-white/80 font-medium">All Products</li>
+              <li className="text-white/80 font-medium">{title}</li>
             </ol>
           </nav>
           <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight mb-3">
-            All Products
+            {title}
           </h1>
-          <p className="text-white/60 text-lg">Browse our full collection.</p>
+          <p className="text-white/60 text-lg">{description}</p>
         </div>
       </div>
 

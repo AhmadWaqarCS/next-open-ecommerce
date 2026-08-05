@@ -5,11 +5,7 @@ import { Inter } from "next/font/google";
 import "./ecommerce-style.css";
 import SiteHeader from "./_components/SiteHeader";
 import SiteFooter from "./_components/SiteFooter";
-import {
-  getSiteConfig,
-  getHeaderData,
-  getFooterData,
-} from "@/lib/storefront";
+import { getSiteConfig } from "@/lib/storefront";
 import { cacheLife, cacheTag } from "next/cache";
 
 const inter = Inter({
@@ -55,31 +51,20 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function EcommerceRootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  cacheTag(
-    "site-config",
-    "categories",
-    "shop-categories",
-    "shipping-methods",
-    "payment-methods",
-    "site-pages"
-  );
+  cacheTag("layout");
   cacheLife("max");
 
-  const [headerData, footerData, config] = await Promise.all([
-    getHeaderData(),
-    getFooterData(),
-    getSiteConfig(),
-  ]);
+  const config = await getSiteConfig();
 
   if (!config) throw new Error("Site config not found.");
 
-  // Inject DB colors as CSS custom properties — server-rendered, no client JS needed.
   const colorStyle = `
     :root {
       --color-primary: ${config.primary_color};
       --color-secondary: ${config.secondary_color};
       --color-accent: ${config.accent_color};
     }
+    ${config.custom_css ? config.custom_css : ""}
   `;
 
   return (
@@ -88,9 +73,9 @@ export default async function EcommerceRootLayout({
         <style dangerouslySetInnerHTML={{ __html: colorStyle }} />
       </head>
       <body className="min-h-full flex flex-col bg-white text-zinc-900 antialiased">
-        <SiteHeader content={headerData} />
+        <SiteHeader />
         <main className="flex-1">{children}</main>
-        <SiteFooter content={footerData} />
+        <SiteFooter />
       </body>
     </html>
   );

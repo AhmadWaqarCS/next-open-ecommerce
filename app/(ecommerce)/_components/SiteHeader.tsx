@@ -1,11 +1,14 @@
+"use cache";
+
 import Link from "next/link";
 import Image from "next/image";
-import type { HeaderData } from "@/lib/storefront";
+import { getHeaderData, type HeaderData } from "@/lib/storefront";
 import SearchButton from "./SearchButton";
 import MobileMenuToggle from "./MobileMenuToggle";
 import CartButton from "./CartButton";
 import CartDrawer from "./CartDrawer";
 import CartProvider from "./CartProvider";
+import { cacheLife, cacheTag } from "next/cache";
 
 export interface SiteHeaderProps {
   content: HeaderData;
@@ -145,18 +148,18 @@ const headerScopedStyles = `
   }
 `;
 
-/**
- * SiteHeader — Consolidated Semantic Header Component.
- *
- * Micro data fetched via `getHeaderData()` and passed through `content`.
- * Features glassmorphism nav bar, topbar, flyout menus, and mobile drawer.
- */
-export default function SiteHeader({ content }: SiteHeaderProps) {
+export default async function SiteHeader() {
+  cacheTag("site-header");
+  cacheLife("max");
+
+  const content = await getHeaderData();
   const siteName = content?.siteName || "Store";
-  const logoUrl = content?.lightLogoUrl || null;
-  const topbarMessage = content?.topbarMessage || null;
-  const currencySymbol = content?.currencySymbol || "$";
-  const navCategories = content?.navCategories || [];
+  const logoUrl = content?.lightLogoUrl;
+  const topbarMessage = content?.topbarMessage;
+  const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
+  const navCategories = content?.categories || [];
+
+  const sitePages = content?.sitePages || [];
 
   return (
     <header className="header-root fixed top-0 inset-x-0 z-50 pointer-events-none">
@@ -249,6 +252,15 @@ export default function SiteHeader({ content }: SiteHeaderProps) {
                   </Link>
                 );
               })}
+              {sitePages.map((p) => (
+                <Link
+                  key={p.slug}
+                  href={`/${p.slug}`}
+                  className="header-nav-link text-sm font-medium tracking-wide transition-colors duration-300 py-5"
+                >
+                  {p.title}
+                </Link>
+              ))}
             </nav>
 
             {/* Right Action Icons */}
@@ -256,7 +268,7 @@ export default function SiteHeader({ content }: SiteHeaderProps) {
               <SearchButton />
               <CartProvider>
                 <CartButton />
-                <CartDrawer currencySymbol={currencySymbol} />
+                <CartDrawer />
               </CartProvider>
               <MobileMenuToggle />
             </div>
@@ -265,7 +277,10 @@ export default function SiteHeader({ content }: SiteHeaderProps) {
       </div>
 
       {/* ── Mobile Navigation Drawer ─────────────────────────────────────── */}
-      <div id="mobile-drawer" className="mobile-drawer md:hidden pointer-events-auto">
+      <div
+        id="mobile-drawer"
+        className="mobile-drawer md:hidden pointer-events-auto"
+      >
         <nav
           className="flex flex-col px-6 py-4 gap-1 divide-y divide-zinc-100/80"
           aria-label="Mobile navigation"
