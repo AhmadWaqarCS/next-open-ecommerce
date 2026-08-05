@@ -225,8 +225,7 @@ export default function PaymentMethodForm({ initialData }: PaymentMethodFormProp
             <div>
               <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Integration keys required</p>
               <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                API keys and webhook secrets for <strong>{PROVIDERS.find(p => p.value === selectedProvider)?.label}</strong> must be stored in the{" "}
-                <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">Secret Vault</span>. This method can be saved as inactive until fully configured.
+                API keys and webhook secrets for <strong>{PROVIDERS.find(p => p.value === selectedProvider)?.label}</strong> must be configured in environment variables (<code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">.env</code>). This method can be saved as inactive until fully configured.
               </p>
             </div>
           </div>

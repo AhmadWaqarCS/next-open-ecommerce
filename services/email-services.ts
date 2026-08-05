@@ -1,6 +1,5 @@
 import nodemailer from "nodemailer";
 import prisma from "@/lib/prisma";
-import { decryptSecret } from "@/lib/crypto";
 import { generateInvoiceForOrderInDB } from "./invoice-services";
 
 // ─── DB MUTATIONS FOR SENT EMAILS ──────────────────────────────────────────────
@@ -108,57 +107,44 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
     order_id: orderId || null,
   });
 
-  if (!emailConfig || !emailConfig.smtp_host) {
+  const host = process.env.SMTP_HOST;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+  const secure = process.env.SMTP_SECURE === "true";
+  const user = process.env.SMTP_USER || fromEmail;
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+
+  if (!host) {
     console.warn(
-      "[sendEmailWithNodemailer] SMTP settings not configured in email_config. Marking email log as unconfigured/failed.",
+      "[sendEmailWithNodemailer] SMTP_HOST environment variable not configured. Marking email log as unconfigured/failed.",
     );
     await updateSentEmailInDB(sentEmailRecord.id, {
       status: "failed",
       error_message:
-        "SMTP settings not configured in dashboard settings. Please configure SMTP host, port, and credentials under Email Config.",
+        "SMTP settings not configured in server environment variables (SMTP_HOST missing).",
     });
     return {
       success: false,
       sentEmailId: sentEmailRecord.id,
-      error: "SMTP not configured.",
+      error: "SMTP_HOST env variable not configured.",
     };
-  }
-
-  let smtpPassword = "";
-  try {
-    const smtpSecret = await prisma.secret_vault.findUnique({
-      where: { key_name: "smtp_password", deleted_at: null },
-    });
-    if (smtpSecret) {
-      smtpPassword = decryptSecret(
-        smtpSecret.encrypted_value,
-        smtpSecret.iv,
-        smtpSecret.auth_tag,
-      );
-    }
-  } catch (err) {
-    console.error(
-      "[sendEmailWithNodemailer] Failed to decrypt SMTP password secret:",
-      err,
-    );
   }
 
   try {
     const transporter = nodemailer.createTransport({
-      host: emailConfig.smtp_host,
-      port: emailConfig.smtp_port || 587,
-      secure: emailConfig.smtp_secure ?? false,
-      auth: smtpPassword
+      host,
+      port,
+      secure,
+      auth: pass
         ? {
-            user: emailConfig.from_email,
-            pass: smtpPassword,
+            user: user || "",
+            pass,
           }
         : undefined,
     });
 
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
-      replyTo: emailConfig.reply_to_email || fromEmail,
+      replyTo: emailConfig?.reply_to_email || fromEmail,
       to: toName ? `"${toName}" <${toEmail}>` : toEmail,
       subject,
       html: bodyHtml,
@@ -191,52 +177,32 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
   }
 }
 
-export async function verifySmtpConnectionService(options?: {
-  host?: string | null;
-  port?: number | null;
-  secure?: boolean;
-  fromEmail?: string | null;
-  smtpPassword?: string | null;
-}): Promise<{ success: boolean; message: string }> {
+export async function verifySmtpConnectionService(): Promise<{
+  success: boolean;
+  message: string;
+}> {
   try {
-    const emailConfig = await prisma.email_config.findFirst({
-      where: { deleted_at: null, is_active: true },
-    });
-
-    const host = options?.host || emailConfig?.smtp_host;
-    const port = options?.port || emailConfig?.smtp_port || 587;
-    const secure =
-      options?.secure !== undefined
-        ? options.secure
-        : (emailConfig?.smtp_secure ?? false);
-    const userEmail = options?.fromEmail || emailConfig?.from_email;
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
+    const secure = process.env.SMTP_SECURE === "true";
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
 
     if (!host) {
-      return { success: false, message: "SMTP host is missing." };
-    }
-
-    let password = options?.smtpPassword;
-    if (!password) {
-      const secret = await prisma.secret_vault.findUnique({
-        where: { key_name: "smtp_password" },
-      });
-      if (secret) {
-        password = decryptSecret(
-          secret.encrypted_value,
-          secret.iv,
-          secret.auth_tag,
-        );
-      }
+      return {
+        success: false,
+        message: "SMTP_HOST is not defined in server environment variables.",
+      };
     }
 
     const transporter = nodemailer.createTransport({
       host,
-      port: Number(port),
+      port,
       secure,
-      auth: password
+      auth: pass
         ? {
-            user: userEmail || "",
-            pass: password,
+            user: user || "",
+            pass,
           }
         : undefined,
     });
@@ -244,7 +210,7 @@ export async function verifySmtpConnectionService(options?: {
     await transporter.verify();
     return {
       success: true,
-      message: "SMTP server connection verified successfully!",
+      message: "SMTP server connection verified successfully via environment variables!",
     };
   } catch (error: any) {
     console.error("[verifySmtpConnectionService] Verification error:", error);

@@ -18,9 +18,16 @@ interface EmailConfigFormProps {
 
 const TABS = [
   { id: "general", label: "General & Sender", icon: "✉️" },
-  { id: "smtp", label: "SMTP Server", icon: "⚙️" },
+  { id: "env_config", label: "SMTP & Environment", icon: "⚙️" },
   { id: "notifications", label: "Notifications & Rules", icon: "🔔" },
 ];
+
+const ENV_SNIPPET = `# Email Server Configuration (SMTP)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=true
+SMTP_USER=user@example.com
+SMTP_PASS=your_smtp_password`;
 
 export default function EmailConfigForm({
   initialData,
@@ -30,6 +37,7 @@ export default function EmailConfigForm({
   const [isPending, startTransition] = useTransition();
   const [isVerifying, startVerifyTransition] = useTransition();
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -38,17 +46,13 @@ export default function EmailConfigForm({
     watch,
     formState: { errors, isDirty },
     reset,
-  } = useForm({
+  } = useForm<EmailConfigUpdateInput>({
     resolver: zodResolver(emailConfigUpdateSchema),
     defaultValues: {
       provider: initialData.provider || "smtp",
       from_name: initialData.from_name || "",
       from_email: initialData.from_email || "",
       reply_to_email: initialData.reply_to_email || "",
-      smtp_host: initialData.smtp_host || "",
-      smtp_port: initialData.smtp_port !== null && initialData.smtp_port !== undefined ? String(initialData.smtp_port) : "",
-      smtp_secure: initialData.smtp_secure ?? true,
-      smtp_password: "",
       send_order_confirmation: initialData.send_order_confirmation ?? true,
       send_shipping_update: initialData.send_shipping_update ?? true,
       send_admin_new_order: initialData.send_admin_new_order ?? true,
@@ -58,25 +62,24 @@ export default function EmailConfigForm({
     },
   });
 
-  const selectedProvider = watch("provider");
   const sendAdminNewOrder = watch("send_admin_new_order");
 
   const handleVerifySmtp = () => {
-    const currentValues = watch();
     startVerifyTransition(async () => {
-      const res = await verifyEmailConfigAction({
-        host: currentValues.smtp_host || undefined,
-        port: currentValues.smtp_port ? Number(currentValues.smtp_port) : undefined,
-        secure: currentValues.smtp_secure,
-        fromEmail: currentValues.from_email || undefined,
-        smtpPassword: currentValues.smtp_password || undefined,
-      });
+      const res = await verifyEmailConfigAction();
       if (res.success) {
         toast(res.message || "SMTP server connection verified successfully!", "success");
       } else {
         toast(res.message || "Failed to connect to SMTP server.", "error");
       }
     });
+  };
+
+  const handleCopyEnv = () => {
+    navigator.clipboard.writeText(ENV_SNIPPET);
+    setCopied(true);
+    toast("Environment variables snippet copied to clipboard!", "success");
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const onSubmit = (data: EmailConfigUpdateInput) => {
@@ -94,7 +97,7 @@ export default function EmailConfigForm({
         return;
       }
 
-      reset({ ...data, smtp_password: "" });
+      reset(data);
       toast("Email configuration updated successfully.", "success");
     });
   };
@@ -107,7 +110,7 @@ export default function EmailConfigForm({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl gap-4">
         <div className="flex items-center gap-2">
           <div className={`h-2.5 w-2.5 rounded-full ${isDirty ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}></div>
-          <span className="text-xs font-semibold text-zinc-550 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
             {isDirty ? "Unsaved changes detected" : "Configuration is up to date"}
           </span>
         </div>
@@ -185,8 +188,6 @@ export default function EmailConfigForm({
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
-          if (tab.id === "smtp" && selectedProvider !== "smtp") return null;
-
           return (
             <button
               key={tab.id}
@@ -214,7 +215,7 @@ export default function EmailConfigForm({
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Sender Identity
               </h3>
-              <p className="text-xs text-zinc-550 dark:text-zinc-400">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Configure default sender info and active email client provider.
               </p>
             </div>
@@ -228,7 +229,7 @@ export default function EmailConfigForm({
                   type="text"
                   disabled={!permissions.update}
                   {...register("from_name")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
                   placeholder="Luma Store"
                 />
                 {errors.from_name && (
@@ -246,7 +247,7 @@ export default function EmailConfigForm({
                   type="email"
                   disabled={!permissions.update}
                   {...register("from_email")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
                   placeholder="orders@luma.store"
                 />
                 {errors.from_email && (
@@ -264,7 +265,7 @@ export default function EmailConfigForm({
                   type="email"
                   disabled={!permissions.update}
                   {...register("reply_to_email")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
                   placeholder="support@luma.store"
                 />
                 {errors.reply_to_email && (
@@ -281,7 +282,7 @@ export default function EmailConfigForm({
                 <select
                   disabled={!permissions.update}
                   {...register("provider")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
                 >
                   <option value="smtp">Standard SMTP Server</option>
                   <option value="resend">Resend (API)</option>
@@ -298,16 +299,16 @@ export default function EmailConfigForm({
           </div>
         )}
 
-        {/* TAB 2: SMTP SETTINGS */}
-        {activeTab === "smtp" && selectedProvider === "smtp" && (
+        {/* TAB 2: SMTP & ENVIRONMENT */}
+        {activeTab === "env_config" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800/80 pb-4">
               <div>
                 <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  SMTP Integration Settings
+                  SMTP & Environment Configuration
                 </h3>
-                <p className="text-xs text-zinc-550 dark:text-zinc-400">
-                  Enter host parameters for SMTP mail delivery and test server connection.
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  All SMTP connection parameters, passwords, and API credentials are read securely from server environment variables (<code className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded text-indigo-600 dark:text-indigo-400">.env</code>).
                 </p>
               </div>
 
@@ -315,12 +316,12 @@ export default function EmailConfigForm({
                 type="button"
                 onClick={handleVerifySmtp}
                 disabled={isVerifying || !permissions.update}
-                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-900/40 rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-900/40 rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
               >
                 {isVerifying ? (
                   <>
                     <svg
-                      className="animate-spin h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+                      className="animate-spin h-4 w-4 text-emerald-600 dark:text-emerald-400"
                       fill="none"
                       viewBox="0 0 24 24"
                     >
@@ -338,12 +339,12 @@ export default function EmailConfigForm({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Verifying Connection...
+                    Testing Connection...
                   </>
                 ) : (
                   <>
                     <svg
-                      className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+                      className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -355,84 +356,57 @@ export default function EmailConfigForm({
                         d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
-                    Verify Email Config
+                    Verify Email Connection
                   </>
                 )}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                  SMTP Host
-                </label>
-                <input
-                  type="text"
-                  disabled={!permissions.update}
-                  {...register("smtp_host")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                  placeholder="smtp.example.com"
-                />
-                {errors.smtp_host && (
-                  <p className="mt-1 text-xs text-red-500 font-medium">
-                    {errors.smtp_host.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                  SMTP Port
-                </label>
-                <input
-                  type="number"
-                  disabled={!permissions.update}
-                  {...register("smtp_port")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-550 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                  placeholder="587"
-                />
-                {errors.smtp_port && (
-                  <p className="mt-1 text-xs text-red-500 font-medium">
-                    {errors.smtp_port.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                  SMTP Password
-                </label>
-                <input
-                  type="password"
-                  disabled={!permissions.update}
-                  {...register("smtp_password")}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                  placeholder="••••••••••••"
-                />
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Leave empty to keep existing password in Secret Vault.
+            {/* Information Card */}
+            <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 flex items-start gap-3">
+              <svg className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+                <p className="font-semibold">Security & Privacy Protocol</p>
+                <p className="text-indigo-700 dark:text-indigo-300">
+                  Passwords and server secrets are never exposed on the client side or stored in the database. Add the environment variables below to your server&apos;s <code className="font-mono bg-indigo-100 dark:bg-indigo-900/60 px-1 py-0.5 rounded">.env</code> file, then click <strong>Verify Email Connection</strong> to test the server setup.
                 </p>
-                {errors.smtp_password && (
-                  <p className="mt-1 text-xs text-red-500 font-medium">
-                    {errors.smtp_password.message}
-                  </p>
-                )}
               </div>
+            </div>
 
-              <div className="flex items-center pt-2 md:col-span-2">
-                <label className="relative flex items-center gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    disabled={!permissions.update}
-                    {...register("smtp_secure")}
-                    className="peer sr-only"
-                  />
-                  <div className="h-5 w-9 rounded-full bg-zinc-200 dark:bg-zinc-800 transition-colors peer-checked:bg-indigo-650 relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4"></div>
-                  <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                    Use Secure SSL/TLS
-                  </span>
-                </label>
+            {/* Code Snippet Box */}
+            <div className="relative rounded-xl bg-zinc-950 border border-zinc-800 p-4 font-mono text-xs text-zinc-100 overflow-x-auto shadow-inner">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-zinc-800 text-zinc-400 font-sans">
+                <span className="flex items-center gap-2 text-xs font-medium">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+                  Required .env Configuration
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyEnv}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-all text-xs cursor-pointer font-mono"
+                >
+                  {copied ? (
+                    <>
+                      <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Copy Snippet
+                    </>
+                  )}
+                </button>
               </div>
+              <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed">
+                {ENV_SNIPPET}
+              </pre>
             </div>
           </div>
         )}
@@ -444,7 +418,7 @@ export default function EmailConfigForm({
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Notification Triggers
               </h3>
-              <p className="text-xs text-zinc-550 dark:text-zinc-400">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Select which notification alerts should fire on store order events.
               </p>
             </div>
@@ -456,13 +430,13 @@ export default function EmailConfigForm({
                   id="send_order_confirmation"
                   disabled={!permissions.update}
                   {...register("send_order_confirmation")}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-750 text-indigo-600 focus:ring-indigo-500"
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex-1 select-none">
                   <label htmlFor="send_order_confirmation" className="text-sm font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
                     Customer Order Confirmation
                   </label>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Sends confirmation receipt and summary to customer immediately after checkout.
                   </p>
                 </div>
@@ -474,13 +448,13 @@ export default function EmailConfigForm({
                   id="send_shipping_update"
                   disabled={!permissions.update}
                   {...register("send_shipping_update")}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-750 text-indigo-600 focus:ring-indigo-500"
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex-1 select-none">
                   <label htmlFor="send_shipping_update" className="text-sm font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
                     Customer Shipping Update
                   </label>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Sends shipment notification with tracking ID once package is marked fulfilled.
                   </p>
                 </div>
@@ -492,13 +466,13 @@ export default function EmailConfigForm({
                   id="include_pdf_invoice"
                   disabled={!permissions.update}
                   {...register("include_pdf_invoice")}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-750 text-indigo-600 focus:ring-indigo-500"
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex-1 select-none">
                   <label htmlFor="include_pdf_invoice" className="text-sm font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
                     Include PDF Invoice
                   </label>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Auto-generate and attach formal PDF receipt to client emails.
                   </p>
                 </div>
@@ -510,32 +484,32 @@ export default function EmailConfigForm({
                   id="is_active"
                   disabled={!permissions.update}
                   {...register("is_active")}
-                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-750 text-indigo-600 focus:ring-indigo-500"
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex-1 select-none">
                   <label htmlFor="is_active" className="text-sm font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
                     Global Email Status Active
                   </label>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
                     Toggle whether standard email notifications should be dispatched by this store client.
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-zinc-55/10 dark:bg-zinc-800/10 border border-zinc-200 dark:border-zinc-800 space-y-4">
+              <div className="p-4 rounded-xl bg-zinc-50/50 dark:bg-zinc-800/10 border border-zinc-200 dark:border-zinc-800 space-y-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     id="send_admin_new_order"
                     disabled={!permissions.update}
                     {...register("send_admin_new_order")}
-                    className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-750 text-indigo-600 focus:ring-indigo-500"
+                    className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500"
                   />
                   <div className="flex-1 select-none">
                     <label htmlFor="send_admin_new_order" className="text-sm font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
                       Admin Notification (New Orders)
                     </label>
-                    <p className="text-xs text-zinc-550 dark:text-zinc-400">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
                       Sends a new order alert to store manager/admin inbox.
                     </p>
                   </div>
@@ -550,7 +524,7 @@ export default function EmailConfigForm({
                       type="email"
                       disabled={!permissions.update}
                       {...register("admin_notification_email")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-55/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-505 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50/30 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
                       placeholder="admin@luma.store"
                     />
                     {errors.admin_notification_email && (

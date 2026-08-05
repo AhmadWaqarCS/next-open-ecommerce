@@ -2,7 +2,6 @@
 
 import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import { encryptSecret } from "@/lib/crypto";
 import {
   EmailConfigCreateInput,
   EmailConfigUpdateInput,
@@ -13,7 +12,6 @@ import {
   createEmailConfigInDB,
   updateEmailConfigInDB,
 } from "@/services/email-config-services";
-import { upsertSecretByKeyInDB } from "@/services/secret-services";
 import { revalidatePath } from "next/cache";
 
 // ─── EMAIL CONFIG ─────────────────────────────────────────────────────────────
@@ -37,10 +35,6 @@ export async function createEmailConfig(
     from_name,
     from_email,
     reply_to_email,
-    smtp_host,
-    smtp_port,
-    smtp_secure,
-    smtp_password,
     send_order_confirmation,
     send_shipping_update,
     send_admin_new_order,
@@ -55,9 +49,6 @@ export async function createEmailConfig(
       from_name,
       from_email,
       reply_to_email: reply_to_email || null,
-      smtp_host: smtp_host || null,
-      smtp_port: smtp_port ?? null,
-      smtp_secure,
       send_order_confirmation,
       send_shipping_update,
       send_admin_new_order,
@@ -67,18 +58,6 @@ export async function createEmailConfig(
       created_by: Number(user.id),
       updated_by: Number(user.id),
     });
-
-    if (smtp_password && smtp_password.trim() !== "") {
-      const { encrypted_value, iv, auth_tag } = encryptSecret(smtp_password);
-      await upsertSecretByKeyInDB({
-        key_name: "smtp_password",
-        encrypted_value,
-        iv,
-        auth_tag,
-        description: "SMTP Server Password",
-        userId: Number(user.id),
-      });
-    }
 
     revalidatePath("/dashboard/email-config");
     return { success: true, message: "Email config created successfully." };
@@ -110,10 +89,6 @@ export async function updateEmailConfig(
     from_name,
     from_email,
     reply_to_email,
-    smtp_host,
-    smtp_port,
-    smtp_secure,
-    smtp_password,
     send_order_confirmation,
     send_shipping_update,
     send_admin_new_order,
@@ -129,9 +104,6 @@ export async function updateEmailConfig(
       from_email,
       reply_to_email:
         reply_to_email !== undefined ? reply_to_email || null : undefined,
-      smtp_host: smtp_host !== undefined ? smtp_host || null : undefined,
-      smtp_port: smtp_port !== undefined ? (smtp_port ?? null) : undefined,
-      smtp_secure,
       send_order_confirmation,
       send_shipping_update,
       send_admin_new_order,
@@ -143,18 +115,6 @@ export async function updateEmailConfig(
       is_active,
       updated_by: Number(user.id),
     });
-
-    if (smtp_password && smtp_password.trim() !== "") {
-      const { encrypted_value, iv, auth_tag } = encryptSecret(smtp_password);
-      await upsertSecretByKeyInDB({
-        key_name: "smtp_password",
-        encrypted_value,
-        iv,
-        auth_tag,
-        description: "SMTP Server Password",
-        userId: Number(user.id),
-      });
-    }
 
     revalidatePath("/dashboard/email-config");
     return { success: true, message: "Email config updated successfully." };
@@ -204,19 +164,13 @@ export async function restoreEmailConfig(id: number): Promise<ActionResponse> {
 
 // ─── VERIFY EMAIL CONFIG ACTION ────────────────────────────────────────────────
 
-export async function verifyEmailConfigAction(data?: {
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  fromEmail?: string;
-  smtpPassword?: string;
-}): Promise<ActionResponse> {
+export async function verifyEmailConfigAction(): Promise<ActionResponse> {
   await assertPermission("update", "/dashboard/email-config");
 
   try {
     const { verifySmtpConnectionService } =
       await import("@/services/email-services");
-    const result = await verifySmtpConnectionService(data);
+    const result = await verifySmtpConnectionService();
     return {
       success: result.success,
       message: result.message,

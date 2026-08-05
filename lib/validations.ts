@@ -416,22 +416,6 @@ export const emailConfigCreateSchema = z.object({
   from_email: emailSchema,
   reply_to_email: emailSchema.optional().or(z.literal("")),
 
-  smtp_host: z
-    .string()
-    .trim()
-    .max(255, "SMTP host cannot exceed 255 characters")
-    .optional(),
-  smtp_port: z.preprocess(
-    (val) =>
-      val === "" || val === undefined || val === null ? undefined : Number(val),
-    z.number().int().min(1).max(65535).optional(),
-  ),
-  smtp_secure: z.boolean().default(true),
-  smtp_password: z
-    .string()
-    .max(255, "SMTP password cannot exceed 255 characters")
-    .optional(),
-
   send_order_confirmation: z.boolean().default(true),
   send_shipping_update: z.boolean().default(true),
   send_admin_new_order: z.boolean().default(true),
@@ -444,89 +428,6 @@ export type EmailConfigCreateInput = z.infer<typeof emailConfigCreateSchema>;
 
 export const emailConfigUpdateSchema = emailConfigCreateSchema.partial();
 export type EmailConfigUpdateInput = z.infer<typeof emailConfigUpdateSchema>;
-
-// ============================================================
-// SECRET VAULT
-// ============================================================
-
-export const secretVaultCreateSchema = z.object({
-  key_name: z
-    .string()
-    .trim()
-    .min(1, "Key name is required")
-    .max(100, "Key name cannot exceed 100 characters")
-    .regex(/^[a-z0-9_]+$/, "Key name must be lowercase with underscores only"),
-  encrypted_value: z
-    .string()
-    .min(1, "Encrypted value is required")
-    .max(4096, "Encrypted value too long"),
-  iv: z.string().min(1, "IV is required").max(255, "IV too long"),
-  auth_tag: z
-    .string()
-    .min(1, "Auth tag is required")
-    .max(255, "Auth tag too long"),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description cannot exceed 500 characters")
-    .optional(),
-  last_rotated: z.string().datetime().optional(),
-});
-export type SecretVaultCreateInput = z.infer<typeof secretVaultCreateSchema>;
-
-export const secretVaultUpdateSchema = z.object({
-  encrypted_value: z
-    .string()
-    .min(1, "Encrypted value is required")
-    .max(4096, "Encrypted value too long")
-    .optional(),
-  iv: z.string().min(1, "IV is required").max(255, "IV too long").optional(),
-  auth_tag: z
-    .string()
-    .min(1, "Auth tag is required")
-    .max(255, "Auth tag too long")
-    .optional(),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description cannot exceed 500 characters")
-    .optional(),
-  last_rotated: z.string().datetime().optional(),
-});
-export type SecretVaultUpdateInput = z.infer<typeof secretVaultUpdateSchema>;
-
-export const secretVaultFormCreateSchema = z.object({
-  key_name: z
-    .string()
-    .trim()
-    .min(1, "Key name is required")
-    .max(100, "Key name cannot exceed 100 characters")
-    .regex(
-      /^[a-z0-9_]+$/,
-      "Key name must be lowercase with underscores only (e.g. smtp_password)",
-    ),
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description cannot exceed 500 characters")
-    .optional()
-    .nullable(),
-});
-export type SecretVaultFormCreateInput = z.infer<
-  typeof secretVaultFormCreateSchema
->;
-
-export const secretVaultFormUpdateSchema = z.object({
-  description: z
-    .string()
-    .trim()
-    .max(500, "Description cannot exceed 500 characters")
-    .optional()
-    .nullable(),
-});
-export type SecretVaultFormUpdateInput = z.infer<
-  typeof secretVaultFormUpdateSchema
->;
 
 // ============================================================
 // SHIPPING METHODS

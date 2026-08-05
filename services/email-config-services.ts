@@ -9,9 +9,6 @@ export async function createEmailConfigInDB(data: {
   from_name: string;
   from_email: string;
   reply_to_email?: string | null;
-  smtp_host?: string | null;
-  smtp_port?: number | null;
-  smtp_secure?: boolean;
   send_order_confirmation?: boolean;
   send_shipping_update?: boolean;
   send_admin_new_order?: boolean;
@@ -31,9 +28,6 @@ export async function updateEmailConfigInDB(
     from_name?: string;
     from_email?: string;
     reply_to_email?: string | null;
-    smtp_host?: string | null;
-    smtp_port?: number | null;
-    smtp_secure?: boolean;
     send_order_confirmation?: boolean;
     send_shipping_update?: boolean;
     send_admin_new_order?: boolean;

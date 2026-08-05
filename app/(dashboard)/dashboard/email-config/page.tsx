@@ -45,9 +45,6 @@ export default async function EmailConfigPage() {
         <EmailConfigForm
           initialData={{
             ...emailConfig,
-            smtp_port:
-              emailConfig.smtp_port !== null ? emailConfig.smtp_port : "",
-            smtp_host: emailConfig.smtp_host || "",
             reply_to_email: emailConfig.reply_to_email || "",
             admin_notification_email:
               emailConfig.admin_notification_email || "",

@@ -118,12 +118,6 @@ async function main() {
     { name: "Media", path: "/dashboard/media", enabled: true, is_super: false },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
-    {
-      name: "Secret Vault",
-      path: "/dashboard/secret-vault",
-      enabled: true,
-      is_super: true,
-    },
   ];
 
   const features = [];
@@ -489,9 +483,6 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         from_name: STORE_NAME,
         from_email: "orders@example.com",
         reply_to_email: "support@example.com",
-        smtp_host: "smtp.mailtrap.io",
-        smtp_port: 2525,
-        smtp_secure: false,
         send_order_confirmation: true,
         send_shipping_update: true,
         send_admin_new_order: true,

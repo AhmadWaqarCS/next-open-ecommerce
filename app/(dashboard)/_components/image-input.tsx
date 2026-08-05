@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useEffect, ChangeEvent } from "react";
+import { useId, useState, ChangeEvent } from "react";
 import Image from "next/image";
 import { useImageGroupContext } from "./image-input-group";
 
@@ -21,7 +21,7 @@ export interface ImageInputProps {
   showAltField?: boolean;
   /** Callback when user selects a file for upload */
   onFileSelect?: (file: File | null) => void;
-  /** Currently staged file (if managed externally) */
+  /** Currently staged file */
   file?: File | null;
   /** Legacy alias for staged file */
   pendingFile?: File | null;
@@ -51,9 +51,9 @@ export function ImageInput({
   altValue = "",
   onAltChange,
   showAltField = true,
+  file,
+  pendingFile,
   onFileSelect,
-  file: externalFile,
-  pendingFile: externalPendingFile,
   onSizeFetch,
   onPreviewFetch,
   error,
@@ -67,23 +67,28 @@ export function ImageInput({
   const urlInputId = useId();
   const altInputId = useId();
 
-  const groupCtx = useImageGroupContext();
+  const { formatBytes, deriveFormat, fetchImageSpecs, createObjectUrl } =
+    useImageGroupContext();
 
-  const activeFile =
-    externalFile !== undefined
-      ? externalFile
-      : externalPendingFile !== undefined
-        ? externalPendingFile
-        : null;
-
-  const [internalFile, setInternalFile] = useState<File | null>(null);
-  const currentFile = activeFile || internalFile;
-
-  const [previewUrl, setPreviewUrl] = useState<string>(value || "");
+  const activeFile = file ?? pendingFile ?? null;
   const [fetchedSize, setFetchedSize] = useState<number | null>(null);
   const [fetchedFormat, setFetchedFormat] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const previewUrl = activeFile ? createObjectUrl(activeFile) : value;
+
+  const fileFormat = activeFile
+    ? deriveFormat(activeFile)
+    : fetchedFormat || deriveFormat(null, value);
+
+  const fileSize = activeFile
+    ? formatBytes(activeFile.size)
+    : fetchedSize !== null
+      ? formatBytes(fetchedSize)
+      : value
+        ? "Click Fetch"
+        : "0 Bytes";
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -95,90 +100,30 @@ export function ImageInput({
     }
 
     setFetchError(null);
-
-    // Delegate client-side size calculation and format derivation to ImageInputGroup context
     setFetchedSize(selectedFile.size);
-    onSizeFetch?.(selectedFile.size);
-    setFetchedFormat(groupCtx.deriveFormat(selectedFile));
-
-    // Delegate object URL preview creation to ImageInputGroup context
-    const objectUrl = groupCtx.createObjectUrl(selectedFile);
-    setPreviewUrl(objectUrl);
-
-    if (onFileSelect) {
-      onFileSelect(selectedFile);
-    } else {
-      setInternalFile(selectedFile);
-    }
+    setFetchedFormat(deriveFormat(selectedFile));
+    onFileSelect?.(selectedFile);
   };
 
   const handleFetchClick = async () => {
-    if (!value || value.startsWith("blob:") || currentFile || isFetching) return;
-
+    if (!value || activeFile || isFetching) return;
     setIsFetching(true);
     setFetchError(null);
-    setPreviewUrl(value);
-    onPreviewFetch?.(value);
 
-    // Delegate image spec fetching logic to ImageInputGroup context
-    const res = await groupCtx.fetchImageSpecs(value);
+    onPreviewFetch?.(value);
+    const res = await fetchImageSpecs(value);
     setIsFetching(false);
     if (res.error) {
-      if (!value.startsWith("/uploads/")) {
-        setFetchError(res.error);
-        setFetchedSize(null);
-      }
+      setFetchError(res.error);
+      setFetchedSize(null);
     } else {
       if (res.size !== null) {
         setFetchedSize(res.size);
         onSizeFetch?.(res.size);
       }
-      if (res.format) {
-        setFetchedFormat(res.format);
-      }
+      if (res.format) setFetchedFormat(res.format);
     }
   };
-
-  useEffect(() => {
-    if (currentFile) {
-      const objectUrl = groupCtx.createObjectUrl(currentFile);
-      setPreviewUrl(objectUrl);
-      setFetchedSize(currentFile.size);
-      onSizeFetch?.(currentFile.size);
-      setFetchedFormat(groupCtx.deriveFormat(currentFile));
-      setFetchError(null);
-      return () => URL.revokeObjectURL(objectUrl);
-    } else if (value) {
-      setPreviewUrl(value);
-      setFetchError(null);
-      setFetchedFormat(groupCtx.deriveFormat(null, value));
-      if (!value.startsWith("blob:")) {
-        handleFetchClick();
-      }
-    } else {
-      setPreviewUrl("");
-      setFetchedSize(null);
-      setFetchedFormat(null);
-      setFetchError(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFile, value]);
-
-  const isUploadedFile = Boolean(
-    currentFile || (value && value.startsWith("/uploads/")),
-  );
-
-  const fileFormat = currentFile
-    ? groupCtx.deriveFormat(currentFile)
-    : fetchedFormat || groupCtx.deriveFormat(null, value);
-
-  const fileSize = currentFile
-    ? groupCtx.formatBytes(currentFile.size)
-    : fetchedSize != null
-      ? groupCtx.formatBytes(fetchedSize)
-      : value
-        ? "Click Fetch"
-        : "0 Bytes";
 
   return (
     <div
@@ -197,10 +142,10 @@ export function ImageInput({
         </div>
       )}
 
-      {/* Top Row: File Picker Box + Display Specifications Box (Format & Size ONLY) */}
+      {/* Top Row: Image File Picker + Display Specs (Format & Size ONLY) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
         {/* Left Side: Upload Button & Preview Thumbnail */}
-        <div className="relative border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl p-2.5 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors flex items-center gap-2.5">
+        <div className="relative border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl p-2.5 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-emerald-500 transition-colors flex items-center gap-2.5">
           <input
             id={fileInputId}
             type="file"
@@ -214,10 +159,7 @@ export function ImageInput({
             <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0 bg-zinc-900/10 dark:bg-zinc-900/40">
               <Image
                 src={previewUrl}
-                alt={
-                  altValue ||
-                  (typeof label === "string" ? label : "Image preview")
-                }
+                alt={typeof label === "string" ? label : "Preview"}
                 fill
                 className="object-cover"
               />
@@ -243,25 +185,12 @@ export function ImageInput({
           <div className="flex-1 min-w-0">
             <label
               htmlFor={disabled ? undefined : fileInputId}
-              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer w-auto ${
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                 disabled
-                  ? "opacity-50 cursor-not-allowed border-zinc-200 dark:border-zinc-800 text-zinc-400"
-                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 shadow-xs"
+                  ? "opacity-50 cursor-not-allowed border-zinc-200 text-zinc-400"
+                  : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700"
               }`}
             >
-              <svg
-                className="w-3 h-3 text-zinc-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                />
-              </svg>
               <span>{previewUrl ? "Change" : "Choose"}</span>
             </label>
             <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
@@ -270,27 +199,20 @@ export function ImageInput({
           </div>
         </div>
 
-        {/* Right Side: Image Display Specifications (Format & Size ONLY) */}
+        {/* Right Side: Specifications (Format & Size ONLY) */}
         <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 bg-zinc-50/80 dark:bg-zinc-800/50 flex flex-col justify-between text-xs space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400">
-              SPECIFICATIONS
-            </span>
-          </div>
-
+          <span className="text-[9px] uppercase font-bold tracking-wider text-zinc-500 dark:text-zinc-400">
+            SPECIFICATIONS
+          </span>
           <div className="grid grid-cols-2 gap-2 text-zinc-700 dark:text-zinc-300 font-medium text-[11px]">
             <div>
-              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">
-                Format
-              </span>
+              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">Format</span>
               <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200">
                 {fileFormat}
               </span>
             </div>
             <div className="truncate">
-              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">
-                Size
-              </span>
+              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 block">Size</span>
               <span
                 className="truncate block font-semibold text-[10px] font-mono"
                 title={fileSize}
@@ -302,7 +224,7 @@ export function ImageInput({
         </div>
       </div>
 
-      {/* Bottom Section: Image Path and Alt Text */}
+      {/* Bottom Row: Image Path & Alt Text */}
       <div className="space-y-3 pt-1">
         <div>
           <label
@@ -315,77 +237,34 @@ export function ImageInput({
             <input
               id={urlInputId}
               type="text"
-              disabled={disabled || isUploadedFile}
-              readOnly={isUploadedFile}
+              disabled={disabled || Boolean(activeFile)}
+              readOnly={Boolean(activeFile)}
               value={value}
               onChange={(e) => {
                 setFetchError(null);
                 onChange(e.target.value);
               }}
               placeholder={`/uploads/${uploadFolder}/example.webp`}
-              className={`flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-xs font-mono ${
-                isUploadedFile
+              className={`flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-mono ${
+                activeFile
                   ? "opacity-60 bg-zinc-100 dark:bg-zinc-900 cursor-not-allowed"
                   : ""
               }`}
             />
             <button
               type="button"
-              disabled={!value || disabled || isFetching}
+              disabled={!value || disabled || Boolean(activeFile) || isFetching}
               onClick={handleFetchClick}
-              className="px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-50 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
             >
-              {isFetching ? (
-                <svg
-                  className="animate-spin h-3.5 w-3.5 text-zinc-600 dark:text-zinc-300"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-3.5 h-3.5 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-              )}
-              <span>Fetch Image</span>
+              {isFetching ? "Fetching..." : "Fetch Image"}
             </button>
           </div>
           {fetchError ? (
-            <p className="mt-1 text-xs text-red-500 font-medium">
-              {fetchError}
-            </p>
+            <p className="mt-1 text-xs text-red-500 font-medium">{fetchError}</p>
           ) : error ? (
             <p className="mt-1 text-xs text-red-500 font-medium">{error}</p>
-          ) : (
-            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-              {isUploadedFile
-                ? "Uploaded asset. Path is uneditable for local uploaded files."
-                : "External image URL. Editable — click Fetch Image to load specifications."}
-            </p>
-          )}
+          ) : null}
         </div>
 
         {showAltField && onAltChange && (
@@ -403,12 +282,10 @@ export function ImageInput({
               value={altValue}
               onChange={(e) => onAltChange(e.target.value)}
               placeholder="Descriptive alt text for search engines and screen readers"
-              className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-xs disabled:opacity-50"
+              className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs disabled:opacity-50"
             />
             {altError && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
-                {altError}
-              </p>
+              <p className="mt-1 text-xs text-red-500 font-medium">{altError}</p>
             )}
           </div>
         )}

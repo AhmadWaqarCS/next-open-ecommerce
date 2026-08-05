@@ -182,10 +182,6 @@ model email_config {
   from_email     String
   reply_to_email String?
 
-  smtp_host   String?
-  smtp_port   Int?
-  smtp_secure Boolean @default(true)
-
   send_order_confirmation  Boolean @default(true)
   send_shipping_update     Boolean @default(true)
   send_admin_new_order     Boolean @default(true)
