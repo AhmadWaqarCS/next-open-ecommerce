@@ -12,8 +12,10 @@ import {
   createProductVariantInDB,
   deleteProductVariantPermanentlyInDB,
   updateProductVariantInDB,
+  getProductVariantForRevalidationInDB,
 } from "@/services/product-variant-services";
-import { revalidatePath } from "next/cache";
+import { getProductForRevalidationInDB } from "@/services/product-services";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function createProductVariant(
   data: ProductVariantCreateInput,
@@ -48,6 +50,10 @@ export async function createProductVariant(
       created_by: Number(user.id),
       updated_by: Number(user.id),
     });
+
+    const product = await getProductForRevalidationInDB(product_id);
+    if (product?.slug) revalidateTag(`product-${product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Variant created successfully." };
   } catch (error) {
@@ -77,6 +83,8 @@ export async function updateProductVariant(
     options, image_url, image_url_alt_text, is_active, sort_order } = validatedFields.data;
 
   try {
+    const existing = await getProductVariantForRevalidationInDB(id);
+
     await updateProductVariantInDB(id, {
       name,
       sku: sku !== undefined ? sku || null : undefined,
@@ -90,6 +98,9 @@ export async function updateProductVariant(
       sort_order,
       updated_by: Number(user.id),
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Variant updated successfully." };
   } catch (error) {
@@ -104,11 +115,16 @@ export async function deleteProductVariant(id: number): Promise<ActionResponse> 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductVariantForRevalidationInDB(id);
+
     await updateProductVariantInDB(id, {
       updated_by: Number(user.id),
       deleted_at: new Date(),
       deleted_by: Number(user.id),
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Variant deleted successfully." };
   } catch (error) {
@@ -123,11 +139,16 @@ export async function restoreProductVariant(id: number): Promise<ActionResponse>
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductVariantForRevalidationInDB(id);
+
     await updateProductVariantInDB(id, {
       updated_by: Number(user.id),
       deleted_at: null,
       deleted_by: null,
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Variant restored successfully." };
   } catch (error) {
@@ -142,7 +163,12 @@ export async function permanentlyDeleteProductVariant(id: number): Promise<Actio
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductVariantForRevalidationInDB(id);
+
     await deleteProductVariantPermanentlyInDB(id);
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Variant permanently deleted." };
   } catch (error) {
@@ -150,3 +176,4 @@ export async function permanentlyDeleteProductVariant(id: number): Promise<Actio
     return { success: false, message: "Failed to permanently delete variant." };
   }
 }
+

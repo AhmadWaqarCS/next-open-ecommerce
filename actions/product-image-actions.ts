@@ -12,8 +12,10 @@ import {
   createProductImageInDB,
   deleteProductImagePermanentlyInDB,
   updateProductImageInDB,
+  getProductImageForRevalidationInDB,
 } from "@/services/product-image-services";
-import { revalidatePath } from "next/cache";
+import { getProductForRevalidationInDB } from "@/services/product-services";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function createProductImage(
   data: ProductImageCreateInput,
@@ -40,6 +42,10 @@ export async function createProductImage(
       created_by: Number(user.id),
       updated_by: Number(user.id),
     });
+
+    const product = await getProductForRevalidationInDB(product_id);
+    if (product?.slug) revalidateTag(`product-${product.slug}`, "max");
+
     revalidatePath(`/dashboard/products`);
     return { success: true, message: "Image added successfully." };
   } catch (error) {
@@ -68,12 +74,17 @@ export async function updateProductImage(
   const { url, alt_text, sort_order } = validatedFields.data;
 
   try {
+    const existing = await getProductImageForRevalidationInDB(id);
+
     await updateProductImageInDB(id, {
       url,
       alt_text,
       sort_order,
       updated_by: Number(user.id),
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Image updated successfully." };
   } catch (error) {
@@ -88,11 +99,16 @@ export async function deleteProductImage(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductImageForRevalidationInDB(id);
+
     await updateProductImageInDB(id, {
       updated_by: Number(user.id),
       deleted_at: new Date(),
       deleted_by: Number(user.id),
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Image deleted successfully." };
   } catch (error) {
@@ -107,11 +123,16 @@ export async function restoreProductImage(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductImageForRevalidationInDB(id);
+
     await updateProductImageInDB(id, {
       updated_by: Number(user.id),
       deleted_at: null,
       deleted_by: null,
     });
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Image restored successfully." };
   } catch (error) {
@@ -126,7 +147,12 @@ export async function permanentlyDeleteProductImage(id: number): Promise<ActionR
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductImageForRevalidationInDB(id);
+
     await deleteProductImagePermanentlyInDB(id);
+
+    if (existing?.product?.slug) revalidateTag(`product-${existing.product.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     return { success: true, message: "Image permanently deleted." };
   } catch (error) {
@@ -134,3 +160,4 @@ export async function permanentlyDeleteProductImage(id: number): Promise<ActionR
     return { success: false, message: "Failed to permanently delete image." };
   }
 }
+

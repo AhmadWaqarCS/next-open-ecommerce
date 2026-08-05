@@ -2,12 +2,21 @@
 
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCategoryPageData } from "@/lib/storefront";
+import { getCategoryPageData, getCategorySlugs } from "@/lib/storefront";
 import CategoryPageMain from "../../CategoryPageMain";
 import { cacheLife, cacheTag } from "next/cache";
 
 interface PaginatedCategoryPageProps {
   params: Promise<{ slug: string; page: string }>;
+}
+
+export async function generateStaticParams() {
+  const slugs = await getCategorySlugs();
+  const paths = [];
+  for (const slug of slugs) {
+    paths.push({ slug, page: "1" });
+  }
+  return paths;
 }
 
 export async function generateMetadata({
@@ -38,5 +47,7 @@ export default async function PaginatedCategoryPage({
   cacheTag(`category-${slug}`);
   cacheLife("max");
 
-  return <CategoryPageMain slug={slug} page={page} />;
+  const data = await getCategoryPageData(slug, page);
+
+  return <CategoryPageMain data={data} />;
 }

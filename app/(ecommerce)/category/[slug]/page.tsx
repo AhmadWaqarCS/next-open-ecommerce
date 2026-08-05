@@ -31,6 +31,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
   cacheTag(`category-${slug}`);
   cacheLife("max");
-  return <CategoryPageMain slug={slug} page={1} />;
+  const data = await getCategoryPageData(slug, 1);
+  return <CategoryPageMain data={data} />;
 }
 

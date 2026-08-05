@@ -82,6 +82,13 @@ export async function updateSiteConfigInDB(
   return await prisma.site_config.update({ where: { id }, data });
 }
 
+export async function getSiteConfigForRevalidationInDB(id: number) {
+  return await prisma.site_config.findUnique({
+    where: { id },
+  });
+}
+
+
 export async function getSitePagesFromDB() {
   return await prisma.site_page.findMany({
     where: { is_active: true, deleted_at: null },

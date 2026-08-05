@@ -21,6 +21,34 @@ import {
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
+function revalidateMediaTags(targetType?: string) {
+  if (targetType === "category") {
+    revalidateTag("page-categories", "max");
+    revalidateTag("site-header", "max");
+    revalidateTag("hero-banner", "max");
+  } else if (
+    targetType === "product_variant" ||
+    targetType === "product_feature" ||
+    targetType === "product_gallery"
+  ) {
+    revalidateTag("page-products", "max");
+    revalidateTag("featured-products", "max");
+  } else if (
+    targetType === "site_logo_light" ||
+    targetType === "site_logo_dark" ||
+    targetType === "site_favicon"
+  ) {
+    revalidateTag("site-config", "max");
+    revalidateTag("site-header", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("hero-banner", "max");
+  } else {
+    revalidateTag("page-categories", "max");
+    revalidateTag("page-products", "max");
+    revalidateTag("site-config", "max");
+  }
+}
+
 /**
  * Deletes a media file from physical storage.
  */
@@ -39,10 +67,7 @@ export async function deleteMediaAction(input: DeleteMediaInput): Promise<Action
   try {
     await deleteMediaFileFromStorage(validation.data.relativePath);
 
-    // Revalidate relevant storefront & dashboard cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("products", "max");
-    revalidateTag("site-config", "max");
+    revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
     return {
@@ -78,9 +103,7 @@ export async function reconnectMediaAction(input: ReconnectMediaInput): Promise<
       userId: Number(user.id),
     });
 
-    revalidateTag("categories", "max");
-    revalidateTag("products", "max");
-    revalidateTag("site-config", "max");
+    revalidateMediaTags(validation.data.targetType);
     revalidatePath("/dashboard/media");
 
     return {
@@ -116,9 +139,7 @@ export async function clearBrokenMediaAction(input: ClearBrokenMediaInput): Prom
       userId: Number(user.id),
     });
 
-    revalidateTag("categories", "max");
-    revalidateTag("products", "max");
-    revalidateTag("site-config", "max");
+    revalidateMediaTags(validation.data.targetType);
     revalidatePath("/dashboard/media");
 
     return {
@@ -151,9 +172,7 @@ export async function bulkDeleteMediaAction(input: BulkDeleteMediaInput): Promis
   try {
     const result = await bulkDeleteMediaFilesFromStorage(validation.data.relativePaths, 5);
 
-    revalidateTag("categories", "max");
-    revalidateTag("products", "max");
-    revalidateTag("site-config", "max");
+    revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
     if (result.failedCount > 0) {

@@ -57,7 +57,7 @@ export async function createShippingMethod(
       updated_by: Number(user.id),
     });
 
-    revalidateTag("shipping-methods", "max");
+    revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
 
@@ -109,7 +109,7 @@ export async function updateShippingMethod(
       updated_by: Number(user.id),
     });
 
-    revalidateTag("shipping-methods", "max");
+    revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
 
@@ -132,7 +132,8 @@ export async function deleteShippingMethod(id: number): Promise<ActionResponse> 
       deleted_by: Number(user.id),
     });
 
-    revalidateTag("shipping-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
@@ -155,7 +156,8 @@ export async function restoreShippingMethod(id: number): Promise<ActionResponse>
       deleted_by: null,
     });
 
-    revalidateTag("shipping-methods", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
@@ -174,7 +176,8 @@ export async function permanentlyDeleteShippingMethod(id: number): Promise<Actio
   try {
     await deleteShippingMethodPermanentlyInDB(id);
 
-    revalidateTag("shipping-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
 
     return { success: true, message: "Shipping method permanently deleted." };
@@ -205,7 +208,8 @@ export async function bulkDeleteShippingMethods(
       filterWhere,
     );
 
-    revalidateTag("shipping-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
@@ -237,7 +241,8 @@ export async function bulkRestoreShippingMethods(
       filterWhere,
     );
 
-    revalidateTag("shipping-methods", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
@@ -259,7 +264,8 @@ export async function bulkPermanentlyDeleteShippingMethods(
   try {
     await bulkDeleteShippingMethodsPermanentlyInDB(ids, selectAllScope, filterWhere);
 
-    revalidateTag("shipping-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
 
     return { success: true, message: "Selected shipping methods permanently deleted." };

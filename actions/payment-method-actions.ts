@@ -60,7 +60,7 @@ export async function createPaymentMethod(
       updated_by: Number(user.id),
     });
 
-    revalidateTag("payment-methods", "max");
+    revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods");
 
@@ -112,7 +112,7 @@ export async function updatePaymentMethod(
       updated_by: Number(user.id),
     });
 
-    revalidateTag("payment-methods", "max");
+    revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods");
 
@@ -135,7 +135,8 @@ export async function deletePaymentMethod(id: number): Promise<ActionResponse> {
       deleted_by: Number(user.id),
     });
 
-    revalidateTag("payment-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods");
     revalidatePath("/dashboard/payment-methods/trash");
 
@@ -158,7 +159,8 @@ export async function restorePaymentMethod(id: number): Promise<ActionResponse> 
       deleted_by: null,
     });
 
-    revalidateTag("payment-methods", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
     revalidatePath("/dashboard/payment-methods");
 
@@ -177,7 +179,8 @@ export async function permanentlyDeletePaymentMethod(id: number): Promise<Action
   try {
     await deletePaymentMethodPermanentlyInDB(id);
 
-    revalidateTag("payment-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
     return { success: true, message: "Payment method permanently deleted." };
@@ -211,7 +214,8 @@ export async function bulkDeletePaymentMethods(
       filterWhere,
     );
 
-    revalidateTag("payment-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods");
     revalidatePath("/dashboard/payment-methods/trash");
 
@@ -246,7 +250,8 @@ export async function bulkRestorePaymentMethods(
       filterWhere,
     );
 
-    revalidateTag("payment-methods", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
     revalidatePath("/dashboard/payment-methods");
 
@@ -271,7 +276,8 @@ export async function bulkPermanentlyDeletePaymentMethods(
   try {
     await bulkDeletePaymentMethodsPermanentlyInDB(ids, selectAllScope, filterWhere);
 
-    revalidateTag("payment-methods", { expire: 0 });
+    revalidateTag("site-footer", "max");
+    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
     return { success: true, message: "Selected payment methods permanently deleted." };

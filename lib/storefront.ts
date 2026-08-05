@@ -161,6 +161,7 @@ export interface ProductFull {
 
 export interface CategoryPageData {
   category: {
+    slug: string;
     name: string;
     description: string | null;
     image_url: string | null;
@@ -464,6 +465,7 @@ export async function getCategoryPageData(
     where: { slug, is_active: true, deleted_at: null },
     select: {
       id: true,
+      slug: true,
       name: true,
       description: true,
       image_url: true,
@@ -527,6 +529,7 @@ export async function getCategoryPageData(
 
   return {
     category: {
+      slug: categoryRow.slug,
       name: categoryRow.name,
       description: categoryRow.description,
       image_url: categoryRow.image_url,

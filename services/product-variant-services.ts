@@ -136,3 +136,17 @@ export async function syncProductVariantsInDB(
     }
   }
 }
+
+export async function getProductVariantForRevalidationInDB(id: number) {
+  return await prisma.product_variant.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      product_id: true,
+      product: {
+        select: { slug: true },
+      },
+    },
+  });
+}
+

@@ -14,7 +14,10 @@ import {
   updateProductInDB,
   bulkUpdateProductsInDB,
   bulkDeleteProductsPermanentlyInDB,
+  getProductForRevalidationInDB,
+  getProductsForRevalidationInDB,
 } from "@/services/product-services";
+import { getCategoryForRevalidationInDB } from "@/services/category-services";
 import {
   createManyProductImagesInDB,
   syncProductImagesInDB,
@@ -215,8 +218,15 @@ export async function createProduct(
       );
     }
 
-    revalidateTag("products", "max");
-    if (category_id) revalidateTag(`category-products-${category_id}`, "max");
+    // Granular storefront revalidations
+    revalidateTag("page-products", "max");
+    revalidateTag(`product-${slug}`, "max");
+    if (is_featured) revalidateTag("featured-products", "max");
+    if (category_id) {
+      const cat = await getCategoryForRevalidationInDB(category_id);
+      if (cat?.slug) revalidateTag(`category-${cat.slug}`, "max");
+    }
+
     revalidatePath("/dashboard/products");
 
     return { success: true, message: "Product created successfully." };
@@ -277,6 +287,8 @@ export async function updateProduct(
   } = validatedFields.data;
 
   try {
+    const existing = await getProductForRevalidationInDB(id);
+
     const updatedProduct = await updateProductInDB(id, {
       name,
       slug,
@@ -318,8 +330,28 @@ export async function updateProduct(
       await syncProductVariantsInDB(id, data.variants, Number(user.id));
     }
 
-    revalidateTag(`product-${slug}`, "max");
-    revalidateTag("featured-products", "max");
+    // Granular storefront tag revalidations based on changed fields
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (updatedProduct.slug && updatedProduct.slug !== existing?.slug) {
+      revalidateTag(`product-${updatedProduct.slug}`, "max");
+    }
+
+    revalidateTag("page-products", "max");
+
+    const featuredChanged = is_featured !== undefined && is_featured !== existing?.is_featured;
+    const isFeaturedRelevant = existing?.is_featured || updatedProduct.is_featured;
+    if (featuredChanged || isFeaturedRelevant) {
+      revalidateTag("featured-products", "max");
+    }
+
+    if (existing?.category?.slug) {
+      revalidateTag(`category-${existing.category.slug}`, "max");
+    }
+    if (category_id && category_id !== existing?.category_id) {
+      const newCat = await getCategoryForRevalidationInDB(category_id);
+      if (newCat?.slug) revalidateTag(`category-${newCat.slug}`, "max");
+    }
+
     revalidatePath("/dashboard/products");
 
     return { success: true, message: "Product updated successfully." };
@@ -335,12 +367,19 @@ export async function deleteProduct(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductForRevalidationInDB(id);
+
     await updateProductInDB(id, {
       updated_by: Number(user.id),
       deleted_at: new Date(),
       deleted_by: Number(user.id),
     });
-    revalidateTag("products", "max");
+
+    revalidateTag("page-products", "max");
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (existing?.is_featured) revalidateTag("featured-products", "max");
+    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
     return { success: true, message: "Product deleted successfully." };
@@ -356,12 +395,19 @@ export async function restoreProduct(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductForRevalidationInDB(id);
+
     await updateProductInDB(id, {
       updated_by: Number(user.id),
       deleted_at: null,
       deleted_by: null,
     });
-    revalidateTag("products", "max");
+
+    revalidateTag("page-products", "max");
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (existing?.is_featured) revalidateTag("featured-products", "max");
+    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
     return { success: true, message: "Product restored successfully." };
@@ -379,8 +425,15 @@ export async function permanentlyDeleteProduct(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getProductForRevalidationInDB(id);
+
     await deleteProductPermanentlyInDB(id);
-    revalidateTag("products", "max");
+
+    revalidateTag("page-products", "max");
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (existing?.is_featured) revalidateTag("featured-products", "max");
+    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+
     revalidatePath("/dashboard/products/trash");
     return { success: true, message: "Product permanently deleted." };
   } catch (error) {
@@ -401,6 +454,8 @@ export async function bulkDeleteProducts(
       : undefined;
 
   try {
+    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, false, filterWhere);
+
     await bulkUpdateProductsInDB(
       ids,
       {
@@ -413,8 +468,13 @@ export async function bulkDeleteProducts(
       filterWhere,
     );
 
-    revalidateTag("products", "max");
-    revalidateTag("shop-products", "max");
+    revalidateTag("page-products", "max");
+    for (const prod of affected) {
+      if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
+      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+    }
+    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
 
@@ -437,6 +497,8 @@ export async function bulkRestoreProducts(
       : undefined;
 
   try {
+    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+
     await bulkUpdateProductsInDB(
       ids,
       {
@@ -449,8 +511,13 @@ export async function bulkRestoreProducts(
       filterWhere,
     );
 
-    revalidateTag("products", "max");
-    revalidateTag("shop-products", "max");
+    revalidateTag("page-products", "max");
+    for (const prod of affected) {
+      if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
+      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+    }
+    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
 
@@ -473,10 +540,17 @@ export async function bulkPermanentlyDeleteProducts(
       : undefined;
 
   try {
+    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+
     await bulkDeleteProductsPermanentlyInDB(ids, selectAllScope, filterWhere);
 
-    revalidateTag("products", "max");
-    revalidateTag("shop-products", "max");
+    revalidateTag("page-products", "max");
+    for (const prod of affected) {
+      if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
+      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+    }
+    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+
     revalidatePath("/dashboard/products/trash");
 
     return { success: true, message: "Selected products permanently deleted." };
@@ -488,3 +562,4 @@ export async function bulkPermanentlyDeleteProducts(
     };
   }
 }
+

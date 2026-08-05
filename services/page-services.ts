@@ -41,3 +41,19 @@ export async function updateSitePageInDB(
 export async function deleteSitePagePermanentlyInDB(id: number) {
   return await prisma.site_page.delete({ where: { id } });
 }
+
+export async function getSitePageForRevalidationInDB(id: number) {
+  return await prisma.site_page.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      show_in_header: true,
+      show_in_footer: true,
+      sort_order: true,
+      is_active: true,
+    },
+  });
+}
+

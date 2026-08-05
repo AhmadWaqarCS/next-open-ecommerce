@@ -105,3 +105,56 @@ export async function bulkDeleteProductsPermanentlyInDB(
     where: whereCondition,
   });
 }
+
+export async function getProductForRevalidationInDB(id: number) {
+  return await prisma.product.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      price: true,
+      compare_at_price: true,
+      feature_image_url: true,
+      feature_image_alt_text: true,
+      category_id: true,
+      category_name: true,
+      is_featured: true,
+      is_active: true,
+      sort_order: true,
+      description: true,
+      short_description: true,
+      sku: true,
+      stock_quantity: true,
+      category: {
+        select: { slug: true },
+      },
+    },
+  });
+}
+
+export async function getProductsForRevalidationInDB(
+  ids: number[],
+  selectAllScope: boolean = false,
+  isTrash: boolean = false,
+  filterWhere?: Prisma.productWhereInput
+) {
+  const whereCondition: any = selectAllScope
+    ? (filterWhere ?? (isTrash ? { NOT: { deleted_at: null } } : { deleted_at: null }))
+    : { id: { in: ids } };
+
+  return await prisma.product.findMany({
+    where: whereCondition,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      category_id: true,
+      is_featured: true,
+      category: {
+        select: { slug: true },
+      },
+    },
+  });
+}
+

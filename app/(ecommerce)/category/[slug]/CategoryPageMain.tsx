@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCategoryPageData, type CategoryPageData } from "@/lib/storefront";
+import type { CategoryPageData } from "@/lib/storefront";
 import ProductCard from "../../_components/ProductCard";
 import FeaturedProducts from "../../_components/FeaturedProducts";
-import { cacheTag, cacheLife } from "next/cache";
 
 export interface CategoryPageMainProps {
-  slug: string;
-  page: number;
+  data: CategoryPageData;
 }
 
 const categoryPageScopedStyles = `
@@ -23,18 +21,15 @@ const categoryPageScopedStyles = `
  * CategoryPageMain — Consolidated Page Component for Category Views.
  * Located beside `app/(ecommerce)/category/[slug]/page.tsx`.
  */
-export default async function CategoryPageMain({
-  slug,
-  page,
-}: CategoryPageMainProps) {
-  const content = await getCategoryPageData(slug, page);
-
-  const { category, products, total, pageCount } = content;
+export default function CategoryPageMain({ data }: CategoryPageMainProps) {
+  const { category, products, total, page, pageCount } = data;
   const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   if (!category) {
     notFound();
   }
+
+  const slug = category.slug;
 
   // Inline fallbacks
   const name = category.meta_info?.title || category.name || "Category";

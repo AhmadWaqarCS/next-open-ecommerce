@@ -80,3 +80,17 @@ export async function syncProductImagesInDB(
     }
   }
 }
+
+export async function getProductImageForRevalidationInDB(id: number) {
+  return await prisma.product_image.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      product_id: true,
+      product: {
+        select: { slug: true },
+      },
+    },
+  });
+}
+

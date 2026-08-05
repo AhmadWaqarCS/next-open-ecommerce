@@ -14,6 +14,8 @@ import {
   updateCategoryInDB,
   bulkUpdateCategoriesInDB,
   bulkDeleteCategoriesPermanentlyInDB,
+  getCategoryForRevalidationInDB,
+  getCategoriesForRevalidationInDB,
 } from "@/services/category-services";
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -124,9 +126,15 @@ export async function createCategory(
       updated_by: Number(user.id),
     });
 
-    // Revalidate storefront cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
+    // Revalidate granular storefront cache tags
+    revalidateTag("page-categories", "max");
+    if (show_in_header) revalidateTag("site-header", "max");
+    if (show_in_footer) revalidateTag("site-footer", "max");
+    if (show_in_home) revalidateTag("hero-banner", "max");
+    if (parent_id) {
+      const parentCat = await getCategoryForRevalidationInDB(parent_id);
+      if (parentCat?.slug) revalidateTag(`category-${parentCat.slug}`, "max");
+    }
 
     // Revalidate admin dashboard page
     revalidatePath("/dashboard/categories");
@@ -172,6 +180,8 @@ export async function updateCategory(
   } = validatedFields.data;
 
   try {
+    const existing = await getCategoryForRevalidationInDB(id);
+
     const result = await updateCategoryInDB(id, {
       name,
       slug,
@@ -189,12 +199,49 @@ export async function updateCategory(
       updated_by: Number(user.id),
     });
 
-    // Revalidate storefront cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
-    revalidateTag(`category-${result.slug}`, "max");
-    if (slug && slug !== result.slug) {
-      revalidateTag(`category-${slug}`, "max");
+    // Granular storefront tag revalidations based on changed fields
+    const categoryListChanged =
+      (name !== undefined && name !== existing?.name) ||
+      (slug !== undefined && slug !== existing?.slug) ||
+      (image_url !== undefined && image_url !== existing?.image_url) ||
+      (bg_color !== undefined && bg_color !== existing?.bg_color) ||
+      (sort_order !== undefined && sort_order !== existing?.sort_order) ||
+      (is_active !== undefined && is_active !== existing?.is_active);
+
+    if (categoryListChanged) {
+      revalidateTag("page-categories", "max");
+    }
+
+    if (existing?.slug) {
+      revalidateTag(`category-${existing.slug}`, "max");
+    }
+    if (result.slug && result.slug !== existing?.slug) {
+      revalidateTag(`category-${result.slug}`, "max");
+    }
+
+    const headerVisibilityChanged = show_in_header !== undefined && show_in_header !== existing?.show_in_header;
+    const isHeaderRelevant = existing?.show_in_header || result.show_in_header;
+    const headerFieldsChanged = name !== undefined || slug !== undefined || sort_order !== undefined || parent_id !== undefined || is_active !== undefined;
+    if (headerVisibilityChanged || (isHeaderRelevant && headerFieldsChanged)) {
+      revalidateTag("site-header", "max");
+    }
+
+    const footerVisibilityChanged = show_in_footer !== undefined && show_in_footer !== existing?.show_in_footer;
+    const isFooterRelevant = existing?.show_in_footer || result.show_in_footer;
+    const footerFieldsChanged = name !== undefined || slug !== undefined || sort_order !== undefined || parent_id !== undefined || is_active !== undefined;
+    if (footerVisibilityChanged || (isFooterRelevant && footerFieldsChanged)) {
+      revalidateTag("site-footer", "max");
+    }
+
+    const homeVisibilityChanged = show_in_home !== undefined && show_in_home !== existing?.show_in_home;
+    const isHomeRelevant = existing?.show_in_home || result.show_in_home;
+    const homeFieldsChanged = name !== undefined || slug !== undefined || image_url !== undefined || bg_color !== undefined || sort_order !== undefined || is_active !== undefined;
+    if (homeVisibilityChanged || (isHomeRelevant && homeFieldsChanged)) {
+      revalidateTag("hero-banner", "max");
+    }
+
+    if (existing?.parent?.slug) {
+      revalidateTag(`category-${existing.parent.slug}`, "max");
     }
 
     // Revalidate admin dashboard page
@@ -213,18 +260,21 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getCategoryForRevalidationInDB(id);
+
     const result = await updateCategoryInDB(id, {
       updated_by: Number(user.id),
       deleted_at: new Date(),
       deleted_by: Number(user.id),
     });
 
-    // Revalidate storefront cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
-    revalidateTag(`category-${result.slug}`, "max");
+    revalidateTag("page-categories", "max");
+    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing?.show_in_header) revalidateTag("site-header", "max");
+    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
-    // Revalidate admin dashboard pages
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
 
@@ -241,18 +291,21 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getCategoryForRevalidationInDB(id);
+
     const result = await updateCategoryInDB(id, {
       updated_by: Number(user.id),
       deleted_at: null,
       deleted_by: null,
     });
 
-    // Revalidate storefront cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
-    revalidateTag(`category-${result.slug}`, "max");
+    revalidateTag("page-categories", "max");
+    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing?.show_in_header) revalidateTag("site-header", "max");
+    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
-    // Revalidate admin dashboard pages
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
 
@@ -269,14 +322,17 @@ export async function permanentlyDeleteCategory(id: number): Promise<ActionRespo
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
+    const existing = await getCategoryForRevalidationInDB(id);
+
     const result = await deleteCategoryPermanentlyInDB(id);
 
-    // Revalidate storefront cache tags
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
-    revalidateTag(`category-${result.slug}`, "max");
+    revalidateTag("page-categories", "max");
+    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing?.show_in_header) revalidateTag("site-header", "max");
+    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
-    // Revalidate admin dashboard page
     revalidatePath("/dashboard/categories/trash");
 
     return { success: true, message: "Category permanently deleted." };
@@ -295,6 +351,8 @@ export async function bulkDeleteCategories(
   const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, false) : undefined;
 
   try {
+    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, false, filterWhere);
+
     await bulkUpdateCategoriesInDB(
       ids,
       {
@@ -307,8 +365,15 @@ export async function bulkDeleteCategories(
       filterWhere,
     );
 
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
+    revalidateTag("page-categories", "max");
+    for (const cat of affected) {
+      if (cat.slug) revalidateTag(`category-${cat.slug}`, "max");
+      if (cat.parent?.slug) revalidateTag(`category-${cat.parent.slug}`, "max");
+    }
+    if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
+    if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
 
@@ -328,6 +393,8 @@ export async function bulkRestoreCategories(
   const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, true) : undefined;
 
   try {
+    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+
     await bulkUpdateCategoriesInDB(
       ids,
       {
@@ -340,8 +407,15 @@ export async function bulkRestoreCategories(
       filterWhere,
     );
 
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
+    revalidateTag("page-categories", "max");
+    for (const cat of affected) {
+      if (cat.slug) revalidateTag(`category-${cat.slug}`, "max");
+      if (cat.parent?.slug) revalidateTag(`category-${cat.parent.slug}`, "max");
+    }
+    if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
+    if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
 
@@ -361,10 +435,19 @@ export async function bulkPermanentlyDeleteCategories(
   const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, true) : undefined;
 
   try {
+    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+
     await bulkDeleteCategoriesPermanentlyInDB(ids, selectAllScope, filterWhere);
 
-    revalidateTag("categories", "max");
-    revalidateTag("shop-categories", "max");
+    revalidateTag("page-categories", "max");
+    for (const cat of affected) {
+      if (cat.slug) revalidateTag(`category-${cat.slug}`, "max");
+      if (cat.parent?.slug) revalidateTag(`category-${cat.parent.slug}`, "max");
+    }
+    if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
+    if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+
     revalidatePath("/dashboard/categories/trash");
 
     return { success: true, message: "Selected categories permanently deleted." };
@@ -376,4 +459,5 @@ export async function bulkPermanentlyDeleteCategories(
     };
   }
 }
+
 

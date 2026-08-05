@@ -21,6 +21,7 @@ import {
   deleteSitePagePermanentlyInDB,
   updateSiteConfigInDB,
   updateSitePageInDB,
+  getSiteConfigForRevalidationInDB,
 } from "@/services/site-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
@@ -157,6 +158,8 @@ export async function updateSiteConfig(
   } = validatedFields.data;
 
   try {
+    const existing = await getSiteConfigForRevalidationInDB(id);
+
     await updateSiteConfigInDB(id, {
       name,
       tagline: tagline !== undefined ? tagline || null : undefined,
@@ -192,7 +195,54 @@ export async function updateSiteConfig(
       meta_info,
       updated_by: Number(user.id),
     });
+
     revalidateTag("site-config", "max");
+
+    // Revalidate site-header if header-related fields changed
+    const headerChanged =
+      name !== undefined ||
+      light_logo_url !== undefined ||
+      dark_logo_url !== undefined ||
+      topbar_message !== undefined;
+    if (headerChanged) revalidateTag("site-header", "max");
+
+    // Revalidate site-footer if footer-related fields changed
+    const footerChanged =
+      name !== undefined ||
+      description !== undefined ||
+      email !== undefined ||
+      phone !== undefined ||
+      address !== undefined ||
+      social_links !== undefined;
+    if (footerChanged) revalidateTag("site-footer", "max");
+
+    // Revalidate hero-banner if hero-related fields changed
+    const heroChanged =
+      home_tagline_label !== undefined ||
+      tagline !== undefined ||
+      description !== undefined ||
+      accent_color !== undefined ||
+      primary_color !== undefined;
+    if (heroChanged) revalidateTag("hero-banner", "max");
+
+    // Revalidate checkout if checkout-related fields changed
+    const checkoutChanged =
+      currency !== undefined ||
+      currency_symbol !== undefined ||
+      require_phone !== undefined ||
+      allow_order_notes !== undefined ||
+      tax_rate !== undefined ||
+      tax_inclusive !== undefined ||
+      tax_label !== undefined;
+    if (checkoutChanged) revalidateTag("checkout", "max");
+
+    // Revalidate layout if global design token fields changed
+    const layoutChanged =
+      primary_color !== undefined ||
+      secondary_color !== undefined ||
+      accent_color !== undefined;
+    if (layoutChanged) revalidateTag("layout", "max");
+
     revalidatePath("/dashboard/settings");
     return { success: true, message: "Site config updated successfully." };
   } catch (error) {
