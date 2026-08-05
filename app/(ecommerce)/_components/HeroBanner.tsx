@@ -38,13 +38,12 @@ export default async function HeroBanner() {
 
   return (
     <section
-      className="relative flex items-center justify-center min-h-screen overflow-hidden"
-      style={{ backgroundColor: primaryColor }}
+      className="relative flex items-center justify-center min-h-screen overflow-hidden bg-zinc-950"
     >
       <style dangerouslySetInnerHTML={{ __html: heroScopedStyles }} />
 
       {/* Background Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/40 to-zinc-950/80" />
+      <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-950/80 to-zinc-950" />
 
       {/* Subtle Animated Orb */}
       <div

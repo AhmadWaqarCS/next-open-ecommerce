@@ -282,11 +282,11 @@ export default async function SiteFooter() {
         </div>
 
         {/* Newsletter Subscription Column */}
-        <div>
+        <div className="md:col-span-2 lg:col-span-2">
           <h3 className="text-white text-xs font-semibold uppercase tracking-widest mb-4">
             Stay Connected
           </h3>
-          <p className="text-zinc-500 text-xs mb-3">
+          <p className="text-zinc-500 text-xs mb-3 max-w-sm">
             Subscribe for exclusive offers and update notifications.
           </p>
           <NewsletterForm />

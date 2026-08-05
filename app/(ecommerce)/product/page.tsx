@@ -32,8 +32,8 @@ export default async function ProductsPage() {
   return (
     <div className="page-enter">
       {/* Dark banner so the transparent header text stays visible */}
-      <div className="bg-gradient-to-br from-zinc-800 to-zinc-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/30" />
+      <div className="bg-zinc-950 relative overflow-hidden border-b border-zinc-800/40">
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-900/30 to-zinc-950" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
           {/* Breadcrumb */}
           <nav className="mb-4" aria-label="Breadcrumb">

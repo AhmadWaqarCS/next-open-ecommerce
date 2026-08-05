@@ -29,7 +29,7 @@ export default function NewsletterForm() {
 
   if (state.success) {
     return (
-      <div className="newsletter-success flex items-center gap-3 bg-emerald-950/40 border border-emerald-700/50 rounded-xl px-4 py-3.5">
+      <div className="newsletter-success flex items-center gap-3 bg-emerald-950/60 border border-emerald-700/50 rounded-2xl px-4 py-3.5 shadow-lg">
         <svg
           className="w-5 h-5 text-emerald-400 shrink-0"
           fill="none"
@@ -49,27 +49,32 @@ export default function NewsletterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
-      <div className="flex gap-2">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2.5 w-full max-w-md">
+      <div className="relative flex items-center w-full rounded-full bg-zinc-900 border border-zinc-800 p-1.5 focus-within:border-zinc-700 focus-within:ring-2 focus-within:ring-zinc-700/40 transition-all shadow-sm">
         <input
           type="email"
           {...register("email")}
-          placeholder="your@email.com"
+          placeholder="Enter your email address"
           disabled={isPending}
-          className="flex-1 min-w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition disabled:opacity-50"
+          className="w-full bg-transparent pl-4 pr-2 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 outline-none disabled:opacity-50 min-w-0"
         />
         <button
           type="submit"
           disabled={isPending}
-          className="shrink-0 bg-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_85%,black)] text-zinc-900 font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors disabled:opacity-60 whitespace-nowrap"
+          className="shrink-0 bg-[var(--color-accent)] hover:brightness-110 text-zinc-950 font-bold px-5 py-2 rounded-full text-xs tracking-wider uppercase transition-all duration-200 disabled:opacity-60 whitespace-nowrap active:scale-95 shadow"
         >
           {isPending ? "…" : "Subscribe"}
         </button>
       </div>
-      {state.message && !state.success && (
-        <p className="text-red-400 text-xs">{state.message}</p>
+      {errors.email && (
+        <p className="text-red-400 text-xs px-3">{errors.email.message}</p>
       )}
-      <p className="text-zinc-600 text-xs">No spam. Unsubscribe any time.</p>
+      {state.message && !state.success && (
+        <p className="text-red-400 text-xs px-3">{state.message}</p>
+      )}
+      <p className="text-zinc-500 text-[11px] px-3">
+        No spam. Unsubscribe any time.
+      </p>
     </form>
   );
 }

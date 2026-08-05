@@ -164,7 +164,7 @@ export default async function SiteHeader() {
               {navCategories.map((cat) => {
                 const hasChildren = cat.children && cat.children.length > 0;
                 return hasChildren ? (
-                  <div key={cat.slug} className="relative group/menu py-5">
+                  <div key={cat.slug} className="relative group/menu py-5 flex items-center">
                     <button className="header-nav-link flex items-center gap-1 text-sm font-medium tracking-wide transition-colors duration-300">
                       {cat.name}
                       <svg
@@ -201,23 +201,25 @@ export default async function SiteHeader() {
                     </div>
                   </div>
                 ) : (
-                  <Link
-                    key={cat.slug}
-                    href={`/category/${cat.slug}`}
-                    className="header-nav-link text-sm font-medium tracking-wide transition-colors duration-300 py-5"
-                  >
-                    {cat.name}
-                  </Link>
+                  <div key={cat.slug} className="py-5 flex items-center">
+                    <Link
+                      href={`/category/${cat.slug}`}
+                      className="header-nav-link text-sm font-medium tracking-wide transition-colors duration-300"
+                    >
+                      {cat.name}
+                    </Link>
+                  </div>
                 );
               })}
               {sitePages.map((p) => (
-                <Link
-                  key={p.slug}
-                  href={`/${p.slug}`}
-                  className="header-nav-link text-sm font-medium tracking-wide transition-colors duration-300 py-5"
-                >
-                  {p.title}
-                </Link>
+                <div key={p.slug} className="py-5 flex items-center">
+                  <Link
+                    href={`/${p.slug}`}
+                    className="header-nav-link text-sm font-medium tracking-wide transition-colors duration-300"
+                  >
+                    {p.title}
+                  </Link>
+                </div>
               ))}
             </nav>
 

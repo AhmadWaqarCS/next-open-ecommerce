@@ -40,7 +40,7 @@ export default function CategoryPageMain({ data }: CategoryPageMainProps) {
 
   const bgClass = category.bg_color?.includes("bg-")
     ? category.bg_color
-    : `bg-gradient-to-br ${category.bg_color ?? "from-zinc-800 to-zinc-950"}`;
+    : `bg-zinc-950`;
 
   return (
     <div className="page-enter">
