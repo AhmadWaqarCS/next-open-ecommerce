@@ -306,6 +306,10 @@ export async function updateOrderTransaction(
     const existing = await tx.order.findUnique({ where: { id } });
     if (!existing) throw new Error("Order not found.");
 
+    if (existing.cancelled_at || existing.fulfillment_status === "cancelled") {
+      throw new Error("ORDER_CANCELLED_CANNOT_BE_EDITED");
+    }
+
     const updated = await tx.order.update({
       where: { id },
       data: { ...data, updated_by: userId },

@@ -53,11 +53,7 @@ const phoneSchema = z
   .max(50, "Phone number cannot exceed 50 characters")
   .regex(/^[+\d\s()\-.]*$/, "Phone number contains invalid characters");
 
-const colorHexSchema = z
-  .string()
-  .trim()
-  .max(7, "Hex color code cannot exceed 7 characters")
-  .regex(/^#[0-9a-fA-F]{6}$/, "Please enter a valid hex color (e.g. #0f0f0f)");
+const colorHexSchema = z.string().trim();
 
 export const relativePathSchema = z
   .string()

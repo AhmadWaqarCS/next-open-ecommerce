@@ -77,8 +77,11 @@ export async function updateOrder(
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${id}`);
     return { success: true, message: "Order updated successfully." };
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    if (error?.message === "ORDER_CANCELLED_CANNOT_BE_EDITED") {
+      return { success: false, message: "Cancelled orders cannot be edited." };
+    }
     return { success: false, message: "Failed to update order." };
   }
 }

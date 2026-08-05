@@ -19,6 +19,8 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
   const [globalError, setGlobalError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const isCancelled = Boolean(order.cancelled_at || order.fulfillment_status === "cancelled");
+
   const {
     register,
     handleSubmit,
@@ -37,7 +39,7 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
   });
 
   const onSubmit = (data: OrderUpdateInput) => {
-    if (!canUpdate) return;
+    if (!canUpdate || isCancelled) return;
     setGlobalError(null);
     startTransition(async () => {
       const response = await updateOrder(order.id, data);
@@ -64,6 +66,15 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
         </div>
       </div>
 
+      {isCancelled && (
+        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+          <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>This order has been cancelled and cannot be edited.</span>
+        </div>
+      )}
+
       {globalError && (
         <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold text-rose-600 dark:text-rose-400">
           {globalError}
@@ -81,9 +92,9 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
           </label>
           <select
             id="order-payment-status"
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("payment_status")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all cursor-not-allowed disabled:cursor-not-allowed"
           >
             <option value="pending">Pending</option>
             <option value="cod_pending">COD Pending</option>
@@ -91,6 +102,7 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
             <option value="failed">Failed</option>
             <option value="refunded">Refunded</option>
             <option value="partially_refunded">Partially Refunded</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           {errors.payment_status && (
             <p className="mt-1 text-xs text-rose-500 font-medium">
@@ -109,9 +121,9 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
           </label>
           <select
             id="order-fulfillment-status"
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("fulfillment_status")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all cursor-not-allowed disabled:cursor-not-allowed"
           >
             <option value="unfulfilled">Unfulfilled</option>
             <option value="processing">Processing</option>
@@ -139,9 +151,9 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
             id="order-carrier-name"
             type="text"
             placeholder="e.g. DHL, FedEx, TCS"
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("carrier_name")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all cursor-not-allowed disabled:cursor-not-allowed"
           />
         </div>
 
@@ -157,9 +169,9 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
             id="order-tracking-number"
             type="text"
             placeholder="e.g. 1Z999AA10123456784"
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("tracking_number")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all cursor-not-allowed disabled:cursor-not-allowed"
           />
         </div>
 
@@ -175,9 +187,9 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
             id="order-tracking-url"
             type="url"
             placeholder="https://track.carrier.com/..."
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("tracking_url")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all cursor-not-allowed disabled:cursor-not-allowed"
           />
           {errors.tracking_url && (
             <p className="mt-1 text-xs text-rose-500 font-medium">
@@ -198,13 +210,13 @@ export default function OrderStatusCard({ order, canUpdate }: OrderStatusCardPro
             id="order-admin-notes"
             rows={3}
             placeholder="Private notes visible only to dashboard managers..."
-            disabled={!canUpdate || isPending}
+            disabled={!canUpdate || isPending || isCancelled}
             {...register("admin_notes")}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all resize-none"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 transition-all resize-none cursor-not-allowed disabled:cursor-not-allowed"
           />
         </div>
 
-        {canUpdate && (
+        {canUpdate && !isCancelled && (
           <button
             type="submit"
             disabled={isPending}
