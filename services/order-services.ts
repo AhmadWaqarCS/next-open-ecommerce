@@ -419,3 +419,65 @@ export async function bulkPermanentlyDeleteOrdersTransaction(
     return { affected };
   });
 }
+
+export async function getOrdersDashboardDataInDB(
+  whereCondition: Prisma.orderWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const ordersRaw = await tx.order.findMany({
+      where: whereCondition,
+      include: {
+        items: {
+          select: { id: true, product_name: true, variant_name: true, quantity: true, unit_price: true },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { placed_at: "desc" },
+    });
+
+    const totalOrders = await tx.order.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    const paymentMethodsRaw = await tx.payment_method.findMany({
+      where: { deleted_at: null },
+      select: { provider: true, name: true },
+      orderBy: { sort_order: "asc" },
+    });
+
+    return { ordersRaw, totalOrders, dashboardUsers, paymentMethodsRaw };
+  });
+}
+
+export async function getOrderDetailsDataInDB(orderId: number) {
+  return await prisma.order.findFirst({
+    where: { id: orderId, deleted_at: null },
+    include: {
+      items: {
+        orderBy: { id: "asc" },
+      },
+      shipping_method: {
+        select: { id: true, name: true, price: true },
+      },
+      coupon: {
+        select: {
+          id: true,
+          code: true,
+          discount_type: true,
+          discount_value: true,
+        },
+      },
+      payment_method_ref: {
+        select: { id: true, name: true, provider: true },
+      },
+    },
+  });
+}
+

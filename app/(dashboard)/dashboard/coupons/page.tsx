@@ -1,9 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import CouponTable from "./coupon-table";
 import { resolveUserNames, serializeCoupons } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { buildCouponWhereInput, CouponFilterParams } from "@/lib/filters/coupon-filters";
+import { getCouponsDashboardDataInDB } from "@/services/coupon-services";
 
 import type { Metadata } from "next";
 
@@ -43,20 +43,8 @@ export default async function DashboardCouponsPage({
 
   const whereCondition = buildCouponWhereInput(filterParams, false);
 
-  const [couponsRaw, totalCoupons, dashboardUsers] = await Promise.all([
-    prisma.coupon.findMany({
-      where: whereCondition,
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { created_at: "desc" },
-    }),
-    prisma.coupon.count({ where: whereCondition }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { couponsRaw, totalCoupons, dashboardUsers } =
+    await getCouponsDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const coupons = serializeCoupons(couponsRaw);
 

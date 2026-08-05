@@ -545,3 +545,33 @@ export async function sendInvoiceAndOrderEmailsForOrder(
     customerResult,
   };
 }
+
+export async function getSentEmailsDashboardDataInDB(
+  where: any,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const emailsRaw = await tx.sent_email.findMany({
+      where,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { sent_at: "desc" },
+    });
+
+    const totalEmails = await tx.sent_email.count({ where });
+
+    return { emailsRaw, totalEmails };
+  });
+}
+
+export async function getSentEmailDetailsDataInDB(id: number) {
+  return await prisma.sent_email.findUnique({
+    where: { id },
+    include: {
+      invoice: true,
+      order: true,
+    },
+  });
+}
+

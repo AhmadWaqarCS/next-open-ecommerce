@@ -249,3 +249,147 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
     return { affected, removedMediaUrls };
   });
 }
+
+export async function getCategoriesDashboardDataInDB(
+  where: Prisma.categoryWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const categories = await tx.category.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        image_url: true,
+        image_alt_text: true,
+        bg_color: true,
+        meta_info: true,
+        parent_id: true,
+        sort_order: true,
+        is_active: true,
+        created_at: true,
+        created_by: true,
+        updated_at: true,
+        updated_by: true,
+        _count: {
+          select: {
+            products: true,
+            children: true,
+          },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { sort_order: "asc" },
+    });
+
+    const totalCategories = await tx.category.count({ where });
+
+    const allCategories = await tx.category.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { categories, totalCategories, allCategories, dashboardUsers };
+  });
+}
+
+export async function getParentCategoriesInDB() {
+  return await prisma.category.findMany({
+    where: { deleted_at: null },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getCategoryEditDataInDB(categoryId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const category = await tx.category.findUnique({
+      where: { id: categoryId, deleted_at: null },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        image_url: true,
+        image_alt_text: true,
+        bg_color: true,
+        meta_info: true,
+        parent_id: true,
+        sort_order: true,
+        is_active: true,
+      },
+    });
+
+    if (!category) return null;
+
+    const parentCategories = await tx.category.findMany({
+      where: { deleted_at: null, NOT: { id: categoryId } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { category, parentCategories };
+  });
+}
+
+export async function getCategoryTrashDashboardDataInDB(
+  where: Prisma.categoryWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const categories = await tx.category.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        image_url: true,
+        image_alt_text: true,
+        bg_color: true,
+        meta_info: true,
+        parent_id: true,
+        sort_order: true,
+        is_active: true,
+        created_at: true,
+        created_by: true,
+        updated_at: true,
+        updated_by: true,
+        deleted_at: true,
+        deleted_by: true,
+        _count: {
+          select: {
+            products: true,
+            children: true,
+          },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalCategories = await tx.category.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { categories, totalCategories, dashboardUsers };
+  });
+}
+

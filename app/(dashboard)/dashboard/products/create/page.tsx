@@ -1,7 +1,7 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import ProductForm from "../_components/product-form";
+import { getCategoriesForProductSelectInDB } from "@/services/product-services";
 
 import type { Metadata } from "next";
 
@@ -13,11 +13,7 @@ export const metadata: Metadata = {
 export default async function CreateProductPage() {
   await assertPermission("create", "/dashboard/products");
 
-  const categories = await prisma.category.findMany({
-    where: { deleted_at: null },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  const categories = await getCategoriesForProductSelectInDB();
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

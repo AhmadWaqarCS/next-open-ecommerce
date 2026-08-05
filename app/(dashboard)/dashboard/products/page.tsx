@@ -1,15 +1,18 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import ProductTable from "./product-table";
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
-import { ProductFilterParams, getProductFilterWhere } from "@/lib/filters/product-filters";
+import {
+  ProductFilterParams,
+  getProductFilterWhere,
+} from "@/lib/filters/product-filters";
+import { getProductsDashboardDataInDB } from "@/services/product-services";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Products",
-  description: "Manage your store products and inventory",
+  description: "Manage storefront products catalog",
 };
 
 export default async function DashboardProductsPage({
@@ -29,18 +32,18 @@ export default async function DashboardProductsPage({
   const filterParams: ProductFilterParams = {
     id: typeof params?.id === "string" ? params.id : undefined,
     name: typeof params?.name === "string" ? params.name : undefined,
-    description: typeof params?.description === "string" ? params.description : undefined,
     category_id: typeof params?.category_id === "string" ? params.category_id : undefined,
     is_active: typeof params?.is_active === "string" ? params.is_active : undefined,
     is_featured: typeof params?.is_featured === "string" ? params.is_featured : undefined,
-    stock_status: typeof params?.stock_status === "string" ? params.stock_status : undefined,
-    min_stock: typeof params?.min_stock === "string" ? params.min_stock : undefined,
-    max_stock: typeof params?.max_stock === "string" ? params.max_stock : undefined,
     min_price: typeof params?.min_price === "string" ? params.min_price : undefined,
     max_price: typeof params?.max_price === "string" ? params.max_price : undefined,
     on_sale: typeof params?.on_sale === "string" ? params.on_sale : undefined,
     track_inventory: typeof params?.track_inventory === "string" ? params.track_inventory : undefined,
     has_image: typeof params?.has_image === "string" ? params.has_image : undefined,
+    description: typeof params?.description === "string" ? params.description : undefined,
+    stock_status: typeof params?.stock_status === "string" ? params.stock_status : undefined,
+    min_stock: typeof params?.min_stock === "string" ? params.min_stock : undefined,
+    max_stock: typeof params?.max_stock === "string" ? params.max_stock : undefined,
     has_variants: typeof params?.has_variants === "string" ? params.has_variants : undefined,
     has_meta: typeof params?.has_meta === "string" ? params.has_meta : undefined,
     created_by: typeof params?.created_by === "string" ? params.created_by : undefined,
@@ -53,52 +56,8 @@ export default async function DashboardProductsPage({
 
   const where = getProductFilterWhere(filterParams, false);
 
-  const [productsRaw, categories, totalProducts, dashboardUsers] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        short_description: true,
-        feature_image_url: true,
-        feature_image_alt_text: true,
-        price: true,
-        compare_at_price: true,
-        cost_price: true,
-        sku: true,
-        stock_quantity: true,
-        low_stock_threshold: true,
-        track_inventory: true,
-        weight: true,
-        dimensions: true,
-        category_id: true,
-        category: { select: { name: true } },
-        is_featured: true,
-        is_active: true,
-        sort_order: true,
-        created_at: true,
-        created_by: true,
-        updated_at: true,
-        updated_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.category.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.product.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { productsRaw, categories, totalProducts, dashboardUsers } =
+    await getProductsDashboardDataInDB(where, skipCount, pageSize);
 
   const products = serializeProducts(productsRaw);
   const userIds = products.flatMap((p) => [p.created_by, p.updated_by]);

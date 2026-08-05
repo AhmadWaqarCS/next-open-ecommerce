@@ -1,13 +1,13 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import InvoiceTrashTable from "./invoice-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
+import { getInvoiceTrashDashboardDataInDB } from "@/services/invoice-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Invoice Trash",
-  description: "Manage soft-deleted invoices",
+  title: "Trash — Invoices",
+  description: "Deleted customer order invoices",
 };
 
 interface TrashedInvoice {
@@ -24,7 +24,7 @@ interface TrashedInvoice {
   deleted_by: number;
 }
 
-export default async function InvoiceTrashPage({
+export default async function DashboardInvoicesTrashPage({
   searchParams,
 }: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -37,23 +37,39 @@ export default async function InvoiceTrashPage({
   const skipCount = (currentPage - 1) * pageSize;
 
   const where: any = { NOT: { deleted_at: null } };
-
-  if (typeof params?.invoice_number === "string" && params.invoice_number.trim()) {
-    where.invoice_number = { contains: params.invoice_number.trim(), mode: "insensitive" };
+  if (
+    typeof params?.invoice_number === "string" &&
+    params.invoice_number.trim()
+  ) {
+    where.invoice_number = {
+      contains: params.invoice_number.trim(),
+      mode: "insensitive",
+    };
   }
-  if (typeof params?.customer_email === "string" && params.customer_email.trim()) {
-    where.customer_email = { contains: params.customer_email.trim(), mode: "insensitive" };
+  if (
+    typeof params?.customer_email === "string" &&
+    params.customer_email.trim()
+  ) {
+    where.customer_email = {
+      contains: params.customer_email.trim(),
+      mode: "insensitive",
+    };
+  }
+  if (
+    typeof params?.customer_name === "string" &&
+    params.customer_name.trim()
+  ) {
+    where.customer_name = {
+      contains: params.customer_name.trim(),
+      mode: "insensitive",
+    };
+  }
+  if (typeof params?.status === "string" && params.status.trim()) {
+    where.status = params.status.trim();
   }
 
-  const [invoicesRaw, totalCount] = await Promise.all([
-    prisma.invoice.findMany({
-      where,
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.invoice.count({ where }),
-  ]);
+  const { invoicesRaw, totalInvoices } =
+    await getInvoiceTrashDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = invoicesRaw.flatMap((inv) => [inv.created_by, inv.updated_by, inv.deleted_by ?? 0]);
   const userNames = await resolveUserNames(userIds);
@@ -78,11 +94,11 @@ export default async function InvoiceTrashPage({
         invoices={formattedInvoices}
         permissions={permissions}
         userNames={userNames}
-        totalCount={totalCount}
+        totalCount={totalInvoices}
       />
 
       <Pagination
-        totalItems={totalCount}
+        totalItems={totalInvoices}
         currentPage={currentPage}
         pageSize={pageSize}
         itemName="deleted invoices"

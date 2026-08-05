@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import InvoiceActionsHeader from "./InvoiceActionsHeader";
+import { getInvoiceDetailsDataInDB } from "@/services/invoice-services";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,24 +24,7 @@ export default async function InvoiceDetailPage({
     notFound();
   }
 
-  const [invoice, siteConfig] = await Promise.all([
-    prisma.invoice.findUnique({
-      where: { id: invoiceId, deleted_at: null },
-      include: {
-        order: {
-          include: {
-            items: true,
-          },
-        },
-        sent_emails: {
-          orderBy: { sent_at: "desc" },
-        },
-      },
-    }),
-    prisma.site_config.findFirst({
-      where: { deleted_at: null },
-    }),
-  ]);
+  const { invoice, siteConfig } = await getInvoiceDetailsDataInDB(invoiceId);
 
   if (!invoice || !invoice.order) {
     notFound();

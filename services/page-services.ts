@@ -105,3 +105,63 @@ export async function permanentlyDeleteSitePageTransaction(id: number) {
     return { existing };
   });
 }
+
+export async function getPagesDashboardDataInDB(
+  where: any,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const pagesRaw = await tx.site_page.findMany({
+      where,
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        content: true,
+        is_active: true,
+        meta_info: true,
+        created_at: true,
+        created_by: true,
+        updated_at: true,
+        updated_by: true,
+        deleted_at: true,
+        deleted_by: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { id: "asc" },
+    });
+
+    const totalPages = await tx.site_page.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { pagesRaw, totalPages, dashboardUsers };
+  });
+}
+
+export async function getPageEditDataInDB(id: number) {
+  return await prisma.site_page.findUnique({
+    where: { id, deleted_at: null },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      content: true,
+      is_active: true,
+      meta_info: true,
+      created_at: true,
+      created_by: true,
+      updated_at: true,
+      updated_by: true,
+      deleted_at: true,
+      deleted_by: true,
+    },
+  });
+}
+

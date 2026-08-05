@@ -156,3 +156,60 @@ export async function bulkPermanentlyDeletePaymentMethodsTransaction(
     });
   });
 }
+
+export async function getPaymentMethodsDashboardDataInDB(
+  whereCondition: Prisma.payment_methodWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const paymentMethods = await tx.payment_method.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { sort_order: "asc" },
+    });
+
+    const totalPaymentMethods = await tx.payment_method.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { paymentMethods, totalPaymentMethods, dashboardUsers };
+  });
+}
+
+export async function getPaymentMethodEditDataInDB(id: number) {
+  return await prisma.payment_method.findUnique({
+    where: { id, deleted_at: null },
+  });
+}
+
+export async function getPaymentMethodTrashDashboardDataInDB(
+  whereCondition: Prisma.payment_methodWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const paymentMethods = await tx.payment_method.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalPaymentMethods = await tx.payment_method.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { paymentMethods, totalPaymentMethods, dashboardUsers };
+  });
+}
+

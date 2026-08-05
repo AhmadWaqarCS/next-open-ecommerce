@@ -1,8 +1,8 @@
 import { resolveUserNames, serializeShippingMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Pagination from "@/app/(dashboard)/_components/pagination";
-import { ShippingFilterParams, getShippingFilterWhere } from "@/lib/filters/shipping-filters";
+import { ShippingFilterParams, buildShippingWhereInput } from "@/lib/filters/shipping-filters";
+import { getShippingDashboardDataInDB } from "@/services/shipping-services";
 import ShippingTable from "./shipping-table";
 
 import type { Metadata } from "next";
@@ -20,7 +20,7 @@ export default async function DashboardShippingPage({
   }>;
 }) {
   const { permissions } = await assertPermission("read", "/dashboard/shipping");
-  const params = await searchParams;
+  const params = (await searchParams) ?? {};
 
   const currentPage = Math.max(1, Number(params?.page ?? 1));
   const pageSize = Math.max(1, Number(params?.size ?? 10));
@@ -41,40 +41,10 @@ export default async function DashboardShippingPage({
     updated_from: typeof params?.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
+  const whereCondition = buildShippingWhereInput(filterParams, false);
 
-  const where = await getShippingFilterWhere(filterParams, false);
-
-  const [shippingMethodsRaw, totalShippingMethods, dashboardUsers] = await Promise.all([
-    prisma.shipping_method.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        free_over: true,
-        estimated_days_min: true,
-        estimated_days_max: true,
-        is_active: true,
-        sort_order: true,
-        created_at: true,
-        created_by: true,
-        updated_at: true,
-        updated_by: true,
-        deleted_at: true,
-        deleted_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.shipping_method.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { shippingMethods: shippingMethodsRaw, totalShippingMethods, dashboardUsers } =
+    await getShippingDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const shippingMethods = serializeShippingMethods(shippingMethodsRaw);
   const userIds = shippingMethods.flatMap((s) => [s.created_by, s.updated_by]);

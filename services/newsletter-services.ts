@@ -34,3 +34,28 @@ export async function bulkDeleteNewsletterSubscribersTransaction(
     });
   });
 }
+
+export async function getNewsletterDashboardDataInDB(
+  where: Prisma.newsletter_subscriberWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const subscribers = await tx.newsletter_subscriber.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        created_at: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { created_at: "desc" },
+    });
+
+    const totalSubscribers = await tx.newsletter_subscriber.count({ where });
+
+    return { subscribers, totalSubscribers };
+  });
+}
+

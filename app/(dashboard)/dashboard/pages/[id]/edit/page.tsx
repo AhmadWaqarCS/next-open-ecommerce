@@ -1,9 +1,9 @@
 import { serializePage } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PageForm from "../../_components/page-form";
+import { getPageEditDataInDB } from "@/services/page-services";
 
 import type { Metadata } from "next";
 
@@ -25,23 +25,7 @@ export default async function EditDashboardPage({
     notFound();
   }
 
-  const pageRaw = await prisma.site_page.findUnique({
-    where: { id: pageId, deleted_at: null },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      content: true,
-      is_active: true,
-      meta_info: true,
-      created_at: true,
-      created_by: true,
-      updated_at: true,
-      updated_by: true,
-      deleted_at: true,
-      deleted_by: true,
-    },
-  });
+  const pageRaw = await getPageEditDataInDB(pageId);
 
   if (!pageRaw) {
     notFound();

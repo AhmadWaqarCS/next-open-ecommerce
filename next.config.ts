@@ -6,10 +6,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  cacheHandler:
-    process.env.USE_CUSTOM_CACHE === "true"
-      ? require.resolve("./lib/cache-handler.mjs")
-      : undefined,
 };
 
 export default nextConfig;

@@ -49,3 +49,9 @@ export async function updateEmailConfigTransaction(
     });
   });
 }
+
+export async function getEmailConfigDashboardDataInDB() {
+  return await prisma.email_config.findFirst({
+    where: { deleted_at: null },
+  });
+}

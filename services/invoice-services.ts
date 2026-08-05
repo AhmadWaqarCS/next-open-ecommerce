@@ -244,3 +244,138 @@ export async function bulkPermanentlyDeleteInvoicesTransaction(
     });
   });
 }
+
+export async function getInvoicesDashboardDataInDB(
+  where: Prisma.invoiceWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const invoicesRaw = await tx.invoice.findMany({
+      where,
+      include: {
+        order: {
+          select: { order_number: true },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { created_at: "desc" },
+    });
+
+    const totalInvoices = await tx.invoice.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { invoicesRaw, totalInvoices, dashboardUsers };
+  });
+}
+
+export async function getInvoiceCreateDataInDB() {
+  return await prisma.order.findMany({
+    where: { deleted_at: null },
+    select: {
+      id: true,
+      order_number: true,
+      customer_first_name: true,
+      customer_last_name: true,
+      customer_email: true,
+      subtotal: true,
+      tax_amount: true,
+      shipping_cost: true,
+      discount_amount: true,
+      total: true,
+      currency: true,
+    },
+    orderBy: { placed_at: "desc" },
+    take: 50,
+  });
+}
+
+export async function getInvoiceDetailsDataInDB(invoiceId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUnique({
+      where: { id: invoiceId, deleted_at: null },
+      include: {
+        order: {
+          include: {
+            items: true,
+          },
+        },
+        sent_emails: {
+          orderBy: { sent_at: "desc" },
+        },
+      },
+    });
+
+    const siteConfig = await tx.site_config.findFirst({
+      where: { deleted_at: null },
+    });
+
+    return { invoice, siteConfig };
+  });
+}
+
+export async function getInvoiceEditDataInDB(invoiceId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUnique({
+      where: { id: invoiceId, deleted_at: null },
+    });
+
+    const ordersRaw = await tx.order.findMany({
+      where: { deleted_at: null },
+      select: {
+        id: true,
+        order_number: true,
+        customer_first_name: true,
+        customer_last_name: true,
+        customer_email: true,
+        subtotal: true,
+        tax_amount: true,
+        shipping_cost: true,
+        discount_amount: true,
+        total: true,
+        currency: true,
+      },
+      orderBy: { placed_at: "desc" },
+      take: 50,
+    });
+
+    return { invoice, ordersRaw };
+  });
+}
+
+export async function getInvoiceTrashDashboardDataInDB(
+  where: Prisma.invoiceWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const invoicesRaw = await tx.invoice.findMany({
+      where,
+      include: {
+        order: {
+          select: { order_number: true },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalInvoices = await tx.invoice.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { invoicesRaw, totalInvoices, dashboardUsers };
+  });
+}
+

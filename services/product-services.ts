@@ -517,3 +517,151 @@ export async function bulkPermanentlyDeleteProductsTransaction(
     };
   });
 }
+
+export async function getProductsDashboardDataInDB(
+  where: Prisma.productWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const productsRaw = await tx.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        short_description: true,
+        feature_image_url: true,
+        feature_image_alt_text: true,
+        price: true,
+        compare_at_price: true,
+        cost_price: true,
+        sku: true,
+        stock_quantity: true,
+        low_stock_threshold: true,
+        track_inventory: true,
+        weight: true,
+        dimensions: true,
+        category_id: true,
+        category: { select: { name: true } },
+        is_featured: true,
+        is_active: true,
+        sort_order: true,
+        created_at: true,
+        created_by: true,
+        updated_at: true,
+        updated_by: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { sort_order: "asc" },
+    });
+
+    const categories = await tx.category.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const totalProducts = await tx.product.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { productsRaw, categories, totalProducts, dashboardUsers };
+  });
+}
+
+export async function getCategoriesForProductSelectInDB() {
+  return await prisma.category.findMany({
+    where: { deleted_at: null },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+export async function getProductEditDataInDB(productId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const productData = await tx.product.findUnique({
+      where: { id: productId, deleted_at: null },
+      include: {
+        images: {
+          where: { deleted_at: null },
+          orderBy: { sort_order: "asc" },
+        },
+        variants: {
+          where: { deleted_at: null },
+          orderBy: { sort_order: "asc" },
+        },
+      },
+    });
+
+    if (!productData) return null;
+
+    const categories = await tx.category.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { productData, categories };
+  });
+}
+
+export async function getProductTrashDashboardDataInDB(
+  where: Prisma.productWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const productsRaw = await tx.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        short_description: true,
+        feature_image_url: true,
+        feature_image_alt_text: true,
+        price: true,
+        compare_at_price: true,
+        cost_price: true,
+        sku: true,
+        stock_quantity: true,
+        low_stock_threshold: true,
+        track_inventory: true,
+        category_id: true,
+        is_featured: true,
+        is_active: true,
+        sort_order: true,
+        deleted_at: true,
+        deleted_by: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalProducts = await tx.product.count({ where });
+
+    const categories = await tx.category.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { productsRaw, totalProducts, categories, dashboardUsers };
+  });
+}
+

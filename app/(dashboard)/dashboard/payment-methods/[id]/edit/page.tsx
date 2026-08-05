@@ -1,15 +1,15 @@
 import { serializePaymentMethod } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PaymentMethodForm from "../../_components/payment-method-form";
+import { getPaymentMethodEditDataInDB } from "@/services/payment-method-services";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Edit Payment Method",
-  description: "Update payment method settings and configuration.",
+  description: "Edit payment method configuration",
 };
 
 export default async function EditPaymentMethodPage({
@@ -24,27 +24,7 @@ export default async function EditPaymentMethodPage({
   if (isNaN(methodId) || methodId < 1) {
     notFound();
   }
-
-  const paymentMethodRaw = await prisma.payment_method.findUnique({
-    where: { id: methodId, deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      provider: true,
-      provider_config: true,
-      extra_charge: true,
-      instructions: true,
-      is_active: true,
-      sort_order: true,
-      created_at: true,
-      created_by: true,
-      updated_at: true,
-      updated_by: true,
-      deleted_at: true,
-      deleted_by: true,
-    },
-  });
+  const paymentMethodRaw = await getPaymentMethodEditDataInDB(methodId);
 
   if (!paymentMethodRaw) {
     notFound();

@@ -1,9 +1,9 @@
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import ProductTrashTable from "./product-trash-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { ProductFilterParams, getProductFilterWhere } from "@/lib/filters/product-filters";
+import { getProductTrashDashboardDataInDB } from "@/services/product-services";
 
 import type { Metadata } from "next";
 
@@ -53,47 +53,8 @@ export default async function DashboardProductsTrashPage({
 
   const where = getProductFilterWhere(filterParams, true);
 
-  const [productsRaw, totalProducts, categories, dashboardUsers] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        short_description: true,
-        feature_image_url: true,
-        feature_image_alt_text: true,
-        price: true,
-        compare_at_price: true,
-        cost_price: true,
-        sku: true,
-        stock_quantity: true,
-        low_stock_threshold: true,
-        track_inventory: true,
-        category_id: true,
-        is_featured: true,
-        is_active: true,
-        sort_order: true,
-        deleted_at: true,
-        deleted_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.product.count({ where }),
-    prisma.category.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { productsRaw, totalProducts, categories, dashboardUsers } =
+    await getProductTrashDashboardDataInDB(where, skipCount, pageSize);
 
   const products = serializeProducts(productsRaw);
   const userIds = products

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import ResendEmailButton from "./ResendEmailButton";
+import { getSentEmailDetailsDataInDB } from "@/services/email-services";
 
 export async function generateMetadata({
   params,
@@ -28,13 +28,7 @@ export default async function SentEmailDetailPage({
     notFound();
   }
 
-  const emailLog = await prisma.sent_email.findUnique({
-    where: { id: emailId },
-    include: {
-      invoice: true,
-      order: true,
-    },
-  });
+  const emailLog = await getSentEmailDetailsDataInDB(emailId);
 
   if (!emailLog) {
     notFound();

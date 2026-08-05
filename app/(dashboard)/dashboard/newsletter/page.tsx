@@ -1,11 +1,11 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import NewsletterTable from "./newsletter-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   NewsletterFilterParams,
   getNewsletterFilterWhere,
 } from "@/lib/filters/newsletter-filters";
+import { getNewsletterDashboardDataInDB } from "@/services/newsletter-services";
 
 import type { Metadata } from "next";
 
@@ -37,20 +37,8 @@ export default async function DashboardNewsletterPage({
 
   const where = await getNewsletterFilterWhere(filterParams);
 
-  const [subscribers, totalSubscribers] = await Promise.all([
-    prisma.newsletter_subscriber.findMany({
-      where,
-      select: {
-        id: true,
-        email: true,
-        created_at: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { created_at: "desc" },
-    }),
-    prisma.newsletter_subscriber.count({ where }),
-  ]);
+  const { subscribers, totalSubscribers } =
+    await getNewsletterDashboardDataInDB(where, skipCount, pageSize);
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

@@ -1,5 +1,4 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import CategoryTable from "./category-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -7,6 +6,7 @@ import {
   CategoryFilterParams,
   getCategoryFilterWhere,
 } from "@/lib/filters/category-filters";
+import { getCategoriesDashboardDataInDB } from "@/services/category-services";
 
 import type { Metadata } from "next";
 
@@ -75,49 +75,8 @@ export default async function DashboardCategoriesPage({
 
   const where = await getCategoryFilterWhere(filterParams, false);
 
-  const [categories, totalCategories, allCategories, dashboardUsers] =
-    await Promise.all([
-      prisma.category.findMany({
-        where,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          image_url: true,
-          image_alt_text: true,
-          bg_color: true,
-          meta_info: true,
-          parent_id: true,
-          sort_order: true,
-          is_active: true,
-          created_at: true,
-          created_by: true,
-          updated_at: true,
-          updated_by: true,
-          _count: {
-            select: {
-              products: true,
-              children: true,
-            },
-          },
-        },
-        take: pageSize,
-        skip: skipCount,
-        orderBy: { sort_order: "asc" },
-      }),
-      prisma.category.count({ where }),
-      prisma.category.findMany({
-        where: { deleted_at: null },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.dashboard_user.findMany({
-        where: { deleted_at: null },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-      }),
-    ]);
+  const { categories, totalCategories, allCategories, dashboardUsers } =
+    await getCategoriesDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = categories.flatMap((c) => [c.created_by, c.updated_by]);
   const userNames = await resolveUserNames(userIds);
@@ -143,3 +102,4 @@ export default async function DashboardCategoriesPage({
     </div>
   );
 }
+

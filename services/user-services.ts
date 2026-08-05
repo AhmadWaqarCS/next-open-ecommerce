@@ -208,3 +208,85 @@ export async function bulkPermanentlyDeleteUsersTransaction(
     });
   });
 }
+
+export async function getUsersDashboardDataInDB(
+  where: Prisma.dashboard_userWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const users = await tx.dashboard_user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        role_name: true,
+        is_active: true,
+        name: true,
+        created_by: true,
+        updated_by: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { created_at: "desc" },
+    });
+
+    const roles = await tx.role.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const totalUsers = await tx.dashboard_user.count({ where });
+
+    const allUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { users, roles, totalUsers, allUsers };
+  });
+}
+
+export async function getUserTrashDashboardDataInDB(
+  where: Prisma.dashboard_userWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const users = await tx.dashboard_user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        role_name: true,
+        is_active: true,
+        name: true,
+        created_by: true,
+        updated_by: true,
+        deleted_at: true,
+        deleted_by: true,
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const roles = await tx.role.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    const totalUsers = await tx.dashboard_user.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { users, roles, totalUsers, dashboardUsers };
+  });
+}
+

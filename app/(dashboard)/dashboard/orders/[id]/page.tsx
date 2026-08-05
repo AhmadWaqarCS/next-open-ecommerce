@@ -2,10 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import { serializeOrder } from "@/lib/action-utils";
 import { order as OrderType } from "@/lib/types";
 import OrderStatusCard from "./order-status-card";
+import { getOrderDetailsDataInDB } from "@/services/order-services";
 import type { Metadata } from "next";
 
 export async function generateMetadata({
@@ -33,28 +33,7 @@ export default async function OrderDetailPage({
     notFound();
   }
 
-  const orderRaw = await prisma.order.findFirst({
-    where: { id: numericId, deleted_at: null },
-    include: {
-      items: {
-        orderBy: { id: "asc" },
-      },
-      shipping_method: {
-        select: { id: true, name: true, price: true },
-      },
-      coupon: {
-        select: {
-          id: true,
-          code: true,
-          discount_type: true,
-          discount_value: true,
-        },
-      },
-      payment_method_ref: {
-        select: { id: true, name: true, provider: true },
-      },
-    },
-  });
+  const orderRaw = await getOrderDetailsDataInDB(numericId);
 
   if (!orderRaw) {
     notFound();

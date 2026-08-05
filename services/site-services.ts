@@ -148,3 +148,39 @@ export async function getSitemapDataTransaction() {
     return { siteConfig, categories, products, pages };
   });
 }
+
+export async function getSiteConfigDashboardDataInDB() {
+  return await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: {
+      id: true,
+      name: true,
+      tagline: true,
+      description: true,
+      site_url: true,
+      topbar_message: true,
+      home_tagline_label: true,
+      light_logo_url: true,
+      dark_logo_url: true,
+      favicon_url: true,
+      primary_color: true,
+      secondary_color: true,
+      accent_color: true,
+      currency: true,
+      currency_symbol: true,
+      email: true,
+      phone: true,
+      address: true,
+      social_links: true,
+      business_name: true,
+      business_registration_number: true,
+      tax_rate: true,
+      tax_inclusive: true,
+      tax_label: true,
+      require_phone: true,
+      allow_order_notes: true,
+      meta_info: true,
+    },
+  });
+}
+

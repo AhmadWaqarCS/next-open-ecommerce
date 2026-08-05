@@ -1,15 +1,15 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import CouponTrashTable from "./coupon-trash-table";
 import { resolveUserNames, serializeCoupons } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
-import { CouponFilterParams, buildCouponWhereInput } from "@/lib/filters/coupon-filters";
+import { buildCouponWhereInput, CouponFilterParams } from "@/lib/filters/coupon-filters";
+import { getCouponTrashDashboardDataInDB } from "@/services/coupon-services";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Trash — Coupons",
-  description: "Deleted discount coupons",
+  description: "Deleted coupons",
 };
 
 export default async function DashboardCouponsTrashPage({
@@ -21,10 +21,6 @@ export default async function DashboardCouponsTrashPage({
 }) {
   const { permissions } = await assertPermission("delete", "/dashboard/coupons");
   const params = (await searchParams) || {};
-
-  const currentPage = Math.max(1, Number(params.page ?? 1));
-  const pageSize = Math.max(1, Number(params.size ?? 10));
-  const skipCount = (currentPage - 1) * pageSize;
 
   const filterParams: CouponFilterParams = {
     id: typeof params.id === "string" ? params.id : undefined,
@@ -41,22 +37,14 @@ export default async function DashboardCouponsTrashPage({
     updated_to: typeof params.updated_to === "string" ? params.updated_to : undefined,
   };
 
+  const currentPage = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.max(1, Number(params.size ?? 10));
+  const skipCount = (currentPage - 1) * pageSize;
+
   const whereCondition = buildCouponWhereInput(filterParams, true);
 
-  const [couponsRaw, totalCoupons, dashboardUsers] = await Promise.all([
-    prisma.coupon.findMany({
-      where: whereCondition,
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.coupon.count({ where: whereCondition }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { couponsRaw, totalCoupons, dashboardUsers } =
+    await getCouponTrashDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const coupons = serializeCoupons(couponsRaw);
 

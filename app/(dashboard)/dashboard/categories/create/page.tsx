@@ -1,7 +1,7 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import CategoryForm from "../_components/category-form";
+import { getParentCategoriesInDB } from "@/services/category-services";
 
 import type { Metadata } from "next";
 
@@ -13,11 +13,7 @@ export const metadata: Metadata = {
 export default async function CreateCategoryPage() {
   await assertPermission("create", "/dashboard/categories");
 
-  const parentCategories = await prisma.category.findMany({
-    where: { deleted_at: null },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  const parentCategories = await getParentCategoriesInDB();
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

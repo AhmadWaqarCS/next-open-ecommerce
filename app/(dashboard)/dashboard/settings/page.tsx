@@ -1,6 +1,6 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import SiteConfigForm from "./site-config-form";
+import { getSiteConfigDashboardDataInDB } from "@/services/site-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -15,38 +15,7 @@ export default async function SettingsPage() {
     "/dashboard/settings",
   );
 
-  const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      tagline: true,
-      description: true,
-      site_url: true,
-      topbar_message: true,
-      home_tagline_label: true,
-      light_logo_url: true,
-      dark_logo_url: true,
-      favicon_url: true,
-      primary_color: true,
-      secondary_color: true,
-      accent_color: true,
-      currency: true,
-      currency_symbol: true,
-      email: true,
-      phone: true,
-      address: true,
-      social_links: true,
-      business_name: true,
-      business_registration_number: true,
-      tax_rate: true,
-      tax_inclusive: true,
-      tax_label: true,
-      require_phone: true,
-      allow_order_notes: true,
-      meta_info: true,
-    },
-  });
+  const siteConfig = await getSiteConfigDashboardDataInDB();
 
   return (
     <div className="space-y-6 flex-1 flex flex-col pb-12">

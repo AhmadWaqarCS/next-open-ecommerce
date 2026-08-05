@@ -277,3 +277,32 @@ export async function bulkDeleteMediaFilesFromStorage(
 
   return { deletedCount, failedCount, errors };
 }
+
+export async function getMediaDashboardDataInDB() {
+  return await prisma.$transaction(async (tx) => {
+    const categories = await tx.category.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: "asc" },
+    });
+
+    const products = await tx.product.findMany({
+      where: { deleted_at: null },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        sku: true,
+        variants: {
+          where: { deleted_at: null },
+          select: { id: true, name: true, sku: true },
+          orderBy: { name: "asc" },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return { categories, products };
+  });
+}
+

@@ -1,9 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import OrderTable from "./order-table";
 import { resolveUserNames, serializeOrders } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { OrderFilterParams, getOrderFilterWhere } from "@/lib/filters/order-filters";
+import { getOrdersDashboardDataInDB } from "@/services/order-services";
 
 import type { Metadata } from "next";
 
@@ -62,68 +62,10 @@ export default async function DashboardOrdersPage({
     updated_from: typeof params?.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
+  const whereCondition = await getOrderFilterWhere(filterParams, false);
 
-  const where = await getOrderFilterWhere(filterParams, false);
-
-  const [ordersRaw, totalOrders, dashboardUsers, paymentMethodsRaw] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      select: {
-        id: true,
-        order_number: true,
-        customer_email: true,
-        customer_first_name: true,
-        customer_last_name: true,
-        customer_phone: true,
-        total: true,
-        subtotal: true,
-        tax_amount: true,
-        shipping_cost: true,
-        discount_amount: true,
-        currency: true,
-        payment_method: true,
-        payment_method_name: true,
-        payment_status: true,
-        fulfillment_status: true,
-        tracking_number: true,
-        tracking_url: true,
-        carrier_name: true,
-        admin_notes: true,
-        customer_notes: true,
-        placed_at: true,
-        shipped_at: true,
-        delivered_at: true,
-        cancelled_at: true,
-        paid_at: true,
-        created_at: true,
-        created_by: true,
-        updated_at: true,
-        updated_by: true,
-        items: {
-          select: {
-            id: true,
-            product_name: true,
-            variant_name: true,
-            quantity: true,
-          },
-        },
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { placed_at: "desc" },
-    }),
-    prisma.order.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.payment_method.findMany({
-      where: { deleted_at: null },
-      select: { provider: true, name: true },
-      orderBy: { sort_order: "asc" },
-    }),
-  ]);
+  const { ordersRaw, totalOrders, dashboardUsers, paymentMethodsRaw } =
+    await getOrdersDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const orders = serializeOrders(ordersRaw);
   const userIds = orders.flatMap((o) => [o.created_by ?? 0, o.updated_by ?? 0]);

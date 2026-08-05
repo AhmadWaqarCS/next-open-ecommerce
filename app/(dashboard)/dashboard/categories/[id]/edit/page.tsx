@@ -1,8 +1,8 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CategoryForm from "../../_components/category-form";
+import { getCategoryEditDataInDB } from "@/services/category-services";
 
 import type { Metadata } from "next";
 
@@ -24,32 +24,13 @@ export default async function EditCategoryPage({
     notFound();
   }
 
-  const category = await prisma.category.findUnique({
-    where: { id: categoryId, deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      description: true,
-      image_url: true,
-      image_alt_text: true,
-      bg_color: true,
-      meta_info: true,
-      parent_id: true,
-      sort_order: true,
-      is_active: true,
-    },
-  });
+  const categoryEditData = await getCategoryEditDataInDB(categoryId);
 
-  if (!category) {
+  if (!categoryEditData) {
     notFound();
   }
 
-  const parentCategories = await prisma.category.findMany({
-    where: { deleted_at: null, NOT: { id: categoryId } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  const { category, parentCategories } = categoryEditData;
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

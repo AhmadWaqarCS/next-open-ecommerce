@@ -268,3 +268,95 @@ export async function bulkPermanentlyDeleteRolesTransaction(
     return { affected };
   });
 }
+
+export async function getRolesDashboardDataInDB(
+  where: Prisma.roleWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const roles = await tx.role.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        is_active: true,
+        created_by: true,
+        updated_by: true,
+        site_feature_roles: {
+          select: {
+            site_feature_id: true,
+            access_crud: true,
+            site_feature: {
+              select: { id: true, name: true, path: true, enabled: true, is_super: true },
+            },
+          },
+        },
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { id: "asc" },
+    });
+
+    const siteFeatures = await tx.site_feature.findMany({
+      where: { enabled: true },
+      select: { id: true, name: true, path: true, enabled: true, is_super: true },
+      orderBy: { name: "asc" },
+    });
+
+    const totalRoles = await tx.role.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { roles, siteFeatures, totalRoles, dashboardUsers };
+  });
+}
+
+export async function getRoleTrashDashboardDataInDB(
+  where: Prisma.roleWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const roles = await tx.role.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        is_active: true,
+        created_by: true,
+        updated_by: true,
+        deleted_at: true,
+        deleted_by: true,
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalRoles = await tx.role.count({ where });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { roles, totalRoles, dashboardUsers };
+  });
+}
+

@@ -1,7 +1,8 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import SentEmailTable from "./sent-email-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
+import { getSentEmailsDashboardDataInDB } from "@/services/email-services";
+
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -52,15 +53,8 @@ export default async function DashboardSentEmailsPage({
     where.type = params.type.trim();
   }
 
-  const [emailsRaw, totalEmails] = await Promise.all([
-    prisma.sent_email.findMany({
-      where,
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { sent_at: "desc" },
-    }),
-    prisma.sent_email.count({ where }),
-  ]);
+  const { emailsRaw, totalEmails } =
+    await getSentEmailsDashboardDataInDB(where, skipCount, pageSize);
 
   const serializedEmails = emailsRaw.map((email) => ({
     id: email.id,

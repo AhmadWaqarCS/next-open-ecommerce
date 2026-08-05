@@ -1,12 +1,12 @@
 import { resolveUserNames, serializePages } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   PageFilterParams,
   buildPageWhereInput,
 } from "@/lib/filters/page-filters";
 import PagesTable from "./pages-table";
+import { getPagesDashboardDataInDB } from "@/services/page-services";
 
 import type { Metadata } from "next";
 
@@ -36,29 +36,8 @@ export default async function DashboardPagesPage({
 
   const where = buildPageWhereInput(filterParams);
 
-  const [pagesRaw, totalPages] = await Promise.all([
-    prisma.site_page.findMany({
-      where,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        content: true,
-        is_active: true,
-        meta_info: true,
-        created_at: true,
-        created_by: true,
-        updated_at: true,
-        updated_by: true,
-        deleted_at: true,
-        deleted_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { id: "asc" },
-    }),
-    prisma.site_page.count({ where }),
-  ]);
+  const { pagesRaw, totalPages, dashboardUsers } =
+    await getPagesDashboardDataInDB(where, skipCount, pageSize);
 
   const pages = serializePages(pagesRaw);
   const userIds = pages.flatMap((p) => [p.created_by, p.updated_by]);

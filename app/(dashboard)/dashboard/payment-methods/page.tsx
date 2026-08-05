@@ -1,12 +1,12 @@
 import { resolveUserNames, serializePaymentMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   PaymentMethodFilterParams,
-  getPaymentMethodFilterWhere,
+  buildPaymentMethodWhereInput,
 } from "@/lib/filters/payment-method-filters";
 import PaymentMethodsTable from "./payment-methods-table";
+import { getPaymentMethodsDashboardDataInDB } from "@/services/payment-method-services";
 
 import type { Metadata } from "next";
 
@@ -40,40 +40,10 @@ export default async function DashboardPaymentMethodsPage({
     updated_from: typeof params?.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
+  const whereCondition = buildPaymentMethodWhereInput(filterParams, false);
 
-  const where = await getPaymentMethodFilterWhere(filterParams, false);
-
-  const [paymentMethodsRaw, totalPaymentMethods, dashboardUsers] = await Promise.all([
-    prisma.payment_method.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        provider: true,
-        provider_config: true,
-        extra_charge: true,
-        instructions: true,
-        is_active: true,
-        sort_order: true,
-        created_at: true,
-        created_by: true,
-        updated_at: true,
-        updated_by: true,
-        deleted_at: true,
-        deleted_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.payment_method.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { paymentMethods: paymentMethodsRaw, totalPaymentMethods, dashboardUsers } =
+    await getPaymentMethodsDashboardDataInDB(whereCondition, skipCount, pageSize);
 
   const paymentMethods = serializePaymentMethods(paymentMethodsRaw);
   const userIds = paymentMethods.flatMap((m) => [m.created_by, m.updated_by]);

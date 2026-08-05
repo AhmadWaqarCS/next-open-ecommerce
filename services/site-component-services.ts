@@ -165,3 +165,10 @@ export async function bulkPermanentlyDeleteSiteComponentsTransaction(
     return { affected, removedMediaUrls };
   });
 }
+
+export async function getSiteComponentsDashboardDataInDB() {
+  return await prisma.site_component.findMany({
+    orderBy: { name: "asc" },
+  });
+}
+

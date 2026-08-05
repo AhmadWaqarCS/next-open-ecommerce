@@ -145,3 +145,60 @@ export async function bulkPermanentlyDeleteCouponsTransaction(
     });
   });
 }
+
+export async function getCouponsDashboardDataInDB(
+  whereCondition: Prisma.couponWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const couponsRaw = await tx.coupon.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { created_at: "desc" },
+    });
+
+    const totalCoupons = await tx.coupon.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { couponsRaw, totalCoupons, dashboardUsers };
+  });
+}
+
+export async function getCouponEditDataInDB(couponId: number) {
+  return await prisma.coupon.findUnique({
+    where: { id: couponId, deleted_at: null },
+  });
+}
+
+export async function getCouponTrashDashboardDataInDB(
+  whereCondition: Prisma.couponWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const couponsRaw = await tx.coupon.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalCoupons = await tx.coupon.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { couponsRaw, totalCoupons, dashboardUsers };
+  });
+}
+

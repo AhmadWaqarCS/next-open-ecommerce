@@ -142,3 +142,60 @@ export async function bulkPermanentlyDeleteShippingMethodsTransaction(
     });
   });
 }
+
+export async function getShippingDashboardDataInDB(
+  whereCondition: Prisma.shipping_methodWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const shippingMethods = await tx.shipping_method.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { sort_order: "asc" },
+    });
+
+    const totalShippingMethods = await tx.shipping_method.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { shippingMethods, totalShippingMethods, dashboardUsers };
+  });
+}
+
+export async function getShippingEditDataInDB(id: number) {
+  return await prisma.shipping_method.findUnique({
+    where: { id, deleted_at: null },
+  });
+}
+
+export async function getShippingTrashDashboardDataInDB(
+  whereCondition: Prisma.shipping_methodWhereInput,
+  skipCount: number,
+  pageSize: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const shippingMethods = await tx.shipping_method.findMany({
+      where: whereCondition,
+      take: pageSize,
+      skip: skipCount,
+      orderBy: { deleted_at: "desc" },
+    });
+
+    const totalShippingMethods = await tx.shipping_method.count({ where: whereCondition });
+
+    const dashboardUsers = await tx.dashboard_user.findMany({
+      where: { deleted_at: null },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+
+    return { shippingMethods, totalShippingMethods, dashboardUsers };
+  });
+}
+

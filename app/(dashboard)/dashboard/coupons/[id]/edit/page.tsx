@@ -1,9 +1,9 @@
 import { serializeCoupon } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CouponForm from "../../_components/coupon-form";
+import { getCouponEditDataInDB } from "@/services/coupon-services";
 
 import type { Metadata } from "next";
 
@@ -25,9 +25,7 @@ export default async function EditCouponPage({
     notFound();
   }
 
-  const rawCouponData = await prisma.coupon.findUnique({
-    where: { id: couponId, deleted_at: null },
-  });
+  const rawCouponData = await getCouponEditDataInDB(couponId);
 
   if (!rawCouponData) {
     notFound();

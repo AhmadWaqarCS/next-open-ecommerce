@@ -1,6 +1,6 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import EmailConfigForm from "./email-config-form";
+import { getEmailConfigDashboardDataInDB } from "@/services/email-config-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -15,9 +15,7 @@ export default async function EmailConfigPage() {
     "/dashboard/email-config",
   );
 
-  const emailConfig = await prisma.email_config.findFirst({
-    where: { deleted_at: null },
-  });
+  const emailConfig = await getEmailConfigDashboardDataInDB();
 
   return (
     <div className="space-y-6 flex-1 flex flex-col pb-12">

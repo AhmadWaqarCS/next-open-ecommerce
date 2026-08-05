@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import InvoiceForm from "../../_components/invoice-form";
+import { getInvoiceEditDataInDB } from "@/services/invoice-services";
 
 export async function generateMetadata({
   params,
@@ -28,29 +28,7 @@ export default async function EditInvoicePage({
     notFound();
   }
 
-  const [invoice, ordersRaw] = await Promise.all([
-    prisma.invoice.findUnique({
-      where: { id: invoiceId, deleted_at: null },
-    }),
-    prisma.order.findMany({
-      where: { deleted_at: null },
-      select: {
-        id: true,
-        order_number: true,
-        customer_first_name: true,
-        customer_last_name: true,
-        customer_email: true,
-        subtotal: true,
-        tax_amount: true,
-        shipping_cost: true,
-        discount_amount: true,
-        total: true,
-        currency: true,
-      },
-      orderBy: { placed_at: "desc" },
-      take: 50,
-    }),
-  ]);
+  const { invoice, ordersRaw } = await getInvoiceEditDataInDB(invoiceId);
 
   if (!invoice) {
     notFound();

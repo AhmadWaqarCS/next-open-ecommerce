@@ -1,9 +1,9 @@
 import { serializeProduct } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductForm from "../../_components/product-form";
+import { getProductEditDataInDB } from "@/services/product-services";
 
 import type { Metadata } from "next";
 
@@ -25,30 +25,13 @@ export default async function EditProductPage({
     notFound();
   }
 
-  const [productData, categories] = await Promise.all([
-    prisma.product.findUnique({
-      where: { id: productId, deleted_at: null },
-      include: {
-        images: {
-          where: { deleted_at: null },
-          orderBy: { sort_order: "asc" },
-        },
-        variants: {
-          where: { deleted_at: null },
-          orderBy: { sort_order: "asc" },
-        },
-      },
-    }),
-    prisma.category.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const editData = await getProductEditDataInDB(productId);
 
-  if (!productData) {
+  if (!editData) {
     notFound();
   }
+
+  const { productData, categories } = editData;
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

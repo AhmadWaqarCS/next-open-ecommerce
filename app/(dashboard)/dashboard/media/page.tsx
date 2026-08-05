@@ -1,7 +1,7 @@
 import { assertPermission } from "@/lib/guards";
 import { scanMediaStorage } from "@/lib/media-scanner";
-import prisma from "@/lib/prisma";
 import MediaClient from "./media-client";
+import { getMediaDashboardDataInDB } from "@/services/media-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,29 +12,9 @@ export const metadata: Metadata = {
 export default async function MediaDashboardPage() {
   const { permissions } = await assertPermission("read", "/dashboard/media");
 
-  // Parallel fetching of disk storage scan, categories, and products with variants
-  const [scanResult, categories, products] = await Promise.all([
+  const [scanResult, { categories, products }] = await Promise.all([
     scanMediaStorage(),
-    prisma.category.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, slug: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.product.findMany({
-      where: { deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        sku: true,
-        variants: {
-          where: { deleted_at: null },
-          select: { id: true, name: true, sku: true },
-          orderBy: { name: "asc" },
-        },
-      },
-      orderBy: { name: "asc" },
-    }),
+    getMediaDashboardDataInDB(),
   ]);
 
   return (

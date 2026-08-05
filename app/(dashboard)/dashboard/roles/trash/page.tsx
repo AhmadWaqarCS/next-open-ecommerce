@@ -1,9 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import RoleTrashTable from "./role-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { RoleFilterParams, getRoleFilterWhere } from "@/lib/filters/role-filters";
+import { getRoleTrashDashboardDataInDB } from "@/services/role-services";
 
 import type { Metadata } from "next";
 
@@ -43,29 +43,8 @@ export default async function DashboardRolesTrashPage({
 
   const where = await getRoleFilterWhere(filterParams, true);
 
-  const [roles, totalRoles, dashboardUsers] = await Promise.all([
-    prisma.role.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        is_active: true,
-        created_by: true,
-        updated_by: true,
-        deleted_by: true,
-        deleted_at: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.role.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { roles, totalRoles, dashboardUsers } =
+    await getRoleTrashDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = roles.flatMap((r) =>
     [r.created_by, r.updated_by, r.deleted_by].filter((id) => id !== null)

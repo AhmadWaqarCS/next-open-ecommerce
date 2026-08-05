@@ -1,50 +1,31 @@
 import { serializeShippingMethod } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ShippingForm from "../../_components/shipping-form";
+import { getShippingEditDataInDB } from "@/services/shipping-services";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Edit Shipping Method",
-  description: "Edit shipping method rates and settings",
+  description: "Edit shipping method settings and rate tiers",
 };
 
-export default async function EditShippingMethodPage({
+export default async function EditShippingPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   await assertPermission("update", "/dashboard/shipping");
   const { id } = await params;
-  const shippingId = Number(id);
+  const methodId = Number(id);
 
-  if (isNaN(shippingId) || shippingId < 1) {
+  if (isNaN(methodId) || methodId < 1) {
     notFound();
   }
 
-  const shippingMethodRaw = await prisma.shipping_method.findUnique({
-    where: { id: shippingId, deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      price: true,
-      free_over: true,
-      estimated_days_min: true,
-      estimated_days_max: true,
-      is_active: true,
-      sort_order: true,
-      created_at: true,
-      created_by: true,
-      updated_at: true,
-      updated_by: true,
-      deleted_at: true,
-      deleted_by: true,
-    },
-  });
+  const shippingMethodRaw = await getShippingEditDataInDB(methodId);
 
   if (!shippingMethodRaw) {
     notFound();

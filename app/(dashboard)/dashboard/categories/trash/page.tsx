@@ -1,9 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import CategoryTrashTable from "./category-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { CategoryFilterParams, getCategoryFilterWhere } from "@/lib/filters/category-filters";
+import { getCategoryTrashDashboardDataInDB } from "@/services/category-services";
 
 import type { Metadata } from "next";
 
@@ -47,33 +47,8 @@ export default async function DashboardCategoriesTrashPage({
 
   const where = await getCategoryFilterWhere(filterParams, true);
 
-  const [categories, totalCategories, dashboardUsers] = await Promise.all([
-    prisma.category.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        description: true,
-        image_url: true,
-        bg_color: true,
-        parent_id: true,
-        sort_order: true,
-        is_active: true,
-        deleted_at: true,
-        deleted_by: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.category.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { categories, totalCategories, dashboardUsers } =
+    await getCategoryTrashDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = categories
     .filter((c) => c.deleted_by !== null)

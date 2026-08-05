@@ -1,14 +1,14 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import UserTrashTable from "./user-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { UserFilterParams, getUserFilterWhere } from "@/lib/filters/user-filters";
+import { getUserTrashDashboardDataInDB } from "@/services/user-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Trash Users",
-  description: "Trash Users",
+  title: "Trash — Users",
+  description: "Deleted users",
 };
 
 export default async function DashboardUsersTrashPage({
@@ -40,36 +40,8 @@ export default async function DashboardUsersTrashPage({
 
   const where = getUserFilterWhere(filterParams, true);
 
-  const [users, roles, totalUsers, dashboardUsers] = await Promise.all([
-    prisma.dashboard_user.findMany({
-      where,
-      select: {
-        id: true,
-        email: true,
-        role_name: true,
-        is_active: true,
-        name: true,
-        created_by: true,
-        updated_by: true,
-        deleted_by: true,
-        deleted_at: true,
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { deleted_at: "desc" },
-    }),
-    prisma.role.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.dashboard_user.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { users, roles, totalUsers, dashboardUsers } =
+    await getUserTrashDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = users.flatMap((u) =>
     [u.created_by, u.updated_by, u.deleted_by].filter((id) => id !== null)

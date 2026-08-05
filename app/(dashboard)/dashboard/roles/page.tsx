@@ -1,9 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import RoleTable from "./role-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
 import { RoleFilterParams, getRoleFilterWhere } from "@/lib/filters/role-filters";
+import { getRolesDashboardDataInDB } from "@/services/role-services";
 
 import type { Metadata } from "next";
 
@@ -43,37 +43,8 @@ export default async function DashboardRolesPage({
 
   const where = await getRoleFilterWhere(filterParams, false);
 
-  const [roles, siteFeatures, totalRoles, dashboardUsers] = await Promise.all([
-    prisma.role.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        is_active: true,
-        created_by: true,
-        updated_by: true,
-        site_feature_roles: {
-          select: {
-            site_feature_id: true,
-            access_crud: true,
-            site_feature: {
-              select: { id: true, name: true, path: true, enabled: true, is_super: true },
-            },
-          },
-        },
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { name: "asc" },
-    }),
-    prisma.site_feature.findMany({ orderBy: { name: "asc" } }),
-    prisma.role.count({ where }),
-    prisma.dashboard_user.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const { roles, siteFeatures, totalRoles, dashboardUsers } =
+    await getRolesDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = roles.flatMap((r) => [r.created_by, r.updated_by]);
   const userNames = await resolveUserNames(userIds);

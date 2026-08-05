@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import InvoiceForm from "../_components/invoice-form";
+import { getInvoiceCreateDataInDB } from "@/services/invoice-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,24 +12,7 @@ export const metadata: Metadata = {
 export default async function CreateInvoicePage() {
   await assertPermission("create", "/dashboard/invoices");
 
-  const ordersRaw = await prisma.order.findMany({
-    where: { deleted_at: null },
-    select: {
-      id: true,
-      order_number: true,
-      customer_first_name: true,
-      customer_last_name: true,
-      customer_email: true,
-      subtotal: true,
-      tax_amount: true,
-      shipping_cost: true,
-      discount_amount: true,
-      total: true,
-      currency: true,
-    },
-    orderBy: { placed_at: "desc" },
-    take: 50,
-  });
+  const ordersRaw = await getInvoiceCreateDataInDB();
 
   const orders = ordersRaw.map((o) => ({
     id: o.id,

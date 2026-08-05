@@ -1,6 +1,6 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import SiteComponentTable from "./_components/site-component-table";
+import { getSiteComponentsDashboardDataInDB } from "@/services/site-component-services";
 
 import type { Metadata } from "next";
 
@@ -15,9 +15,7 @@ export default async function DashboardSiteComponentsPage() {
     "/dashboard/site-components",
   );
 
-  const components = await prisma.site_component.findMany({
-    orderBy: { name: "asc" },
-  });
+  const components = await getSiteComponentsDashboardDataInDB();
 
   return (
     <div className="space-y-6 flex-1 flex flex-col">

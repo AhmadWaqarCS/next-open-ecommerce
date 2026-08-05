@@ -1,8 +1,9 @@
 import { assertPermission } from "@/lib/guards";
-import prisma from "@/lib/prisma";
 import InvoiceTable from "./invoice-table";
 import { resolveUserNames } from "@/lib/action-utils";
 import Pagination from "@/app/(dashboard)/_components/pagination";
+import { getInvoicesDashboardDataInDB } from "@/services/invoice-services";
+
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -54,20 +55,8 @@ export default async function DashboardInvoicesPage({
     where.status = params.status.trim();
   }
 
-  const [invoicesRaw, totalInvoices] = await Promise.all([
-    prisma.invoice.findMany({
-      where,
-      include: {
-        order: {
-          select: { order_number: true },
-        },
-      },
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { issued_at: "desc" },
-    }),
-    prisma.invoice.count({ where }),
-  ]);
+  const { invoicesRaw, totalInvoices, dashboardUsers } =
+    await getInvoicesDashboardDataInDB(where, skipCount, pageSize);
 
   const userIds = invoicesRaw.flatMap((inv) => [
     inv.created_by,
