@@ -9,14 +9,20 @@ import {
   shippingMethodUpdateSchema,
 } from "@/lib/validations";
 import {
-  createShippingMethodInDB,
-  updateShippingMethodInDB,
-  deleteShippingMethodPermanentlyInDB,
-  bulkUpdateShippingMethodsInDB,
-  bulkDeleteShippingMethodsPermanentlyInDB,
+  createShippingMethodTransaction,
+  updateShippingMethodTransaction,
+  deleteShippingMethodTransaction,
+  restoreShippingMethodTransaction,
+  permanentlyDeleteShippingMethodTransaction,
+  bulkDeleteShippingMethodsTransaction,
+  bulkRestoreShippingMethodsTransaction,
+  bulkPermanentlyDeleteShippingMethodsTransaction,
 } from "@/services/shipping-services";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { ShippingFilterParams, getShippingFilterWhere } from "@/lib/filters/shipping-filters";
+import {
+  ShippingFilterParams,
+  getShippingFilterWhere,
+} from "@/lib/filters/shipping-filters";
 
 export async function createShippingMethod(
   data: ShippingMethodCreateInput,
@@ -44,21 +50,21 @@ export async function createShippingMethod(
   } = validatedFields.data;
 
   try {
-    await createShippingMethodInDB({
-      name,
-      description: description || null,
-      price,
-      free_over: free_over ?? null,
-      estimated_days_min: estimated_days_min ?? null,
-      estimated_days_max: estimated_days_max ?? null,
-      is_active,
-      sort_order,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createShippingMethodTransaction(
+      {
+        name,
+        description: description || null,
+        price,
+        free_over: free_over ?? null,
+        estimated_days_min: estimated_days_min ?? null,
+        estimated_days_max: estimated_days_max ?? null,
+        is_active,
+        sort_order,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
 
     return { success: true, message: "Shipping method created successfully." };
@@ -97,20 +103,24 @@ export async function updateShippingMethod(
   } = validatedFields.data;
 
   try {
-    await updateShippingMethodInDB(id, {
-      name,
-      description: description !== undefined ? description || null : undefined,
-      price,
-      free_over: free_over !== undefined ? free_over ?? null : undefined,
-      estimated_days_min: estimated_days_min !== undefined ? estimated_days_min ?? null : undefined,
-      estimated_days_max: estimated_days_max !== undefined ? estimated_days_max ?? null : undefined,
-      is_active,
-      sort_order,
-      updated_by: Number(user.id),
-    });
+    await updateShippingMethodTransaction(
+      id,
+      {
+        name,
+        description: description !== undefined ? description || null : undefined,
+        price,
+        free_over: free_over !== undefined ? free_over ?? null : undefined,
+        estimated_days_min:
+          estimated_days_min !== undefined ? estimated_days_min ?? null : undefined,
+        estimated_days_max:
+          estimated_days_max !== undefined ? estimated_days_max ?? null : undefined,
+        is_active,
+        sort_order,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
 
     return { success: true, message: "Shipping method updated successfully." };
@@ -126,14 +136,9 @@ export async function deleteShippingMethod(id: number): Promise<ActionResponse> 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updateShippingMethodInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    await deleteShippingMethodTransaction(id, Number(user.id));
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
@@ -144,20 +149,17 @@ export async function deleteShippingMethod(id: number): Promise<ActionResponse> 
   }
 }
 
-export async function restoreShippingMethod(id: number): Promise<ActionResponse> {
+export async function restoreShippingMethod(
+  id: number,
+): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/shipping");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updateShippingMethodInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    await restoreShippingMethodTransaction(id, Number(user.id));
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
@@ -168,22 +170,26 @@ export async function restoreShippingMethod(id: number): Promise<ActionResponse>
   }
 }
 
-export async function permanentlyDeleteShippingMethod(id: number): Promise<ActionResponse> {
+export async function permanentlyDeleteShippingMethod(
+  id: number,
+): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/shipping");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await deleteShippingMethodPermanentlyInDB(id);
+    await permanentlyDeleteShippingMethodTransaction(id);
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
 
     return { success: true, message: "Shipping method permanently deleted." };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to permanently delete shipping method." };
+    return {
+      success: false,
+      message: "Failed to permanently delete shipping method.",
+    };
   }
 }
 
@@ -193,30 +199,30 @@ export async function bulkDeleteShippingMethods(
   filterParams?: ShippingFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/shipping");
-  const filterWhere = selectAllScope && filterParams ? await getShippingFilterWhere(filterParams, false) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getShippingFilterWhere(filterParams, false)
+      : undefined;
 
   try {
-    await bulkUpdateShippingMethodsInDB(
+    await bulkDeleteShippingMethodsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
     return { success: true, message: "Selected shipping methods moved to trash." };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to delete selected shipping methods." };
+    return {
+      success: false,
+      message: "Failed to delete selected shipping methods.",
+    };
   }
 }
 
@@ -226,30 +232,30 @@ export async function bulkRestoreShippingMethods(
   filterParams?: ShippingFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/shipping");
-  const filterWhere = selectAllScope && filterParams ? await getShippingFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getShippingFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkUpdateShippingMethodsInDB(
+    await bulkRestoreShippingMethodsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
     return { success: true, message: "Selected shipping methods restored." };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to restore selected shipping methods." };
+    return {
+      success: false,
+      message: "Failed to restore selected shipping methods.",
+    };
   }
 }
 
@@ -259,16 +265,25 @@ export async function bulkPermanentlyDeleteShippingMethods(
   filterParams?: ShippingFilterParams,
 ): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/shipping");
-  const filterWhere = selectAllScope && filterParams ? await getShippingFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getShippingFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkDeleteShippingMethodsPermanentlyInDB(ids, selectAllScope, filterWhere);
+    await bulkPermanentlyDeleteShippingMethodsTransaction(
+      ids,
+      selectAllScope,
+      filterWhere,
+    );
 
     revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
     revalidatePath("/dashboard/shipping/trash");
 
-    return { success: true, message: "Selected shipping methods permanently deleted." };
+    return {
+      success: true,
+      message: "Selected shipping methods permanently deleted.",
+    };
   } catch (error) {
     console.error(error);
     return {

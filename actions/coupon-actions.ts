@@ -9,17 +9,23 @@ import {
   couponUpdateSchema,
 } from "@/lib/validations";
 import {
-  createCouponInDB,
-  deleteCouponPermanentlyInDB,
-  updateCouponInDB,
-  bulkUpdateCouponsInDB,
-  bulkDeleteCouponsPermanentlyInDB,
+  createCouponTransaction,
+  updateCouponTransaction,
+  deleteCouponTransaction,
+  restoreCouponTransaction,
+  permanentlyDeleteCouponTransaction,
+  bulkDeleteCouponsTransaction,
+  bulkRestoreCouponsTransaction,
+  bulkPermanentlyDeleteCouponsTransaction,
 } from "@/services/coupon-services";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { CouponFilterParams, getCouponFilterWhere } from "@/lib/filters/coupon-filters";
+import {
+  CouponFilterParams,
+  getCouponFilterWhere,
+} from "@/lib/filters/coupon-filters";
 
 export async function createCoupon(
-  data: CouponCreateInput
+  data: CouponCreateInput,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("create", "/dashboard/coupons");
 
@@ -48,19 +54,20 @@ export async function createCoupon(
     const startsAtDate = starts_at ? new Date(starts_at) : new Date();
     const expiresAtDate = expires_at ? new Date(expires_at) : null;
 
-    await createCouponInDB({
-      code,
-      discount_type,
-      discount_value,
-      minimum_order_amount: minimum_order_amount ?? null,
-      max_uses: max_uses ?? null,
-      max_uses_per_email,
-      starts_at: startsAtDate,
-      expires_at: expiresAtDate,
-      is_active,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createCouponTransaction(
+      {
+        code,
+        discount_type,
+        discount_value,
+        minimum_order_amount: minimum_order_amount ?? null,
+        max_uses: max_uses ?? null,
+        max_uses_per_email,
+        starts_at: startsAtDate,
+        expires_at: expiresAtDate,
+        is_active,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("coupons", "max");
     revalidatePath("/dashboard/coupons");
@@ -81,7 +88,7 @@ export async function createCoupon(
 
 export async function updateCoupon(
   id: number,
-  data: CouponUpdateInput
+  data: CouponUpdateInput,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/coupons");
 
@@ -117,21 +124,24 @@ export async function updateCoupon(
           : null
         : undefined;
 
-    const result = await updateCouponInDB(id, {
-      code,
-      discount_type,
-      discount_value,
-      minimum_order_amount,
-      max_uses,
-      max_uses_per_email,
-      starts_at: startsAtDate,
-      expires_at: expiresAtDate,
-      is_active,
-      updated_by: Number(user.id),
-    });
+    const { updated } = await updateCouponTransaction(
+      id,
+      {
+        code,
+        discount_type,
+        discount_value,
+        minimum_order_amount,
+        max_uses,
+        max_uses_per_email,
+        starts_at: startsAtDate,
+        expires_at: expiresAtDate,
+        is_active,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("coupons", "max");
-    revalidateTag(`coupon-${result.code}`, "max");
+    revalidateTag(`coupon-${updated.code}`, "max");
     revalidatePath("/dashboard/coupons");
 
     return { success: true, message: "Coupon updated successfully." };
@@ -154,14 +164,10 @@ export async function deleteCoupon(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const result = await updateCouponInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    const { existing } = await deleteCouponTransaction(id, Number(user.id));
 
     revalidateTag("coupons", "max");
-    revalidateTag(`coupon-${result.code}`, "max");
+    revalidateTag(`coupon-${existing.code}`, "max");
     revalidatePath("/dashboard/coupons");
     revalidatePath("/dashboard/coupons/trash");
 
@@ -178,14 +184,10 @@ export async function restoreCoupon(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const result = await updateCouponInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    const { existing } = await restoreCouponTransaction(id, Number(user.id));
 
     revalidateTag("coupons", "max");
-    revalidateTag(`coupon-${result.code}`, "max");
+    revalidateTag(`coupon-${existing.code}`, "max");
     revalidatePath("/dashboard/coupons/trash");
     revalidatePath("/dashboard/coupons");
 
@@ -196,16 +198,18 @@ export async function restoreCoupon(id: number): Promise<ActionResponse> {
   }
 }
 
-export async function permanentlyDeleteCoupon(id: number): Promise<ActionResponse> {
+export async function permanentlyDeleteCoupon(
+  id: number,
+): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/coupons");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const result = await deleteCouponPermanentlyInDB(id);
+    const { existing } = await permanentlyDeleteCouponTransaction(id);
 
     revalidateTag("coupons", "max");
-    revalidateTag(`coupon-${result.code}`, "max");
+    revalidateTag(`coupon-${existing.code}`, "max");
     revalidatePath("/dashboard/coupons/trash");
 
     return { success: true, message: "Coupon permanently deleted." };
@@ -218,22 +222,20 @@ export async function permanentlyDeleteCoupon(id: number): Promise<ActionRespons
 export async function bulkDeleteCoupons(
   ids: number[],
   selectAllScope: boolean = false,
-  filterParams?: CouponFilterParams
+  filterParams?: CouponFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/coupons");
-  const filterWhere = selectAllScope && filterParams ? await getCouponFilterWhere(filterParams, false) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCouponFilterWhere(filterParams, false)
+      : undefined;
 
   try {
-    await bulkUpdateCouponsInDB(
+    await bulkDeleteCouponsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
-      filterWhere
+      filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("coupons", "max");
@@ -250,22 +252,20 @@ export async function bulkDeleteCoupons(
 export async function bulkRestoreCoupons(
   ids: number[],
   selectAllScope: boolean = false,
-  filterParams?: CouponFilterParams
+  filterParams?: CouponFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/coupons");
-  const filterWhere = selectAllScope && filterParams ? await getCouponFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCouponFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkUpdateCouponsInDB(
+    await bulkRestoreCouponsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
-      filterWhere
+      filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("coupons", "max");
@@ -282,13 +282,16 @@ export async function bulkRestoreCoupons(
 export async function bulkPermanentlyDeleteCoupons(
   ids: number[],
   selectAllScope: boolean = false,
-  filterParams?: CouponFilterParams
+  filterParams?: CouponFilterParams,
 ): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/coupons");
-  const filterWhere = selectAllScope && filterParams ? await getCouponFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCouponFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkDeleteCouponsPermanentlyInDB(ids, selectAllScope, filterWhere);
+    await bulkPermanentlyDeleteCouponsTransaction(ids, selectAllScope, filterWhere);
 
     revalidateTag("coupons", "max");
     revalidatePath("/dashboard/coupons/trash");

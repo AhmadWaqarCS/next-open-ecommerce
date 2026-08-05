@@ -9,12 +9,14 @@ import {
   invoiceUpdateSchema,
 } from "@/lib/validations";
 import {
-  createInvoiceInDB,
-  updateInvoiceInDB,
-  deleteInvoicePermanentlyInDB,
-  bulkUpdateInvoicesInDB,
-  bulkDeleteInvoicesPermanentlyInDB,
-  generateInvoiceForOrderInDB,
+  createInvoiceTransaction,
+  updateInvoiceTransaction,
+  deleteInvoiceTransaction,
+  restoreInvoiceTransaction,
+  permanentlyDeleteInvoiceTransaction,
+  bulkDeleteInvoicesTransaction,
+  bulkRestoreInvoicesTransaction,
+  bulkPermanentlyDeleteInvoicesTransaction,
 } from "@/services/invoice-services";
 import { sendInvoiceAndOrderEmailsForOrder } from "@/services/email-services";
 import { revalidatePath } from "next/cache";
@@ -50,23 +52,24 @@ export async function createInvoice(
   } = validatedFields.data;
 
   try {
-    const invoice = await createInvoiceInDB({
-      order_id,
-      status,
-      customer_name,
-      customer_email,
-      subtotal,
-      tax_amount: tax_amount ?? 0,
-      shipping_cost: shipping_cost ?? 0,
-      discount_amount: discount_amount ?? 0,
-      total,
-      currency: currency || "USD",
-      notes: notes || null,
-      due_at: due_at ? new Date(due_at) : null,
-      paid_at: paid_at ? new Date(paid_at) : null,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    const invoice = await createInvoiceTransaction(
+      {
+        order_id,
+        status,
+        customer_name,
+        customer_email,
+        subtotal,
+        tax_amount: tax_amount ?? 0,
+        shipping_cost: shipping_cost ?? 0,
+        discount_amount: discount_amount ?? 0,
+        total,
+        currency: currency || "USD",
+        notes: notes || null,
+        due_at: due_at ? new Date(due_at) : null,
+        paid_at: paid_at ? new Date(paid_at) : null,
+      },
+      Number(user.id),
+    );
 
     revalidatePath("/dashboard/invoices");
     revalidatePath(`/dashboard/orders/${order_id}`);
@@ -117,21 +120,24 @@ export async function updateInvoice(
   } = validatedFields.data;
 
   try {
-    await updateInvoiceInDB(id, {
-      status,
-      customer_name,
-      customer_email,
-      subtotal,
-      tax_amount,
-      shipping_cost,
-      discount_amount,
-      total,
-      currency,
-      notes: notes !== undefined ? notes || null : undefined,
-      due_at: due_at !== undefined ? (due_at ? new Date(due_at) : null) : undefined,
-      paid_at: paid_at !== undefined ? (paid_at ? new Date(paid_at) : null) : undefined,
-      updated_by: Number(user.id),
-    });
+    await updateInvoiceTransaction(
+      id,
+      {
+        status,
+        customer_name,
+        customer_email,
+        subtotal,
+        tax_amount,
+        shipping_cost,
+        discount_amount,
+        total,
+        currency,
+        notes: notes !== undefined ? notes || null : undefined,
+        due_at: due_at !== undefined ? (due_at ? new Date(due_at) : null) : undefined,
+        paid_at: paid_at !== undefined ? (paid_at ? new Date(paid_at) : null) : undefined,
+      },
+      Number(user.id),
+    );
 
     revalidatePath("/dashboard/invoices");
     revalidatePath(`/dashboard/invoices/${id}`);
@@ -148,11 +154,7 @@ export async function deleteInvoice(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "Invalid invoice ID." };
 
   try {
-    await updateInvoiceInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    await deleteInvoiceTransaction(id, Number(user.id));
     revalidatePath("/dashboard/invoices");
     revalidatePath("/dashboard/invoices/trash");
     return { success: true, message: "Invoice moved to trash." };
@@ -168,11 +170,7 @@ export async function restoreInvoice(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "Invalid invoice ID." };
 
   try {
-    await updateInvoiceInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    await restoreInvoiceTransaction(id, Number(user.id));
     revalidatePath("/dashboard/invoices/trash");
     revalidatePath("/dashboard/invoices");
     return { success: true, message: "Invoice restored successfully." };
@@ -182,13 +180,15 @@ export async function restoreInvoice(id: number): Promise<ActionResponse> {
   }
 }
 
-export async function permanentlyDeleteInvoice(id: number): Promise<ActionResponse> {
+export async function permanentlyDeleteInvoice(
+  id: number,
+): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/invoices");
 
   if (id < 1) return { success: false, message: "Invalid invoice ID." };
 
   try {
-    await deleteInvoicePermanentlyInDB(id);
+    await permanentlyDeleteInvoiceTransaction(id);
     revalidatePath("/dashboard/invoices/trash");
     return { success: true, message: "Invoice permanently deleted." };
   } catch (error) {
@@ -206,16 +206,12 @@ export async function bulkDeleteInvoices(
   const { user } = await assertPermission("delete", "/dashboard/invoices");
 
   try {
-    await bulkUpdateInvoicesInDB(
+    await bulkDeleteInvoicesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
       isTrash,
       filterWhere,
+      Number(user.id),
     );
     revalidatePath("/dashboard/invoices");
     revalidatePath("/dashboard/invoices/trash");
@@ -235,16 +231,12 @@ export async function bulkRestoreInvoices(
   const { user } = await assertPermission("delete", "/dashboard/invoices");
 
   try {
-    await bulkUpdateInvoicesInDB(
+    await bulkRestoreInvoicesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
       isTrash,
       filterWhere,
+      Number(user.id),
     );
     revalidatePath("/dashboard/invoices/trash");
     revalidatePath("/dashboard/invoices");
@@ -263,12 +255,15 @@ export async function bulkPermanentlyDeleteInvoices(
   await assertPermission("delete", "/dashboard/invoices");
 
   try {
-    await bulkDeleteInvoicesPermanentlyInDB(ids, selectAllScope, filterWhere);
+    await bulkPermanentlyDeleteInvoicesTransaction(ids, selectAllScope, filterWhere);
     revalidatePath("/dashboard/invoices/trash");
     return { success: true, message: "Selected invoices permanently deleted." };
   } catch (error) {
     console.error("[bulkPermanentlyDeleteInvoices] Error:", error);
-    return { success: true, message: `Bulk action complete. Successfully processed ${ids.length} invoices.` };
+    return {
+      success: true,
+      message: `Bulk action complete. Successfully processed ${ids.length} invoices.`,
+    };
   }
 }
 

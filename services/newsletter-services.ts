@@ -1,34 +1,36 @@
 import prisma from "@/lib/prisma";
-import { Prisma } from "@/lib/generated/prisma/client";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
-export async function upsertNewsletterSubscriberInDB(email: string) {
-  return await prisma.newsletter_subscriber.upsert({
-    where: { email },
-    update: {},
-    create: { email },
+export async function subscribeNewsletterTransaction(email: string) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.newsletter_subscriber.upsert({
+      where: { email },
+      update: {},
+      create: { email },
+    });
   });
 }
 
-export async function deleteNewsletterSubscriberInDB(id: number) {
-  return await prisma.newsletter_subscriber.delete({
-    where: { id },
+export async function deleteNewsletterSubscriberTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.newsletter_subscriber.delete({
+      where: { id },
+    });
   });
 }
 
-export async function bulkDeleteNewsletterSubscribersInDB(
+export async function bulkDeleteNewsletterSubscribersTransaction(
   ids: number[],
   selectAllScope: boolean = false,
-  filterWhere?: Prisma.newsletter_subscriberWhereInput
+  filterWhere?: Prisma.newsletter_subscriberWhereInput,
 ) {
-  let whereCondition: Prisma.newsletter_subscriberWhereInput;
+  return await prisma.$transaction(async (tx) => {
+    const whereCondition: Prisma.newsletter_subscriberWhereInput = selectAllScope
+      ? (filterWhere || {})
+      : { id: { in: ids } };
 
-  if (selectAllScope) {
-    whereCondition = filterWhere || {};
-  } else {
-    whereCondition = { id: { in: ids } };
-  }
-
-  return await prisma.newsletter_subscriber.deleteMany({
-    where: whereCondition,
+    return await tx.newsletter_subscriber.deleteMany({
+      where: whereCondition,
+    });
   });
 }

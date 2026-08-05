@@ -9,11 +9,14 @@ import {
   paymentMethodUpdateSchema,
 } from "@/lib/validations";
 import {
-  createPaymentMethodInDB,
-  updatePaymentMethodInDB,
-  deletePaymentMethodPermanentlyInDB,
-  bulkUpdatePaymentMethodsInDB,
-  bulkDeletePaymentMethodsPermanentlyInDB,
+  createPaymentMethodTransaction,
+  updatePaymentMethodTransaction,
+  deletePaymentMethodTransaction,
+  restorePaymentMethodTransaction,
+  permanentlyDeletePaymentMethodTransaction,
+  bulkDeletePaymentMethodsTransaction,
+  bulkRestorePaymentMethodsTransaction,
+  bulkPermanentlyDeletePaymentMethodsTransaction,
 } from "@/services/payment-method-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -47,18 +50,19 @@ export async function createPaymentMethod(
   } = validatedFields.data;
 
   try {
-    await createPaymentMethodInDB({
-      name,
-      description: description || null,
-      provider,
-      provider_config: provider_config ?? null,
-      extra_charge: extra_charge ?? null,
-      instructions: instructions || null,
-      is_active,
-      sort_order,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createPaymentMethodTransaction(
+      {
+        name,
+        description: description || null,
+        provider,
+        provider_config: provider_config ?? null,
+        extra_charge: extra_charge ?? null,
+        instructions: instructions || null,
+        is_active,
+        sort_order,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
@@ -100,17 +104,23 @@ export async function updatePaymentMethod(
   } = validatedFields.data;
 
   try {
-    await updatePaymentMethodInDB(id, {
-      name,
-      description: description !== undefined ? description || null : undefined,
-      provider,
-      provider_config: provider_config !== undefined ? provider_config ?? null : undefined,
-      extra_charge: extra_charge !== undefined ? extra_charge ?? null : undefined,
-      instructions: instructions !== undefined ? instructions || null : undefined,
-      is_active,
-      sort_order,
-      updated_by: Number(user.id),
-    });
+    await updatePaymentMethodTransaction(
+      id,
+      {
+        name,
+        description: description !== undefined ? description || null : undefined,
+        provider,
+        provider_config:
+          provider_config !== undefined ? provider_config ?? null : undefined,
+        extra_charge:
+          extra_charge !== undefined ? extra_charge ?? null : undefined,
+        instructions:
+          instructions !== undefined ? instructions || null : undefined,
+        is_active,
+        sort_order,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
@@ -129,11 +139,7 @@ export async function deletePaymentMethod(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updatePaymentMethodInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    await deletePaymentMethodTransaction(id, Number(user.id));
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
@@ -153,11 +159,7 @@ export async function restorePaymentMethod(id: number): Promise<ActionResponse> 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updatePaymentMethodInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    await restorePaymentMethodTransaction(id, Number(user.id));
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
@@ -171,22 +173,30 @@ export async function restorePaymentMethod(id: number): Promise<ActionResponse> 
   }
 }
 
-export async function permanentlyDeletePaymentMethod(id: number): Promise<ActionResponse> {
+export async function permanentlyDeletePaymentMethod(
+  id: number,
+): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/payment-methods");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await deletePaymentMethodPermanentlyInDB(id);
+    await permanentlyDeletePaymentMethodTransaction(id);
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
-    return { success: true, message: "Payment method permanently deleted." };
+    return {
+      success: true,
+      message: "Payment method permanently deleted.",
+    };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to permanently delete payment method." };
+    return {
+      success: false,
+      message: "Failed to permanently delete payment method.",
+    };
   }
 }
 
@@ -202,16 +212,11 @@ export async function bulkDeletePaymentMethods(
       : undefined;
 
   try {
-    await bulkUpdatePaymentMethodsInDB(
+    await bulkDeletePaymentMethodsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("site-footer", "max");
@@ -219,10 +224,16 @@ export async function bulkDeletePaymentMethods(
     revalidatePath("/dashboard/payment-methods");
     revalidatePath("/dashboard/payment-methods/trash");
 
-    return { success: true, message: "Selected payment methods moved to trash." };
+    return {
+      success: true,
+      message: "Selected payment methods moved to trash.",
+    };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to delete selected payment methods." };
+    return {
+      success: false,
+      message: "Failed to delete selected payment methods.",
+    };
   }
 }
 
@@ -238,16 +249,11 @@ export async function bulkRestorePaymentMethods(
       : undefined;
 
   try {
-    await bulkUpdatePaymentMethodsInDB(
+    await bulkRestorePaymentMethodsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("site-footer", "max");
@@ -258,7 +264,10 @@ export async function bulkRestorePaymentMethods(
     return { success: true, message: "Selected payment methods restored." };
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Failed to restore selected payment methods." };
+    return {
+      success: false,
+      message: "Failed to restore selected payment methods.",
+    };
   }
 }
 
@@ -274,13 +283,20 @@ export async function bulkPermanentlyDeletePaymentMethods(
       : undefined;
 
   try {
-    await bulkDeletePaymentMethodsPermanentlyInDB(ids, selectAllScope, filterWhere);
+    await bulkPermanentlyDeletePaymentMethodsTransaction(
+      ids,
+      selectAllScope,
+      filterWhere,
+    );
 
     revalidateTag("site-footer", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
-    return { success: true, message: "Selected payment methods permanently deleted." };
+    return {
+      success: true,
+      message: "Selected payment methods permanently deleted.",
+    };
   } catch (error) {
     console.error(error);
     return {

@@ -9,13 +9,15 @@ import {
   roleUpdateSchema,
 } from "@/lib/validations";
 import {
-  bulkDeleteRolesPermanentlyInDB,
-  bulkUpdateRolesInDB,
-  createRoleInDB,
-  deleteRolePermanentlyInDB,
-  updateRoleInDB,
-  updateRolePermissionsInDB,
-  getRoleByIdFromDB,
+  createRoleTransaction,
+  updateRoleTransaction,
+  updateRolePermissionsTransaction,
+  deleteRoleTransaction,
+  restoreRoleTransaction,
+  permanentlyDeleteRoleTransaction,
+  bulkDeleteRolesTransaction,
+  bulkRestoreRolesTransaction,
+  bulkPermanentlyDeleteRolesTransaction,
 } from "@/services/role-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { RoleFilterParams, getRoleFilterWhere } from "@/lib/filters/role-filters";
@@ -40,15 +42,11 @@ export async function createRole(
     return { success: false, message: "You cannot create the superadmin role." };
 
   try {
-    await createRoleInDB({
-      name,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createRoleTransaction({ name, is_active }, Number(user.id));
     revalidatePath("/dashboard/roles");
     return { success: true, message: "Role created successfully." };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { success: false, message: "Failed to create role." };
   }
 }
@@ -72,37 +70,31 @@ export async function updateRole(
 
   const { name, is_active } = validatedFields.data;
 
-  const targetRole = await getRoleByIdFromDB(id);
-
-  if (!targetRole) {
-    return { success: false, message: "Role not found." };
-  }
-
-  if (targetRole.name === "superadmin") {
-    if (name && name !== "superadmin") {
-      return { success: false, message: "Superadmin role name cannot be changed." };
-    }
-    if (is_active === false) {
-      return { success: false, message: "Superadmin role must remain active." };
-    }
-  } else {
-    if (name === "superadmin") {
-      return { success: false, message: "You cannot rename a role to superadmin." };
-    }
-  }
-
   try {
-    await updateRoleInDB(id, {
-      name: targetRole.name === "superadmin" ? "superadmin" : name,
-      is_active: targetRole.name === "superadmin" ? true : is_active,
-      updated_by: Number(user.id),
-    });
+    const { targetRole } = await updateRoleTransaction(
+      id,
+      { name, is_active },
+      Number(user.id),
+    );
+
     revalidateTag("admin-permissions", "max");
     revalidateTag(`admin-permissions-${targetRole.name}`, "max");
     revalidatePath("/dashboard/roles");
     return { success: true, message: "Role updated successfully." };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating role:", error);
+    if (error.message === "SUPERADMIN_NAME_IMMUTABLE") {
+      return { success: false, message: "Superadmin role name cannot be changed." };
+    }
+    if (error.message === "SUPERADMIN_ACTIVE_IMMUTABLE") {
+      return { success: false, message: "Superadmin role must remain active." };
+    }
+    if (error.message === "CANNOT_RENAME_TO_SUPERADMIN") {
+      return { success: false, message: "You cannot rename a role to superadmin." };
+    }
+    if (error.message === "ROLE_NOT_FOUND") {
+      return { success: false, message: "Role not found." };
+    }
     return { success: false, message: "Failed to update role." };
   }
 }
@@ -120,24 +112,24 @@ export async function updateRolePermissions(
   if (!permissions.length)
     return { success: false, message: "No permissions provided." };
 
-  const targetRole = await getRoleByIdFromDB(roleId);
-
-  if (!targetRole) {
-    return { success: false, message: "Role not found." };
-  }
-
-  if (targetRole.name === "superadmin") {
-    return { success: false, message: "Superadmin role permissions are immutable." };
-  }
-
   try {
-    await updateRolePermissionsInDB(roleId, permissions);
+    const { targetRole } = await updateRolePermissionsTransaction(
+      roleId,
+      permissions,
+    );
+
     revalidateTag("admin-permissions", "max");
     revalidateTag(`admin-permissions-${targetRole.name}`, "max");
     revalidatePath("/dashboard/roles");
     return { success: true, message: "Permissions updated successfully." };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating role permissions:", error);
+    if (error.message === "SUPERADMIN_PERMISSIONS_IMMUTABLE") {
+      return { success: false, message: "Superadmin role permissions are immutable." };
+    }
+    if (error.message === "ROLE_NOT_FOUND") {
+      return { success: false, message: "Role not found." };
+    }
     return { success: false, message: "Failed to update permissions." };
   }
 }
@@ -147,27 +139,19 @@ export async function deleteRole(id: number): Promise<ActionResponse> {
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
-  const targetRole = await getRoleByIdFromDB(id);
-
-  if (!targetRole) {
-    return { success: false, message: "Role not found." };
-  }
-
-  if (targetRole.name === "superadmin") {
-    return { success: false, message: "Superadmin role cannot be deleted." };
-  }
-
   try {
-    await updateRoleInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    await deleteRoleTransaction(id, Number(user.id));
     revalidatePath("/dashboard/roles");
     revalidatePath("/dashboard/roles/trash");
     return { success: true, message: "Role deleted successfully." };
-  } catch (error) {
-    console.log(error);
+  } catch (error: any) {
+    console.error(error);
+    if (error.message === "CANNOT_DELETE_SUPERADMIN") {
+      return { success: false, message: "Superadmin role cannot be deleted." };
+    }
+    if (error.message === "ROLE_NOT_FOUND") {
+      return { success: false, message: "Role not found." };
+    }
     return { success: false, message: "Failed to delete role." };
   }
 }
@@ -177,27 +161,16 @@ export async function restoreRole(id: number): Promise<ActionResponse> {
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
-  const targetRole = await getRoleByIdFromDB(id);
-
-  if (!targetRole) {
-    return { success: false, message: "Role not found." };
-  }
-
-  if (targetRole.name === "superadmin") {
-    return { success: false, message: "Superadmin role cannot be restored." };
-  }
-
   try {
-    await updateRoleInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    await restoreRoleTransaction(id, Number(user.id));
     revalidatePath("/dashboard/roles/trash");
     revalidatePath("/dashboard/roles");
     return { success: true, message: "Role restored successfully." };
-  } catch (error) {
-    console.log(error);
+  } catch (error: any) {
+    console.error(error);
+    if (error.message === "ROLE_NOT_FOUND") {
+      return { success: false, message: "Role not found." };
+    }
     return { success: false, message: "Failed to restore role." };
   }
 }
@@ -207,22 +180,21 @@ export async function permanentlyDeleteRole(id: number): Promise<ActionResponse>
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
-  const targetRole = await getRoleByIdFromDB(id);
-
-  if (!targetRole) {
-    return { success: false, message: "Role not found." };
-  }
-
-  if (targetRole.name === "superadmin") {
-    return { success: false, message: "Superadmin role cannot be deleted permanently." };
-  }
-
   try {
-    await deleteRolePermanentlyInDB(id);
+    await permanentlyDeleteRoleTransaction(id);
     revalidatePath("/dashboard/roles/trash");
     return { success: true, message: "Role permanently deleted." };
-  } catch (error) {
-    console.log(error);
+  } catch (error: any) {
+    console.error(error);
+    if (error.message === "CANNOT_DELETE_SUPERADMIN") {
+      return {
+        success: false,
+        message: "Superadmin role cannot be deleted permanently.",
+      };
+    }
+    if (error.message === "ROLE_NOT_FOUND") {
+      return { success: false, message: "Role not found." };
+    }
     return { success: false, message: "Failed to permanently delete role." };
   }
 }
@@ -233,19 +205,17 @@ export async function bulkDeleteRoles(
   filterParams?: RoleFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/roles");
-  const filterWhere = selectAllScope && filterParams ? await getRoleFilterWhere(filterParams, false) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getRoleFilterWhere(filterParams, false)
+      : undefined;
 
   try {
-    await bulkUpdateRolesInDB(
+    await bulkDeleteRolesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
       filterWhere,
+      Number(user.id),
     );
     revalidatePath("/dashboard/roles");
     revalidatePath("/dashboard/roles/trash");
@@ -262,19 +232,17 @@ export async function bulkRestoreRoles(
   filterParams?: RoleFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/roles");
-  const filterWhere = selectAllScope && filterParams ? await getRoleFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getRoleFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkUpdateRolesInDB(
+    await bulkRestoreRolesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
       filterWhere,
+      Number(user.id),
     );
     revalidatePath("/dashboard/roles/trash");
     revalidatePath("/dashboard/roles");
@@ -291,10 +259,13 @@ export async function bulkPermanentlyDeleteRoles(
   filterParams?: RoleFilterParams,
 ): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/roles");
-  const filterWhere = selectAllScope && filterParams ? await getRoleFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getRoleFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    await bulkDeleteRolesPermanentlyInDB(ids, selectAllScope, filterWhere);
+    await bulkPermanentlyDeleteRolesTransaction(ids, selectAllScope, filterWhere);
     revalidatePath("/dashboard/roles/trash");
     return { success: true, message: "Selected roles permanently deleted." };
   } catch (error) {
@@ -305,4 +276,3 @@ export async function bulkPermanentlyDeleteRoles(
     };
   }
 }
-

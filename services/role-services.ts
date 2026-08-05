@@ -1,110 +1,80 @@
 import prisma from "@/lib/prisma";
-import { Prisma } from "@/lib/generated/prisma/client";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
-export async function createRoleInDB(data: {
-  name: string;
-  created_by: number;
-  updated_by: number;
-}) {
-  const features = await prisma.site_feature.findMany({ select: { id: true } });
-  const result = await prisma.role.create({
-    data: {
-      ...data,
-      site_feature_roles: {
-        createMany: {
-          data: features.map((f) => ({
-            site_feature_id: f.id,
-            access_crud: {
-              create: false,
-              read: false,
-              update: false,
-              delete: false,
-            },
-          })),
-        },
-      },
-    },
-  });
-  return result;
-}
-
-export async function getRolesFromDB() {
-  return await prisma.role.findMany({
-    where: { deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      is_active: true,
-    },
-    orderBy: { name: "asc" },
-  });
-}
-
-export async function getDeletedRolesFromDB() {
-  return await prisma.role.findMany({
-    where: { deleted_at: { not: null } },
-    select: {
-      id: true,
-      name: true,
-      is_active: true,
-      deleted_at: true,
-      deleted_by: true,
-    },
-    orderBy: { deleted_at: "desc" },
-  });
-}
-
-export async function getRoleByIdFromDB(id: number) {
-  return await prisma.role.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      is_active: true,
-      site_feature_roles: {
-        select: {
-          site_feature_id: true,
-          access_crud: true,
-          site_feature: {
-            select: {
-              id: true,
-              name: true,
-              path: true,
-              enabled: true,
-              is_super: true,
-            },
+export async function createRoleTransaction(
+  data: {
+    name: string;
+    is_active?: boolean;
+  },
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const features = await tx.site_feature.findMany({ select: { id: true } });
+    const role = await tx.role.create({
+      data: {
+        name: data.name,
+        is_active: data.is_active ?? true,
+        created_by: userId,
+        updated_by: userId,
+        site_feature_roles: {
+          createMany: {
+            data: features.map((f) => ({
+              site_feature_id: f.id,
+              access_crud: {
+                create: false,
+                read: false,
+                update: false,
+                delete: false,
+              },
+            })),
           },
         },
       },
-      created_at: true,
-      created_by: true,
-      updated_at: true,
-      updated_by: true,
-      deleted_at: true,
-      deleted_by: true,
-    },
+    });
+    return role;
   });
 }
 
-export async function getSiteFeaturesFromDB() {
-  return await prisma.site_feature.findMany({ orderBy: { name: "asc" } });
-}
-
-export async function updateRoleInDB(
+export async function updateRoleTransaction(
   id: number,
   data: {
     name?: string;
     is_active?: boolean;
-    updated_by: number;
-    deleted_at?: Date | null;
-    deleted_by?: number | null;
   },
+  userId: number,
 ) {
-  return await prisma.role.update({ where: { id }, data });
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+
+    if (targetRole.name === "superadmin") {
+      if (data.name && data.name !== "superadmin") {
+        throw new Error("SUPERADMIN_NAME_IMMUTABLE");
+      }
+      if (data.is_active === false) {
+        throw new Error("SUPERADMIN_ACTIVE_IMMUTABLE");
+      }
+    } else {
+      if (data.name === "superadmin") {
+        throw new Error("CANNOT_RENAME_TO_SUPERADMIN");
+      }
+    }
+
+    const updatedRole = await tx.role.update({
+      where: { id },
+      data: {
+        name: targetRole.name === "superadmin" ? "superadmin" : data.name,
+        is_active: targetRole.name === "superadmin" ? true : data.is_active,
+        updated_by: userId,
+      },
+    });
+
+    return { targetRole, updatedRole };
+  });
 }
 
-export async function updateRolePermissionsInDB(
-  role_id: number,
+export async function updateRolePermissionsTransaction(
+  roleId: number,
   permissions: {
     site_feature_id: number;
     access_crud: {
@@ -115,83 +85,186 @@ export async function updateRolePermissionsInDB(
     };
   }[],
 ) {
-  return await prisma.$transaction(
-    permissions.map((p) =>
-      prisma.site_feature_role.upsert({
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id: roleId } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+    if (targetRole.name === "superadmin") throw new Error("SUPERADMIN_PERMISSIONS_IMMUTABLE");
+
+    for (const p of permissions) {
+      await tx.site_feature_role.upsert({
         where: {
           site_feature_id_role_id: {
             site_feature_id: p.site_feature_id,
-            role_id,
+            role_id: roleId,
           },
         },
         update: { access_crud: p.access_crud },
         create: {
           site_feature_id: p.site_feature_id,
-          role_id,
+          role_id: roleId,
           access_crud: p.access_crud,
         },
-      }),
-    ),
-  );
-}
-
-export async function deleteRolePermanentlyInDB(id: number) {
-  return await prisma.role.delete({ where: { id } });
-}
-
-export async function bulkUpdateRolesInDB(
-  ids: number[],
-  data: {
-    updated_by: number;
-    deleted_at?: Date | null;
-    deleted_by?: number | null;
-  },
-  selectAllScope: boolean = false,
-  isTrash: boolean = false,
-  filterWhere?: Prisma.roleWhereInput
-) {
-  let whereCondition: any;
-
-  if (selectAllScope) {
-    if (filterWhere) {
-      whereCondition = {
-        AND: [filterWhere, { NOT: { name: "superadmin" } }],
-      };
-    } else if (isTrash) {
-      whereCondition = { NOT: [{ name: "superadmin" }, { deleted_at: null }] };
-    } else {
-      whereCondition = { deleted_at: null, NOT: { name: "superadmin" } };
+      });
     }
-  } else {
-    whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
-  }
 
-  return await prisma.role.updateMany({
-    where: whereCondition,
-    data,
+    return { targetRole };
   });
 }
 
-export async function bulkDeleteRolesPermanentlyInDB(
+export async function deleteRoleTransaction(id: number, userId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+    if (targetRole.name === "superadmin") throw new Error("CANNOT_DELETE_SUPERADMIN");
+
+    const updatedRole = await tx.role.update({
+      where: { id },
+      data: {
+        updated_by: userId,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    });
+
+    return { targetRole, updatedRole };
+  });
+}
+
+export async function restoreRoleTransaction(id: number, userId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+
+    const updatedRole = await tx.role.update({
+      where: { id },
+      data: {
+        updated_by: userId,
+        deleted_at: null,
+        deleted_by: null,
+      },
+    });
+
+    return { targetRole, updatedRole };
+  });
+}
+
+export async function permanentlyDeleteRoleTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+    if (targetRole.name === "superadmin") throw new Error("CANNOT_DELETE_SUPERADMIN");
+
+    await tx.site_feature_role.deleteMany({ where: { role_id: id } });
+    await tx.role.delete({ where: { id } });
+
+    return { targetRole };
+  });
+}
+
+export async function bulkDeleteRolesTransaction(
   ids: number[],
   selectAllScope: boolean = false,
-  filterWhere?: Prisma.roleWhereInput
+  filterWhere?: Prisma.roleWhereInput,
+  userId: number = 0,
 ) {
-  let whereCondition: any;
-
-  if (selectAllScope) {
-    if (filterWhere) {
-      whereCondition = {
-        AND: [filterWhere, { NOT: { name: "superadmin" } }],
-      };
+  return await prisma.$transaction(async (tx) => {
+    let whereCondition: Prisma.roleWhereInput;
+    if (selectAllScope) {
+      if (filterWhere) {
+        whereCondition = { AND: [filterWhere, { NOT: { name: "superadmin" } }] };
+      } else {
+        whereCondition = { deleted_at: null, NOT: { name: "superadmin" } };
+      }
     } else {
-      whereCondition = { NOT: [{ name: "superadmin" }, { deleted_at: null }] };
+      whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
     }
-  } else {
-    whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
-  }
 
-  return await prisma.role.deleteMany({
-    where: whereCondition,
+    const affected = await tx.role.findMany({
+      where: whereCondition,
+      select: { id: true, name: true },
+    });
+
+    await tx.role.updateMany({
+      where: whereCondition,
+      data: {
+        updated_by: userId,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    });
+
+    return { affected };
+  });
+}
+
+export async function bulkRestoreRolesTransaction(
+  ids: number[],
+  selectAllScope: boolean = false,
+  filterWhere?: Prisma.roleWhereInput,
+  userId: number = 0,
+) {
+  return await prisma.$transaction(async (tx) => {
+    let whereCondition: Prisma.roleWhereInput;
+    if (selectAllScope) {
+      if (filterWhere) {
+        whereCondition = { AND: [filterWhere, { NOT: { name: "superadmin" } }] };
+      } else {
+        whereCondition = { NOT: [{ name: "superadmin" }, { deleted_at: null }] };
+      }
+    } else {
+      whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
+    }
+
+    const affected = await tx.role.findMany({
+      where: whereCondition,
+      select: { id: true, name: true },
+    });
+
+    await tx.role.updateMany({
+      where: whereCondition,
+      data: {
+        updated_by: userId,
+        deleted_at: null,
+        deleted_by: null,
+      },
+    });
+
+    return { affected };
+  });
+}
+
+export async function bulkPermanentlyDeleteRolesTransaction(
+  ids: number[],
+  selectAllScope: boolean = false,
+  filterWhere?: Prisma.roleWhereInput,
+) {
+  return await prisma.$transaction(async (tx) => {
+    let whereCondition: Prisma.roleWhereInput;
+    if (selectAllScope) {
+      if (filterWhere) {
+        whereCondition = { AND: [filterWhere, { NOT: { name: "superadmin" } }] };
+      } else {
+        whereCondition = { NOT: [{ name: "superadmin" }, { deleted_at: null }] };
+      }
+    } else {
+      whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
+    }
+
+    const affected = await tx.role.findMany({
+      where: whereCondition,
+      select: { id: true, name: true },
+    });
+
+    const affectedIds = affected.map((r) => r.id);
+    if (affectedIds.length > 0) {
+      await tx.site_feature_role.deleteMany({
+        where: { role_id: { in: affectedIds } },
+      });
+      await tx.role.deleteMany({
+        where: { id: { in: affectedIds } },
+      });
+    }
+
+    return { affected };
   });
 }

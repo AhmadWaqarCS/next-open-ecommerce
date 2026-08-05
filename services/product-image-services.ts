@@ -1,96 +1,106 @@
 import prisma from "@/lib/prisma";
 
-export async function createProductImageInDB(data: {
-  product_id: number;
-  url: string;
-  alt_text?: string | null;
-  sort_order?: number;
-  created_by: number;
-  updated_by: number;
-}) {
-  return await prisma.product_image.create({ data });
+export async function createProductImageTransaction(
+  data: {
+    product_id: number;
+    url: string;
+    alt_text?: string | null;
+    sort_order?: number;
+  },
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const newImage = await tx.product_image.create({
+      data: {
+        ...data,
+        created_by: userId,
+        updated_by: userId,
+      },
+      include: {
+        product: { select: { slug: true } },
+      },
+    });
+    return newImage;
+  });
 }
 
-export async function createManyProductImagesInDB(data: {
-  product_id: number;
-  url: string;
-  alt_text?: string | null;
-  sort_order?: number;
-  created_by: number;
-  updated_by: number;
-}[]) {
-  return await prisma.product_image.createMany({ data });
-}
-
-export async function updateProductImageInDB(
+export async function updateProductImageTransaction(
   id: number,
   data: {
     url?: string;
     alt_text?: string | null;
     sort_order?: number;
-    updated_by: number;
-    deleted_at?: Date | null;
-    deleted_by?: number | null;
   },
+  userId: number,
 ) {
-  return await prisma.product_image.update({ where: { id }, data });
-}
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product_image.findUnique({
+      where: { id },
+      include: { product: { select: { slug: true } } },
+    });
+    if (!existing) throw new Error("Image not found.");
 
-export async function deleteProductImagePermanentlyInDB(id: number) {
-  return await prisma.product_image.delete({ where: { id } });
-}
-
-export async function syncProductImagesInDB(
-  productId: number,
-  incomingGallery: Array<{ id?: number; url: string; alt_text?: string | null; sort_order?: number }>,
-  userId: number
-) {
-  const incomingIds = incomingGallery.map((img) => img.id).filter(Boolean) as number[];
-
-  await prisma.product_image.deleteMany({
-    where: {
-      product_id: productId,
-      id: { notIn: incomingIds },
-    },
-  });
-
-  for (let idx = 0; idx < incomingGallery.length; idx++) {
-    const img = incomingGallery[idx];
-    if (img.id) {
-      await prisma.product_image.update({
-        where: { id: img.id },
-        data: {
-          url: img.url,
-          alt_text: img.alt_text || null,
-          sort_order: img.sort_order ?? idx,
-          updated_by: userId,
-        },
-      });
-    } else {
-      await prisma.product_image.create({
-        data: {
-          product_id: productId,
-          url: img.url,
-          alt_text: img.alt_text || null,
-          sort_order: img.sort_order ?? idx,
-          created_by: userId,
-          updated_by: userId,
-        },
-      });
+    let removedMediaUrl: string | null = null;
+    if (data.url !== undefined && data.url !== existing.url && existing.url) {
+      removedMediaUrl = existing.url;
     }
-  }
-}
 
-export async function getProductImageForRevalidationInDB(id: number) {
-  return await prisma.product_image.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      product_id: true,
-      product: {
-        select: { slug: true },
-      },
-    },
+    const updated = await tx.product_image.update({
+      where: { id },
+      data: { ...data, updated_by: userId },
+    });
+
+    return { existing, updated, removedMediaUrl };
   });
 }
 
+export async function deleteProductImageTransaction(id: number, userId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product_image.findUnique({
+      where: { id },
+      include: { product: { select: { slug: true } } },
+    });
+    if (!existing) throw new Error("Image not found.");
+
+    await tx.product_image.update({
+      where: { id },
+      data: { updated_by: userId, deleted_at: new Date(), deleted_by: userId },
+    });
+
+    return { existing };
+  });
+}
+
+export async function restoreProductImageTransaction(
+  id: number,
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product_image.findUnique({
+      where: { id },
+      include: { product: { select: { slug: true } } },
+    });
+    if (!existing) throw new Error("Image not found.");
+
+    await tx.product_image.update({
+      where: { id },
+      data: { updated_by: userId, deleted_at: null, deleted_by: null },
+    });
+
+    return { existing };
+  });
+}
+
+export async function permanentlyDeleteProductImageTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product_image.findUnique({
+      where: { id },
+      include: { product: { select: { slug: true } } },
+    });
+    if (!existing) throw new Error("Image not found.");
+
+    await tx.product_image.delete({ where: { id } });
+
+    return { existing, removedMediaUrl: existing.url };
+  });
+}

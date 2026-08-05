@@ -43,7 +43,7 @@ export async function deleteMediaFileFromStorage(relativePath: string): Promise<
 }
 
 /**
- * Reconnects/assigns an image URL to a target database entity.
+ * Reconnects/assigns an image URL to a target database entity inside a single Prisma transaction.
  */
 export async function reconnectMediaInDB(data: {
   relativePath: string;
@@ -61,99 +61,101 @@ export async function reconnectMediaInDB(data: {
 }) {
   const { relativePath, targetType, targetId, altText, userId } = data;
 
-  switch (targetType) {
-    case "category": {
-      if (!targetId) throw new Error("Category ID is required.");
-      return await prisma.category.update({
-        where: { id: targetId },
-        data: {
-          image_url: relativePath,
-          image_alt_text: altText ?? undefined,
-          updated_by: userId,
-        },
-      });
-    }
+  return await prisma.$transaction(async (tx) => {
+    switch (targetType) {
+      case "category": {
+        if (!targetId) throw new Error("Category ID is required.");
+        return await tx.category.update({
+          where: { id: targetId },
+          data: {
+            image_url: relativePath,
+            image_alt_text: altText ?? undefined,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "product_feature": {
-      if (!targetId) throw new Error("Product ID is required.");
-      return await prisma.product.update({
-        where: { id: targetId },
-        data: {
-          feature_image_url: relativePath,
-          feature_image_alt_text: altText ?? undefined,
-          updated_by: userId,
-        },
-      });
-    }
+      case "product_feature": {
+        if (!targetId) throw new Error("Product ID is required.");
+        return await tx.product.update({
+          where: { id: targetId },
+          data: {
+            feature_image_url: relativePath,
+            feature_image_alt_text: altText ?? undefined,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "product_gallery": {
-      if (!targetId) throw new Error("Product ID is required.");
-      return await prisma.product_image.create({
-        data: {
-          product_id: targetId,
-          url: relativePath,
-          alt_text: altText ?? undefined,
-          created_by: userId,
-          updated_by: userId,
-        },
-      });
-    }
+      case "product_gallery": {
+        if (!targetId) throw new Error("Product ID is required.");
+        return await tx.product_image.create({
+          data: {
+            product_id: targetId,
+            url: relativePath,
+            alt_text: altText ?? undefined,
+            created_by: userId,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "product_variant": {
-      if (!targetId) throw new Error("Variant ID is required.");
-      return await prisma.product_variant.update({
-        where: { id: targetId },
-        data: {
-          image_url: relativePath,
-          image_url_alt_text: altText ?? undefined,
-          updated_by: userId,
-        },
-      });
-    }
+      case "product_variant": {
+        if (!targetId) throw new Error("Variant ID is required.");
+        return await tx.product_variant.update({
+          where: { id: targetId },
+          data: {
+            image_url: relativePath,
+            image_url_alt_text: altText ?? undefined,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "site_logo_light": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: {
-          light_logo_url: relativePath,
-          updated_by: userId,
-        },
-      });
-    }
+      case "site_logo_light": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: {
+            light_logo_url: relativePath,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "site_logo_dark": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: {
-          dark_logo_url: relativePath,
-          updated_by: userId,
-        },
-      });
-    }
+      case "site_logo_dark": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: {
+            dark_logo_url: relativePath,
+            updated_by: userId,
+          },
+        });
+      }
 
-    case "site_favicon": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: {
-          favicon_url: relativePath,
-          updated_by: userId,
-        },
-      });
-    }
+      case "site_favicon": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: {
+            favicon_url: relativePath,
+            updated_by: userId,
+          },
+        });
+      }
 
-    default:
-      throw new Error("Unsupported target entity type.");
-  }
+      default:
+        throw new Error("Unsupported target entity type.");
+    }
+  });
 }
 
 /**
- * Clears or removes a broken image URL reference from the database.
+ * Clears or removes a broken image URL reference from the database inside a single Prisma transaction.
  */
 export async function clearBrokenImageReferenceInDB(data: {
   targetType:
@@ -170,68 +172,70 @@ export async function clearBrokenImageReferenceInDB(data: {
 }) {
   const { targetType, targetId, galleryImageId, userId } = data;
 
-  switch (targetType) {
-    case "category": {
-      if (!targetId) throw new Error("Category ID is required.");
-      return await prisma.category.update({
-        where: { id: targetId },
-        data: { image_url: null, updated_by: userId },
-      });
-    }
+  return await prisma.$transaction(async (tx) => {
+    switch (targetType) {
+      case "category": {
+        if (!targetId) throw new Error("Category ID is required.");
+        return await tx.category.update({
+          where: { id: targetId },
+          data: { image_url: null, updated_by: userId },
+        });
+      }
 
-    case "product_feature": {
-      if (!targetId) throw new Error("Product ID is required.");
-      return await prisma.product.update({
-        where: { id: targetId },
-        data: { feature_image_url: null, updated_by: userId },
-      });
-    }
+      case "product_feature": {
+        if (!targetId) throw new Error("Product ID is required.");
+        return await tx.product.update({
+          where: { id: targetId },
+          data: { feature_image_url: null, updated_by: userId },
+        });
+      }
 
-    case "product_gallery": {
-      if (!galleryImageId) throw new Error("Gallery Image ID is required.");
-      return await prisma.product_image.delete({
-        where: { id: galleryImageId },
-      });
-    }
+      case "product_gallery": {
+        if (!galleryImageId) throw new Error("Gallery Image ID is required.");
+        return await tx.product_image.delete({
+          where: { id: galleryImageId },
+        });
+      }
 
-    case "product_variant": {
-      if (!targetId) throw new Error("Variant ID is required.");
-      return await prisma.product_variant.update({
-        where: { id: targetId },
-        data: { image_url: null, updated_by: userId },
-      });
-    }
+      case "product_variant": {
+        if (!targetId) throw new Error("Variant ID is required.");
+        return await tx.product_variant.update({
+          where: { id: targetId },
+          data: { image_url: null, updated_by: userId },
+        });
+      }
 
-    case "site_logo_light": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: { light_logo_url: null, updated_by: userId },
-      });
-    }
+      case "site_logo_light": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: { light_logo_url: null, updated_by: userId },
+        });
+      }
 
-    case "site_logo_dark": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: { dark_logo_url: null, updated_by: userId },
-      });
-    }
+      case "site_logo_dark": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: { dark_logo_url: null, updated_by: userId },
+        });
+      }
 
-    case "site_favicon": {
-      const config = await prisma.site_config.findFirst({ where: { deleted_at: null } });
-      if (!config) throw new Error("Site configuration not found.");
-      return await prisma.site_config.update({
-        where: { id: config.id },
-        data: { favicon_url: null, updated_by: userId },
-      });
-    }
+      case "site_favicon": {
+        const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+        if (!config) throw new Error("Site configuration not found.");
+        return await tx.site_config.update({
+          where: { id: config.id },
+          data: { favicon_url: null, updated_by: userId },
+        });
+      }
 
-    default:
-      throw new Error("Unsupported target entity type.");
-  }
+      default:
+        throw new Error("Unsupported target entity type.");
+    }
+  });
 }
 
 /**
@@ -273,4 +277,3 @@ export async function bulkDeleteMediaFilesFromStorage(
 
   return { deletedCount, failedCount, errors };
 }
-

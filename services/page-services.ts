@@ -1,23 +1,33 @@
 import prisma from "@/lib/prisma";
 
-export async function createSitePageInDB(data: {
-  slug: string;
-  title: string;
-  content: string;
-  is_active?: boolean;
-  show_in_header?: boolean;
-  show_in_footer?: boolean;
-  sort_order?: number;
-  meta_info?: object;
-  theme_config?: object;
-  components_config?: object;
-  created_by: number;
-  updated_by: number;
-}) {
-  return await prisma.site_page.create({ data });
+export async function createSitePageTransaction(
+  data: {
+    slug: string;
+    title: string;
+    content: string;
+    is_active?: boolean;
+    show_in_header?: boolean;
+    show_in_footer?: boolean;
+    sort_order?: number;
+    meta_info?: object;
+    theme_config?: object;
+    components_config?: object;
+  },
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const page = await tx.site_page.create({
+      data: {
+        ...data,
+        created_by: userId,
+        updated_by: userId,
+      },
+    });
+    return page;
+  });
 }
 
-export async function updateSitePageInDB(
+export async function updateSitePageTransaction(
   id: number,
   data: {
     slug?: string;
@@ -30,30 +40,68 @@ export async function updateSitePageInDB(
     meta_info?: object;
     theme_config?: object;
     components_config?: object;
-    updated_by: number;
-    deleted_at?: Date | null;
-    deleted_by?: number | null;
   },
+  userId: number,
 ) {
-  return await prisma.site_page.update({ where: { id }, data });
-}
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.site_page.findUnique({ where: { id } });
+    if (!existing) throw new Error("Page not found.");
 
-export async function deleteSitePagePermanentlyInDB(id: number) {
-  return await prisma.site_page.delete({ where: { id } });
-}
+    const updated = await tx.site_page.update({
+      where: { id },
+      data: {
+        ...data,
+        updated_by: userId,
+      },
+    });
 
-export async function getSitePageForRevalidationInDB(id: number) {
-  return await prisma.site_page.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      show_in_header: true,
-      show_in_footer: true,
-      sort_order: true,
-      is_active: true,
-    },
+    return { existing, updated };
   });
 }
 
+export async function deleteSitePageTransaction(id: number, userId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.site_page.findUnique({ where: { id } });
+    if (!existing) throw new Error("Page not found.");
+
+    const updated = await tx.site_page.update({
+      where: { id },
+      data: {
+        updated_by: userId,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    });
+
+    return { existing, updated };
+  });
+}
+
+export async function restoreSitePageTransaction(id: number, userId: number) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.site_page.findUnique({ where: { id } });
+    if (!existing) throw new Error("Page not found.");
+
+    const updated = await tx.site_page.update({
+      where: { id },
+      data: {
+        updated_by: userId,
+        deleted_at: null,
+        deleted_by: null,
+      },
+    });
+
+    return { existing, updated };
+  });
+}
+
+export async function permanentlyDeleteSitePageTransaction(id: number) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.site_page.findUnique({ where: { id } });
+    if (!existing) throw new Error("Page not found.");
+
+    await tx.site_page.delete({ where: { id } });
+
+    return { existing };
+  });
+}

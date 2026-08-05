@@ -1,27 +1,32 @@
 import prisma from "@/lib/prisma";
 
-export async function getEmailConfigFromDB() {
-  return await prisma.email_config.findFirst({ where: { deleted_at: null } });
+export async function createEmailConfigTransaction(
+  data: {
+    provider?: string;
+    from_name: string;
+    from_email: string;
+    reply_to_email?: string | null;
+    send_order_confirmation?: boolean;
+    send_shipping_update?: boolean;
+    send_admin_new_order?: boolean;
+    admin_notification_email?: string | null;
+    include_pdf_invoice?: boolean;
+    is_active?: boolean;
+  },
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    return await tx.email_config.create({
+      data: {
+        ...data,
+        created_by: userId,
+        updated_by: userId,
+      },
+    });
+  });
 }
 
-export async function createEmailConfigInDB(data: {
-  provider?: string;
-  from_name: string;
-  from_email: string;
-  reply_to_email?: string | null;
-  send_order_confirmation?: boolean;
-  send_shipping_update?: boolean;
-  send_admin_new_order?: boolean;
-  admin_notification_email?: string | null;
-  include_pdf_invoice?: boolean;
-  is_active?: boolean;
-  created_by: number;
-  updated_by: number;
-}) {
-  return await prisma.email_config.create({ data });
-}
-
-export async function updateEmailConfigInDB(
+export async function updateEmailConfigTransaction(
   id: number,
   data: {
     provider?: string;
@@ -34,10 +39,13 @@ export async function updateEmailConfigInDB(
     admin_notification_email?: string | null;
     include_pdf_invoice?: boolean;
     is_active?: boolean;
-    updated_by: number;
-    deleted_at?: Date | null;
-    deleted_by?: number | null;
   },
+  userId: number,
 ) {
-  return await prisma.email_config.update({ where: { id }, data });
+  return await prisma.$transaction(async (tx) => {
+    return await tx.email_config.update({
+      where: { id },
+      data: { ...data, updated_by: userId },
+    });
+  });
 }

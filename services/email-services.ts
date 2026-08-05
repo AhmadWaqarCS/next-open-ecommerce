@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import prisma from "@/lib/prisma";
-import { generateInvoiceForOrderInDB } from "./invoice-services";
+import { generateInvoiceForOrderTransaction } from "./invoice-services";
 
 // ─── DB MUTATIONS FOR SENT EMAILS ──────────────────────────────────────────────
 
@@ -437,7 +437,7 @@ export async function sendInvoiceAndOrderEmailsForOrder(
   orderId: number,
   createdBy: number = 0,
 ) {
-  const invoice = await generateInvoiceForOrderInDB(orderId, createdBy);
+  const invoice = await generateInvoiceForOrderTransaction(orderId, createdBy);
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

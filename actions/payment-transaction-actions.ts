@@ -9,9 +9,9 @@ import {
   paymentTransactionUpdateSchema,
 } from "@/lib/validations";
 import {
-  createPaymentTransactionInDB,
-  updatePaymentTransactionInDB,
-  deletePaymentTransactionPermanentlyInDB,
+  createPaymentTransactionTransaction,
+  updatePaymentTransactionTransaction,
+  permanentlyDeletePaymentTransactionTransaction,
 } from "@/services/payment-services";
 import { revalidatePath } from "next/cache";
 
@@ -44,7 +44,7 @@ export async function createPaymentTransaction(
   } = validatedFields.data;
 
   try {
-    await createPaymentTransactionInDB({
+    await createPaymentTransactionTransaction({
       order_id,
       provider,
       provider_transaction_id: provider_transaction_id || null,
@@ -97,7 +97,7 @@ export async function updatePaymentTransaction(
   } = validatedFields.data;
 
   try {
-    await updatePaymentTransactionInDB(id, {
+    await updatePaymentTransactionTransaction(id, {
       provider_transaction_id,
       provider_session_id,
       provider_status,
@@ -126,7 +126,7 @@ export async function deletePaymentTransaction(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await deletePaymentTransactionPermanentlyInDB(id);
+    await permanentlyDeletePaymentTransactionTransaction(id);
 
     revalidatePath("/dashboard/orders");
 

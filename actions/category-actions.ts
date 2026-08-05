@@ -9,17 +9,22 @@ import {
   categoryUpdateSchema,
 } from "@/lib/validations";
 import {
-  createCategoryInDB,
-  deleteCategoryPermanentlyInDB,
-  updateCategoryInDB,
-  bulkUpdateCategoriesInDB,
-  bulkDeleteCategoriesPermanentlyInDB,
-  getCategoryForRevalidationInDB,
-  getCategoriesForRevalidationInDB,
+  createCategoryTransaction,
+  updateCategoryTransaction,
+  deleteCategoryTransaction,
+  restoreCategoryTransaction,
+  permanentlyDeleteCategoryTransaction,
+  bulkDeleteCategoriesTransaction,
+  bulkRestoreCategoriesTransaction,
+  bulkPermanentlyDeleteCategoriesTransaction,
 } from "@/services/category-services";
+import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { CategoryFilterParams, getCategoryFilterWhere } from "@/lib/filters/category-filters";
+import {
+  CategoryFilterParams,
+  getCategoryFilterWhere,
+} from "@/lib/filters/category-filters";
 
 export async function uploadCategoryImage(
   formData: FormData,
@@ -43,7 +48,8 @@ export async function uploadCategoryImage(
   if (!allowedTypes.includes(file.type)) {
     return {
       success: false,
-      message: "Unsupported file type. Please upload a JPEG, PNG, WebP, GIF, SVG, or AVIF image.",
+      message:
+        "Unsupported file type. Please upload a JPEG, PNG, WebP, GIF, SVG, or AVIF image.",
     };
   }
 
@@ -108,35 +114,31 @@ export async function createCategory(
   } = validatedFields.data;
 
   try {
-    await createCategoryInDB({
-      name,
-      slug,
-      description: description || null,
-      image_url: image_url || null,
-      image_alt_text: image_alt_text || null,
-      bg_color: bg_color || null,
-      show_in_header,
-      show_in_footer,
-      show_in_home,
-      parent_id: parent_id ?? null,
-      sort_order,
-      is_active,
-      meta_info,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    const { parentSlug } = await createCategoryTransaction(
+      {
+        name,
+        slug,
+        description: description || null,
+        image_url: image_url || null,
+        image_alt_text: image_alt_text || null,
+        bg_color: bg_color || null,
+        show_in_header,
+        show_in_footer,
+        show_in_home,
+        parent_id: parent_id ?? null,
+        sort_order,
+        is_active,
+        meta_info,
+      },
+      Number(user.id),
+    );
 
-    // Revalidate granular storefront cache tags
     revalidateTag("page-categories", "max");
     if (show_in_header) revalidateTag("site-header", "max");
     if (show_in_footer) revalidateTag("site-footer", "max");
     if (show_in_home) revalidateTag("hero-banner", "max");
-    if (parent_id) {
-      const parentCat = await getCategoryForRevalidationInDB(parent_id);
-      if (parentCat?.slug) revalidateTag(`category-${parentCat.slug}`, "max");
-    }
+    if (parentSlug) revalidateTag(`category-${parentSlug}`, "max");
 
-    // Revalidate admin dashboard page
     revalidatePath("/dashboard/categories");
 
     return { success: true, message: "Category created successfully." };
@@ -180,71 +182,99 @@ export async function updateCategory(
   } = validatedFields.data;
 
   try {
-    const existing = await getCategoryForRevalidationInDB(id);
+    const { existing, updated, newParentSlug, removedMediaUrls } =
+      await updateCategoryTransaction(
+        id,
+        {
+          name,
+          slug,
+          description: description !== undefined ? description || null : undefined,
+          image_url: image_url !== undefined ? image_url || null : undefined,
+          image_alt_text:
+            image_alt_text !== undefined ? image_alt_text || null : undefined,
+          bg_color: bg_color !== undefined ? bg_color || null : undefined,
+          show_in_header,
+          show_in_footer,
+          show_in_home,
+          parent_id,
+          sort_order,
+          is_active,
+          meta_info,
+        },
+        Number(user.id),
+      );
 
-    const result = await updateCategoryInDB(id, {
-      name,
-      slug,
-      description: description !== undefined ? description || null : undefined,
-      image_url: image_url !== undefined ? image_url || null : undefined,
-      image_alt_text: image_alt_text !== undefined ? image_alt_text || null : undefined,
-      bg_color: bg_color !== undefined ? bg_color || null : undefined,
-      show_in_header,
-      show_in_footer,
-      show_in_home,
-      parent_id,
-      sort_order,
-      is_active,
-      meta_info,
-      updated_by: Number(user.id),
-    });
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
-    // Granular storefront tag revalidations based on changed fields
     const categoryListChanged =
-      (name !== undefined && name !== existing?.name) ||
-      (slug !== undefined && slug !== existing?.slug) ||
-      (image_url !== undefined && image_url !== existing?.image_url) ||
-      (bg_color !== undefined && bg_color !== existing?.bg_color) ||
-      (sort_order !== undefined && sort_order !== existing?.sort_order) ||
-      (is_active !== undefined && is_active !== existing?.is_active);
+      (name !== undefined && name !== existing.name) ||
+      (slug !== undefined && slug !== existing.slug) ||
+      (image_url !== undefined && image_url !== existing.image_url) ||
+      (bg_color !== undefined && bg_color !== existing.bg_color) ||
+      (sort_order !== undefined && sort_order !== existing.sort_order) ||
+      (is_active !== undefined && is_active !== existing.is_active);
 
     if (categoryListChanged) {
       revalidateTag("page-categories", "max");
     }
 
-    if (existing?.slug) {
-      revalidateTag(`category-${existing.slug}`, "max");
-    }
-    if (result.slug && result.slug !== existing?.slug) {
-      revalidateTag(`category-${result.slug}`, "max");
+    if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (updated.slug && updated.slug !== existing.slug) {
+      revalidateTag(`category-${updated.slug}`, "max");
     }
 
-    const headerVisibilityChanged = show_in_header !== undefined && show_in_header !== existing?.show_in_header;
-    const isHeaderRelevant = existing?.show_in_header || result.show_in_header;
-    const headerFieldsChanged = name !== undefined || slug !== undefined || sort_order !== undefined || parent_id !== undefined || is_active !== undefined;
+    const headerVisibilityChanged =
+      show_in_header !== undefined && show_in_header !== existing.show_in_header;
+    const isHeaderRelevant = existing.show_in_header || updated.show_in_header;
+    const headerFieldsChanged =
+      name !== undefined ||
+      slug !== undefined ||
+      sort_order !== undefined ||
+      parent_id !== undefined ||
+      is_active !== undefined;
+
     if (headerVisibilityChanged || (isHeaderRelevant && headerFieldsChanged)) {
       revalidateTag("site-header", "max");
     }
 
-    const footerVisibilityChanged = show_in_footer !== undefined && show_in_footer !== existing?.show_in_footer;
-    const isFooterRelevant = existing?.show_in_footer || result.show_in_footer;
-    const footerFieldsChanged = name !== undefined || slug !== undefined || sort_order !== undefined || parent_id !== undefined || is_active !== undefined;
+    const footerVisibilityChanged =
+      show_in_footer !== undefined && show_in_footer !== existing.show_in_footer;
+    const isFooterRelevant = existing.show_in_footer || updated.show_in_footer;
+    const footerFieldsChanged =
+      name !== undefined ||
+      slug !== undefined ||
+      sort_order !== undefined ||
+      parent_id !== undefined ||
+      is_active !== undefined;
+
     if (footerVisibilityChanged || (isFooterRelevant && footerFieldsChanged)) {
       revalidateTag("site-footer", "max");
     }
 
-    const homeVisibilityChanged = show_in_home !== undefined && show_in_home !== existing?.show_in_home;
-    const isHomeRelevant = existing?.show_in_home || result.show_in_home;
-    const homeFieldsChanged = name !== undefined || slug !== undefined || image_url !== undefined || bg_color !== undefined || sort_order !== undefined || is_active !== undefined;
+    const homeVisibilityChanged =
+      show_in_home !== undefined && show_in_home !== existing.show_in_home;
+    const isHomeRelevant = existing.show_in_home || updated.show_in_home;
+    const homeFieldsChanged =
+      name !== undefined ||
+      slug !== undefined ||
+      image_url !== undefined ||
+      bg_color !== undefined ||
+      sort_order !== undefined ||
+      is_active !== undefined;
+
     if (homeVisibilityChanged || (isHomeRelevant && homeFieldsChanged)) {
       revalidateTag("hero-banner", "max");
     }
 
-    if (existing?.parent?.slug) {
+    if (existing.parent?.slug) {
       revalidateTag(`category-${existing.parent.slug}`, "max");
     }
+    if (newParentSlug) {
+      revalidateTag(`category-${newParentSlug}`, "max");
+    }
 
-    // Revalidate admin dashboard page
     revalidatePath("/dashboard/categories");
 
     return { success: true, message: "Category updated successfully." };
@@ -260,20 +290,14 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getCategoryForRevalidationInDB(id);
-
-    const result = await updateCategoryInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    const { existing } = await deleteCategoryTransaction(id, Number(user.id));
 
     revalidateTag("page-categories", "max");
-    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
-    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
+    if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing.show_in_header) revalidateTag("site-header", "max");
+    if (existing.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
@@ -291,20 +315,14 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getCategoryForRevalidationInDB(id);
-
-    const result = await updateCategoryInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    const { existing } = await restoreCategoryTransaction(id, Number(user.id));
 
     revalidateTag("page-categories", "max");
-    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
-    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
+    if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing.show_in_header) revalidateTag("site-header", "max");
+    if (existing.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
@@ -316,22 +334,27 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
   }
 }
 
-export async function permanentlyDeleteCategory(id: number): Promise<ActionResponse> {
+export async function permanentlyDeleteCategory(
+  id: number,
+): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/categories");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getCategoryForRevalidationInDB(id);
+    const { existing, removedMediaUrls } =
+      await permanentlyDeleteCategoryTransaction(id);
 
-    const result = await deleteCategoryPermanentlyInDB(id);
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("page-categories", "max");
-    if (existing?.slug) revalidateTag(`category-${existing.slug}`, "max");
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing?.show_in_home) revalidateTag("hero-banner", "max");
-    if (existing?.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
+    if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing.show_in_header) revalidateTag("site-header", "max");
+    if (existing.show_in_footer) revalidateTag("site-footer", "max");
+    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories/trash");
 
@@ -348,21 +371,17 @@ export async function bulkDeleteCategories(
   filterParams?: CategoryFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/categories");
-  const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, false) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCategoryFilterWhere(filterParams, false)
+      : undefined;
 
   try {
-    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, false, filterWhere);
-
-    await bulkUpdateCategoriesInDB(
+    const { affected } = await bulkDeleteCategoriesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("page-categories", "max");
@@ -390,21 +409,17 @@ export async function bulkRestoreCategories(
   filterParams?: CategoryFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/categories");
-  const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCategoryFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, true, filterWhere);
-
-    await bulkUpdateCategoriesInDB(
+    const { affected } = await bulkRestoreCategoriesTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("page-categories", "max");
@@ -432,12 +447,22 @@ export async function bulkPermanentlyDeleteCategories(
   filterParams?: CategoryFilterParams,
 ): Promise<ActionResponse> {
   await assertPermission("delete", "/dashboard/categories");
-  const filterWhere = selectAllScope && filterParams ? await getCategoryFilterWhere(filterParams, true) : undefined;
+  const filterWhere =
+    selectAllScope && filterParams
+      ? await getCategoryFilterWhere(filterParams, true)
+      : undefined;
 
   try {
-    const affected = await getCategoriesForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+    const { affected, removedMediaUrls } =
+      await bulkPermanentlyDeleteCategoriesTransaction(
+        ids,
+        selectAllScope,
+        filterWhere,
+      );
 
-    await bulkDeleteCategoriesPermanentlyInDB(ids, selectAllScope, filterWhere);
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("page-categories", "max");
     for (const cat of affected) {
@@ -459,5 +484,3 @@ export async function bulkPermanentlyDeleteCategories(
     };
   }
 }
-
-

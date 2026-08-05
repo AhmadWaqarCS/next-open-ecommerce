@@ -9,9 +9,9 @@ import {
   orderRefundUpdateSchema,
 } from "@/lib/validations";
 import {
-  createOrderRefundInDB,
-  updateOrderRefundInDB,
-  deleteOrderRefundPermanentlyInDB,
+  createOrderRefundTransaction,
+  updateOrderRefundTransaction,
+  permanentlyDeleteOrderRefundTransaction,
 } from "@/services/payment-services";
 import { revalidatePath } from "next/cache";
 
@@ -33,15 +33,17 @@ export async function createOrderRefund(
     validatedFields.data;
 
   try {
-    await createOrderRefundInDB({
-      order_id,
-      amount,
-      reason: reason || null,
-      provider_refund_id: provider_refund_id || null,
-      status,
-      refunded_at: refunded_at ? new Date(refunded_at) : null,
-      created_by: Number(user.id),
-    });
+    await createOrderRefundTransaction(
+      {
+        order_id,
+        amount,
+        reason: reason || null,
+        provider_refund_id: provider_refund_id || null,
+        status,
+        refunded_at: refunded_at ? new Date(refunded_at) : null,
+      },
+      Number(user.id),
+    );
 
     revalidatePath("/dashboard/orders");
 
@@ -72,7 +74,7 @@ export async function updateOrderRefund(
   const { status, provider_refund_id, refunded_at } = validatedFields.data;
 
   try {
-    await updateOrderRefundInDB(id, {
+    await updateOrderRefundTransaction(id, {
       status,
       provider_refund_id:
         provider_refund_id !== undefined ? provider_refund_id || null : undefined,
@@ -94,7 +96,7 @@ export async function deleteOrderRefund(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await deleteOrderRefundPermanentlyInDB(id);
+    await permanentlyDeleteOrderRefundTransaction(id);
 
     revalidatePath("/dashboard/orders");
 

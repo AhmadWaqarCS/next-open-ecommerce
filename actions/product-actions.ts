@@ -9,23 +9,16 @@ import {
   productUpdateSchema,
 } from "@/lib/validations";
 import {
-  createProductInDB,
-  deleteProductPermanentlyInDB,
-  updateProductInDB,
-  bulkUpdateProductsInDB,
-  bulkDeleteProductsPermanentlyInDB,
-  getProductForRevalidationInDB,
-  getProductsForRevalidationInDB,
+  createProductTransaction,
+  updateProductTransaction,
+  deleteProductTransaction,
+  restoreProductTransaction,
+  permanentlyDeleteProductTransaction,
+  bulkDeleteProductsTransaction,
+  bulkRestoreProductsTransaction,
+  bulkPermanentlyDeleteProductsTransaction,
 } from "@/services/product-services";
-import { getCategoryForRevalidationInDB } from "@/services/category-services";
-import {
-  createManyProductImagesInDB,
-  syncProductImagesInDB,
-} from "@/services/product-image-services";
-import {
-  createManyProductVariantsInDB,
-  syncProductVariantsInDB,
-} from "@/services/product-variant-services";
+import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -155,77 +148,38 @@ export async function createProduct(
   } = validatedFields.data;
 
   try {
-    const newProduct = await createProductInDB({
-      name,
-      slug,
-      description: description || null,
-      short_description: short_description || null,
-      feature_image_url: feature_image_url || null,
-      feature_image_alt_text: feature_image_alt_text || null,
-      price,
-      compare_at_price: compare_at_price ?? null,
-      cost_price: cost_price ?? null,
-      sku: sku || null,
-      stock_quantity,
-      low_stock_threshold,
-      track_inventory,
-      weight: weight ?? null,
-      dimensions: dimensions ?? null,
-      category_id: category_id ?? null,
-      is_featured,
-      is_active,
-      sort_order,
-      meta_info,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    const { categorySlug } = await createProductTransaction(
+      {
+        name,
+        slug,
+        description: description || null,
+        short_description: short_description || null,
+        feature_image_url: feature_image_url || null,
+        feature_image_alt_text: feature_image_alt_text || null,
+        price,
+        compare_at_price: compare_at_price ?? null,
+        cost_price: cost_price ?? null,
+        sku: sku || null,
+        stock_quantity,
+        low_stock_threshold,
+        track_inventory,
+        weight: weight ?? null,
+        dimensions: dimensions ?? null,
+        category_id: category_id ?? null,
+        is_featured,
+        is_active,
+        sort_order,
+        meta_info,
+        gallery_images: data.gallery_images,
+        variants: data.variants,
+      },
+      Number(user.id),
+    );
 
-    // Handle gallery images if present
-    if (data.gallery_images && data.gallery_images.length > 0) {
-      await createManyProductImagesInDB(
-        data.gallery_images.map((img, idx) => ({
-          product_id: newProduct.id,
-          url: img.url,
-          alt_text: img.alt_text || null,
-          sort_order: img.sort_order ?? idx,
-          created_by: Number(user.id),
-          updated_by: Number(user.id),
-        })),
-      );
-    }
-
-    // Handle product variants if present
-    if (data.variants && data.variants.length > 0) {
-      await createManyProductVariantsInDB(
-        data.variants.map((v, idx) => ({
-          product_id: newProduct.id,
-          name: v.name,
-          sku: v.sku || null,
-          price: v.price != null && v.price !== "" ? Number(v.price) : null,
-          compare_at_price:
-            v.compare_at_price != null && v.compare_at_price !== ""
-              ? Number(v.compare_at_price)
-              : null,
-          stock_quantity: v.stock_quantity ?? 0,
-          options: v.options ?? {},
-          image_url: v.image_url || null,
-          image_url_alt_text: v.image_url_alt_text || null,
-          is_active: v.is_active ?? true,
-          sort_order: v.sort_order ?? idx,
-          created_by: Number(user.id),
-          updated_by: Number(user.id),
-        })),
-      );
-    }
-
-    // Granular storefront revalidations
     revalidateTag("page-products", "max");
     revalidateTag(`product-${slug}`, "max");
     if (is_featured) revalidateTag("featured-products", "max");
-    if (category_id) {
-      const cat = await getCategoryForRevalidationInDB(category_id);
-      if (cat?.slug) revalidateTag(`category-${cat.slug}`, "max");
-    }
+    if (categorySlug) revalidateTag(`category-${categorySlug}`, "max");
 
     revalidatePath("/dashboard/products");
 
@@ -287,50 +241,47 @@ export async function updateProduct(
   } = validatedFields.data;
 
   try {
-    const existing = await getProductForRevalidationInDB(id);
+    const { existing, updatedProduct, newCategorySlug, removedMediaUrls } =
+      await updateProductTransaction(
+        id,
+        {
+          name,
+          slug,
+          description: description !== undefined ? description || null : undefined,
+          short_description:
+            short_description !== undefined ? short_description || null : undefined,
+          feature_image_url:
+            feature_image_url !== undefined ? feature_image_url || null : undefined,
+          feature_image_alt_text:
+            feature_image_alt_text !== undefined
+              ? feature_image_alt_text || null
+              : undefined,
+          price,
+          compare_at_price:
+            compare_at_price !== undefined ? (compare_at_price ?? null) : undefined,
+          cost_price: cost_price !== undefined ? (cost_price ?? null) : undefined,
+          sku: sku !== undefined ? sku || null : undefined,
+          stock_quantity,
+          low_stock_threshold,
+          track_inventory,
+          weight: weight !== undefined ? (weight ?? null) : undefined,
+          dimensions: dimensions !== undefined ? (dimensions ?? null) : undefined,
+          category_id:
+            category_id !== undefined ? (category_id ?? null) : undefined,
+          is_featured,
+          is_active,
+          sort_order,
+          meta_info,
+          gallery_images: data.gallery_images,
+          variants: data.variants,
+        },
+        Number(user.id),
+      );
 
-    const updatedProduct = await updateProductInDB(id, {
-      name,
-      slug,
-      description: description !== undefined ? description || null : undefined,
-      short_description:
-        short_description !== undefined ? short_description || null : undefined,
-      feature_image_url:
-        feature_image_url !== undefined ? feature_image_url || null : undefined,
-      feature_image_alt_text:
-        feature_image_alt_text !== undefined
-          ? feature_image_alt_text || null
-          : undefined,
-      price,
-      compare_at_price:
-        compare_at_price !== undefined ? (compare_at_price ?? null) : undefined,
-      cost_price: cost_price !== undefined ? (cost_price ?? null) : undefined,
-      sku: sku !== undefined ? sku || null : undefined,
-      stock_quantity,
-      low_stock_threshold,
-      track_inventory,
-      weight: weight !== undefined ? (weight ?? null) : undefined,
-      dimensions: dimensions !== undefined ? (dimensions ?? null) : undefined,
-      category_id:
-        category_id !== undefined ? (category_id ?? null) : undefined,
-      is_featured,
-      is_active,
-      sort_order,
-      meta_info,
-      updated_by: Number(user.id),
-    });
-
-    // Handle gallery images synchronization if passed
-    if (data.gallery_images !== undefined) {
-      await syncProductImagesInDB(id, data.gallery_images, Number(user.id));
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
     }
 
-    // Handle product variants synchronization if passed
-    if (data.variants !== undefined) {
-      await syncProductVariantsInDB(id, data.variants, Number(user.id));
-    }
-
-    // Granular storefront tag revalidations based on changed fields
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (updatedProduct.slug && updatedProduct.slug !== existing?.slug) {
       revalidateTag(`product-${updatedProduct.slug}`, "max");
@@ -338,7 +289,8 @@ export async function updateProduct(
 
     revalidateTag("page-products", "max");
 
-    const featuredChanged = is_featured !== undefined && is_featured !== existing?.is_featured;
+    const featuredChanged =
+      is_featured !== undefined && is_featured !== existing?.is_featured;
     const isFeaturedRelevant = existing?.is_featured || updatedProduct.is_featured;
     if (featuredChanged || isFeaturedRelevant) {
       revalidateTag("featured-products", "max");
@@ -347,9 +299,8 @@ export async function updateProduct(
     if (existing?.category?.slug) {
       revalidateTag(`category-${existing.category.slug}`, "max");
     }
-    if (category_id && category_id !== existing?.category_id) {
-      const newCat = await getCategoryForRevalidationInDB(category_id);
-      if (newCat?.slug) revalidateTag(`category-${newCat.slug}`, "max");
+    if (newCategorySlug) {
+      revalidateTag(`category-${newCategorySlug}`, "max");
     }
 
     revalidatePath("/dashboard/products");
@@ -367,18 +318,13 @@ export async function deleteProduct(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getProductForRevalidationInDB(id);
-
-    await updateProductInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    const { existing } = await deleteProductTransaction(id, Number(user.id));
 
     revalidateTag("page-products", "max");
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (existing?.is_featured) revalidateTag("featured-products", "max");
-    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+    if (existing?.category?.slug)
+      revalidateTag(`category-${existing.category.slug}`, "max");
 
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
@@ -395,18 +341,13 @@ export async function restoreProduct(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getProductForRevalidationInDB(id);
-
-    await updateProductInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    const { existing } = await restoreProductTransaction(id, Number(user.id));
 
     revalidateTag("page-products", "max");
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (existing?.is_featured) revalidateTag("featured-products", "max");
-    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+    if (existing?.category?.slug)
+      revalidateTag(`category-${existing.category.slug}`, "max");
 
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
@@ -425,14 +366,18 @@ export async function permanentlyDeleteProduct(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getProductForRevalidationInDB(id);
+    const { existing, removedMediaUrls } =
+      await permanentlyDeleteProductTransaction(id);
 
-    await deleteProductPermanentlyInDB(id);
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("page-products", "max");
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (existing?.is_featured) revalidateTag("featured-products", "max");
-    if (existing?.category?.slug) revalidateTag(`category-${existing.category.slug}`, "max");
+    if (existing?.category?.slug)
+      revalidateTag(`category-${existing.category.slug}`, "max");
 
     revalidatePath("/dashboard/products/trash");
     return { success: true, message: "Product permanently deleted." };
@@ -454,26 +399,21 @@ export async function bulkDeleteProducts(
       : undefined;
 
   try {
-    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, false, filterWhere);
-
-    await bulkUpdateProductsInDB(
+    const { affected } = await bulkDeleteProductsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-      },
       selectAllScope,
-      false,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("page-products", "max");
     for (const prod of affected) {
       if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
-      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+      if (prod.category?.slug)
+        revalidateTag(`category-${prod.category.slug}`, "max");
     }
-    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+    if (affected.some((p) => p.is_featured))
+      revalidateTag("featured-products", "max");
 
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
@@ -497,26 +437,21 @@ export async function bulkRestoreProducts(
       : undefined;
 
   try {
-    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, true, filterWhere);
-
-    await bulkUpdateProductsInDB(
+    const { affected } = await bulkRestoreProductsTransaction(
       ids,
-      {
-        updated_by: Number(user.id),
-        deleted_at: null,
-        deleted_by: null,
-      },
       selectAllScope,
-      true,
       filterWhere,
+      Number(user.id),
     );
 
     revalidateTag("page-products", "max");
     for (const prod of affected) {
       if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
-      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+      if (prod.category?.slug)
+        revalidateTag(`category-${prod.category.slug}`, "max");
     }
-    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+    if (affected.some((p) => p.is_featured))
+      revalidateTag("featured-products", "max");
 
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
@@ -540,16 +475,25 @@ export async function bulkPermanentlyDeleteProducts(
       : undefined;
 
   try {
-    const affected = await getProductsForRevalidationInDB(ids, selectAllScope, true, filterWhere);
+    const { affected, removedMediaUrls } =
+      await bulkPermanentlyDeleteProductsTransaction(
+        ids,
+        selectAllScope,
+        filterWhere,
+      );
 
-    await bulkDeleteProductsPermanentlyInDB(ids, selectAllScope, filterWhere);
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("page-products", "max");
     for (const prod of affected) {
       if (prod.slug) revalidateTag(`product-${prod.slug}`, "max");
-      if (prod.category?.slug) revalidateTag(`category-${prod.category.slug}`, "max");
+      if (prod.category?.slug)
+        revalidateTag(`category-${prod.category.slug}`, "max");
     }
-    if (affected.some((p) => p.is_featured)) revalidateTag("featured-products", "max");
+    if (affected.some((p) => p.is_featured))
+      revalidateTag("featured-products", "max");
 
     revalidatePath("/dashboard/products/trash");
 
@@ -562,4 +506,3 @@ export async function bulkPermanentlyDeleteProducts(
     };
   }
 }
-

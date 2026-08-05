@@ -9,12 +9,16 @@ import {
   siteComponentUpdateSchema,
 } from "@/lib/validations";
 import {
-  createSiteComponentInDB,
-  updateSiteComponentInDB,
-  deleteSiteComponentPermanentlyInDB,
-  bulkUpdateSiteComponentsInDB,
-  bulkDeleteSiteComponentsPermanentlyInDB,
+  createSiteComponentTransaction,
+  updateSiteComponentTransaction,
+  deleteSiteComponentTransaction,
+  restoreSiteComponentTransaction,
+  permanentlyDeleteSiteComponentTransaction,
+  bulkDeleteSiteComponentsTransaction,
+  bulkRestoreSiteComponentsTransaction,
+  bulkPermanentlyDeleteSiteComponentsTransaction,
 } from "@/services/site-component-services";
+import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function createSiteComponent(
@@ -45,17 +49,18 @@ export async function createSiteComponent(
   } = validatedFields.data;
 
   try {
-    await createSiteComponentInDB({
-      name,
-      component_key,
-      category,
-      description: description || null,
-      default_props,
-      thumbnail_url: thumbnail_url || null,
-      is_active,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createSiteComponentTransaction(
+      {
+        name,
+        component_key,
+        category,
+        description: description || null,
+        default_props,
+        thumbnail_url: thumbnail_url || null,
+        is_active,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
@@ -98,16 +103,24 @@ export async function updateSiteComponent(
   } = validatedFields.data;
 
   try {
-    await updateSiteComponentInDB(id, {
-      name,
-      component_key,
-      category,
-      description: description !== undefined ? description || null : undefined,
-      default_props,
-      thumbnail_url: thumbnail_url !== undefined ? thumbnail_url || null : undefined,
-      is_active,
-      updated_by: Number(user.id),
-    });
+    const { removedMediaUrls } = await updateSiteComponentTransaction(
+      id,
+      {
+        name,
+        component_key,
+        category,
+        description: description !== undefined ? description || null : undefined,
+        default_props,
+        thumbnail_url:
+          thumbnail_url !== undefined ? thumbnail_url || null : undefined,
+        is_active,
+      },
+      Number(user.id),
+    );
+
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
@@ -128,11 +141,7 @@ export async function deleteSiteComponent(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updateSiteComponentInDB(id, {
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await deleteSiteComponentTransaction(id, Number(user.id));
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
@@ -153,11 +162,7 @@ export async function restoreSiteComponent(id: number): Promise<ActionResponse> 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await updateSiteComponentInDB(id, {
-      deleted_at: null,
-      deleted_by: null,
-      updated_by: Number(user.id),
-    });
+    await restoreSiteComponentTransaction(id, Number(user.id));
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
@@ -177,7 +182,12 @@ export async function permanentlyDeleteSiteComponent(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    await deleteSiteComponentPermanentlyInDB(id);
+    const { removedMediaUrls } =
+      await permanentlyDeleteSiteComponentTransaction(id);
+
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
@@ -200,15 +210,11 @@ export async function bulkSoftDeleteSiteComponents(
   );
 
   try {
-    await bulkUpdateSiteComponentsInDB(
+    await bulkDeleteSiteComponentsTransaction(
       ids,
-      {
-        deleted_at: new Date(),
-        deleted_by: Number(user.id),
-        updated_by: Number(user.id),
-      },
       selectAllScope,
       isTrash,
+      Number(user.id),
     );
 
     revalidateTag("site-components", "max");
@@ -232,15 +238,11 @@ export async function bulkRestoreSiteComponents(
   );
 
   try {
-    await bulkUpdateSiteComponentsInDB(
+    await bulkRestoreSiteComponentsTransaction(
       ids,
-      {
-        deleted_at: null,
-        deleted_by: null,
-        updated_by: Number(user.id),
-      },
       selectAllScope,
       isTrash,
+      Number(user.id),
     );
 
     revalidateTag("site-components", "max");
@@ -260,7 +262,12 @@ export async function bulkPermanentlyDeleteSiteComponents(
   await assertPermission("delete", "/dashboard/site-components");
 
   try {
-    await bulkDeleteSiteComponentsPermanentlyInDB(ids, selectAllScope);
+    const { removedMediaUrls } =
+      await bulkPermanentlyDeleteSiteComponentsTransaction(ids, selectAllScope);
+
+    if (removedMediaUrls.length > 0) {
+      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
+    }
 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");

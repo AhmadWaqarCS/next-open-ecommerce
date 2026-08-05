@@ -9,10 +9,11 @@ import {
   sitePageUpdateSchema,
 } from "@/lib/validations";
 import {
-  createSitePageInDB,
-  updateSitePageInDB,
-  deleteSitePagePermanentlyInDB,
-  getSitePageForRevalidationInDB,
+  createSitePageTransaction,
+  updateSitePageTransaction,
+  deleteSitePageTransaction,
+  restoreSitePageTransaction,
+  permanentlyDeleteSitePageTransaction,
 } from "@/services/page-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
@@ -57,20 +58,21 @@ export async function createSitePage(
   } = validatedFields.data;
 
   try {
-    await createSitePageInDB({
-      slug,
-      title,
-      content,
-      is_active,
-      show_in_header,
-      show_in_footer,
-      sort_order,
-      theme_config,
-      components_config,
-      meta_info,
-      created_by: Number(user.id),
-      updated_by: Number(user.id),
-    });
+    await createSitePageTransaction(
+      {
+        slug,
+        title,
+        content,
+        is_active,
+        show_in_header,
+        show_in_footer,
+        sort_order,
+        theme_config,
+        components_config,
+        meta_info,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-pages", "max");
     revalidatePageTags(slug);
@@ -117,43 +119,56 @@ export async function updateSitePage(
   } = validatedFields.data;
 
   try {
-    const existing = await getSitePageForRevalidationInDB(id);
-
-    const result = await updateSitePageInDB(id, {
-      slug,
-      title,
-      content,
-      is_active,
-      show_in_header,
-      show_in_footer,
-      sort_order,
-      theme_config,
-      components_config,
-      meta_info,
-      updated_by: Number(user.id),
-    });
+    const { existing, updated } = await updateSitePageTransaction(
+      id,
+      {
+        slug,
+        title,
+        content,
+        is_active,
+        show_in_header,
+        show_in_footer,
+        sort_order,
+        theme_config,
+        components_config,
+        meta_info,
+      },
+      Number(user.id),
+    );
 
     revalidateTag("site-pages", "max");
 
     if (existing?.slug) revalidatePageTags(existing.slug);
-    if (result.slug && result.slug !== existing?.slug) revalidatePageTags(result.slug);
+    if (updated.slug && updated.slug !== existing?.slug) {
+      revalidatePageTags(updated.slug);
+    }
 
-    const headerVisibilityChanged = show_in_header !== undefined && show_in_header !== existing?.show_in_header;
-    const isHeaderRelevant = existing?.show_in_header || result.show_in_header;
-    const headerFieldsChanged = title !== undefined || slug !== undefined || sort_order !== undefined || is_active !== undefined;
+    const headerVisibilityChanged =
+      show_in_header !== undefined && show_in_header !== existing?.show_in_header;
+    const isHeaderRelevant = existing?.show_in_header || updated.show_in_header;
+    const headerFieldsChanged =
+      title !== undefined ||
+      slug !== undefined ||
+      sort_order !== undefined ||
+      is_active !== undefined;
     if (headerVisibilityChanged || (isHeaderRelevant && headerFieldsChanged)) {
       revalidateTag("site-header", "max");
     }
 
-    const footerVisibilityChanged = show_in_footer !== undefined && show_in_footer !== existing?.show_in_footer;
-    const isFooterRelevant = existing?.show_in_footer || result.show_in_footer;
-    const footerFieldsChanged = title !== undefined || slug !== undefined || sort_order !== undefined || is_active !== undefined;
+    const footerVisibilityChanged =
+      show_in_footer !== undefined && show_in_footer !== existing?.show_in_footer;
+    const isFooterRelevant = existing?.show_in_footer || updated.show_in_footer;
+    const footerFieldsChanged =
+      title !== undefined ||
+      slug !== undefined ||
+      sort_order !== undefined ||
+      is_active !== undefined;
     if (footerVisibilityChanged || (isFooterRelevant && footerFieldsChanged)) {
       revalidateTag("site-footer", "max");
     }
 
     revalidatePath("/dashboard/pages");
-    revalidatePath(`/${result.slug}`);
+    revalidatePath(`/${updated.slug}`);
 
     return { success: true, message: "Page updated successfully." };
   } catch (error) {
@@ -168,13 +183,7 @@ export async function deleteSitePage(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getSitePageForRevalidationInDB(id);
-
-    const result = await updateSitePageInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: new Date(),
-      deleted_by: Number(user.id),
-    });
+    const { existing } = await deleteSitePageTransaction(id, Number(user.id));
 
     revalidateTag("site-pages", "max");
     if (existing?.slug) revalidatePageTags(existing.slug);
@@ -196,13 +205,7 @@ export async function restoreSitePage(id: number): Promise<ActionResponse> {
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getSitePageForRevalidationInDB(id);
-
-    const result = await updateSitePageInDB(id, {
-      updated_by: Number(user.id),
-      deleted_at: null,
-      deleted_by: null,
-    });
+    const { existing } = await restoreSitePageTransaction(id, Number(user.id));
 
     revalidateTag("site-pages", "max");
     if (existing?.slug) revalidatePageTags(existing.slug);
@@ -226,9 +229,7 @@ export async function permanentlyDeleteSitePage(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const existing = await getSitePageForRevalidationInDB(id);
-
-    const result = await deleteSitePagePermanentlyInDB(id);
+    const { existing } = await permanentlyDeleteSitePageTransaction(id);
 
     revalidateTag("site-pages", "max");
     if (existing?.slug) revalidatePageTags(existing.slug);
@@ -243,4 +244,3 @@ export async function permanentlyDeleteSitePage(
     return { success: false, message: "Failed to permanently delete page." };
   }
 }
-
