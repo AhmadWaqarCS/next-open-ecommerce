@@ -17,6 +17,8 @@ import {
   bulkDeleteMediaFilesFromStorage,
   reconnectMediaInDB,
   clearBrokenImageReferenceInDB,
+  removeMediaAndDisconnectInDB,
+  saveOptimizedMediaFileInStorage,
 } from "@/services/media-services";
 import { saveFileToUploads } from "@/services/upload-services";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -66,13 +68,14 @@ export async function deleteMediaAction(input: DeleteMediaInput): Promise<Action
 
   try {
     await deleteMediaFileFromStorage(validation.data.relativePath);
+    await removeMediaAndDisconnectInDB(validation.data.relativePath, Number(user.id));
 
     revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
     return {
       success: true,
-      message: `File deleted successfully from storage.`,
+      message: `File deleted successfully from storage and DB references cleared.`,
     };
   } catch (error: any) {
     return {
@@ -251,6 +254,46 @@ export async function uploadMediaImage(
     return {
       success: false,
       message: error.message || "Failed to save image to disk.",
+    };
+  }
+}
+
+/**
+ * Replaces an existing media file with an optimized version.
+ */
+export async function replaceOptimizedMediaAction(
+  formData: FormData
+): Promise<ActionResponse<{ relativePath: string; fileName: string; size: number }>> {
+  const { user } = await assertPermission("update", "/dashboard/media");
+
+  const oldRelativePath = formData.get("oldRelativePath") as string | null;
+  const file = formData.get("file") as File | null;
+
+  if (!oldRelativePath || !file || !(file instanceof File) || file.size === 0) {
+    return { success: false, message: "Invalid parameters or no file uploaded." };
+  }
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await saveOptimizedMediaFileInStorage(
+      oldRelativePath,
+      Buffer.from(arrayBuffer),
+      file.name,
+      Number(user.id)
+    );
+
+    revalidateMediaTags();
+    revalidatePath("/dashboard/media");
+
+    return {
+      success: true,
+      message: "Media file optimized and replaced successfully.",
+      data: result,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || "Failed to replace optimized media file.",
     };
   }
 }

@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import prisma from "@/lib/prisma";
+import { saveFileToUploads } from "./upload-services";
 
 /**
  * Deletes a physical file from storage (currently disk IO uploads folder).
@@ -304,5 +305,120 @@ export async function getMediaDashboardDataInDB() {
 
     return { categories, products };
   });
+}
+
+/**
+ * Clears or removes all DB references matching a relative path inside a single Prisma transaction.
+ */
+export async function removeMediaAndDisconnectInDB(relativePath: string, userId: number) {
+  const norm = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Clear category image_url
+    await tx.category.updateMany({
+      where: { image_url: norm, deleted_at: null },
+      data: { image_url: null, updated_by: userId },
+    });
+
+    // 2. Clear product feature_image_url
+    await tx.product.updateMany({
+      where: { feature_image_url: norm, deleted_at: null },
+      data: { feature_image_url: null, updated_by: userId },
+    });
+
+    // 3. Delete product_image records
+    await tx.product_image.deleteMany({
+      where: { url: norm, deleted_at: null },
+    });
+
+    // 4. Clear product_variant image_url
+    await tx.product_variant.updateMany({
+      where: { image_url: norm, deleted_at: null },
+      data: { image_url: null, updated_by: userId },
+    });
+
+    // 5. Clear site_config logo/favicon URLs
+    const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+    if (config) {
+      const updates: any = {};
+      if (config.light_logo_url === norm) updates.light_logo_url = null;
+      if (config.dark_logo_url === norm) updates.dark_logo_url = null;
+      if (config.favicon_url === norm) updates.favicon_url = null;
+      if (Object.keys(updates).length > 0) {
+        updates.updated_by = userId;
+        await tx.site_config.update({ where: { id: config.id }, data: updates });
+      }
+    }
+  });
+}
+
+/**
+ * Overwrites/replaces a physical media file on disk with an optimized version.
+ * If the file extension/path changes (e.g. .jpg -> .webp), updates DB connections to point to the new path in a single Prisma transaction, and deletes the old file.
+ */
+export async function saveOptimizedMediaFileInStorage(
+  oldRelativePath: string,
+  optimizedFileBuffer: Buffer,
+  newFileName: string,
+  userId: number
+): Promise<{ relativePath: string; fileName: string; size: number }> {
+  let cleanOldPath = oldRelativePath.trim().replace(/^\/uploads\//, "").replace(/^uploads\//, "").replace(/^\/+/, "");
+  const oldFolder = path.dirname(cleanOldPath); // e.g. "products/2026/08" or "categories"
+
+  // Save the optimized binary to disk using the old folder structure
+  const result = await saveFileToUploads(optimizedFileBuffer, newFileName, oldFolder === "." ? "" : oldFolder);
+
+  const oldNorm = oldRelativePath.startsWith("/") ? oldRelativePath : `/${oldRelativePath}`;
+  const newNorm = result.relativePath;
+
+  // If the file path changed (e.g., extension changed from .jpg to .webp), update DB references in a single transaction and delete old file
+  if (oldNorm !== newNorm) {
+    await prisma.$transaction(async (tx) => {
+      await tx.category.updateMany({
+        where: { image_url: oldNorm, deleted_at: null },
+        data: { image_url: newNorm, updated_by: userId },
+      });
+
+      await tx.product.updateMany({
+        where: { feature_image_url: oldNorm, deleted_at: null },
+        data: { feature_image_url: newNorm, updated_by: userId },
+      });
+
+      await tx.product_image.updateMany({
+        where: { url: oldNorm, deleted_at: null },
+        data: { url: newNorm, updated_by: userId },
+      });
+
+      await tx.product_variant.updateMany({
+        where: { image_url: oldNorm, deleted_at: null },
+        data: { image_url: newNorm, updated_by: userId },
+      });
+
+      const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+      if (config) {
+        const updates: any = {};
+        if (config.light_logo_url === oldNorm) updates.light_logo_url = newNorm;
+        if (config.dark_logo_url === oldNorm) updates.dark_logo_url = newNorm;
+        if (config.favicon_url === oldNorm) updates.favicon_url = newNorm;
+        if (Object.keys(updates).length > 0) {
+          updates.updated_by = userId;
+          await tx.site_config.update({ where: { id: config.id }, data: updates });
+        }
+      }
+    });
+
+    // Delete old physical file from disk
+    try {
+      await deleteMediaFileFromStorage(oldNorm);
+    } catch {
+      // ignore if old file was already unlinked
+    }
+  }
+
+  return {
+    relativePath: newNorm,
+    fileName: result.fileName,
+    size: result.size,
+  };
 }
 

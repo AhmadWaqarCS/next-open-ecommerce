@@ -28,7 +28,7 @@ interface CategoryFormProps {
   parentCategories: { id: number; name: string }[];
 }
 
-type TabType = "details" | "meta" | "media" | "hierarchy";
+type TabType = "details" | "meta" | "media";
 
 const PRESET_GRADIENTS = [
   { label: "Dark Zinc", value: "from-zinc-800 to-zinc-950" },
@@ -202,19 +202,19 @@ export default function CategoryForm({
   const hasErrorsInTab = (tab: TabType): boolean => {
     if (tab === "details") {
       return Boolean(
-        errors.name || errors.slug || errors.description || errors.is_active,
+        errors.name ||
+          errors.slug ||
+          errors.description ||
+          errors.is_active ||
+          errors.parent_id ||
+          errors.sort_order,
       );
     }
     if (tab === "meta") {
       return Boolean(errors.meta_info);
     }
     if (tab === "media") {
-      return Boolean(
-        errors.image_alt_text || errors.bg_color,
-      );
-    }
-    if (tab === "hierarchy") {
-      return Boolean(errors.parent_id || errors.sort_order);
+      return Boolean(errors.image_alt_text || errors.bg_color);
     }
     return false;
   };
@@ -277,21 +277,6 @@ export default function CategoryForm({
           >
             <span>Media &amp; Styling</span>
             {hasErrorsInTab("media") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("hierarchy")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "hierarchy"
-                ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Hierarchy &amp; Sorting</span>
-            {hasErrorsInTab("hierarchy") && (
               <span className="w-2 h-2 rounded-full bg-red-500" />
             )}
           </button>
@@ -391,6 +376,63 @@ export default function CategoryForm({
               {errors.slug && (
                 <p className="mt-1 text-xs text-red-500 font-medium">
                   {errors.slug.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Parent Category */}
+            <div>
+              <label
+                htmlFor="parent_id"
+                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Parent Category (Optional)
+              </label>
+              <select
+                id="parent_id"
+                {...register("parent_id", {
+                  setValueAs: (v) =>
+                    v === "" || v === null ? undefined : Number(v),
+                })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+              >
+                <option value="">None (Top Level Category)</option>
+                {parentCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              {errors.parent_id && (
+                <p className="mt-1 text-xs text-red-500 font-medium">
+                  {errors.parent_id.message}
+                </p>
+              )}
+            </div>
+
+            {/* Display Sort Order */}
+            <div>
+              <label
+                htmlFor="sort_order"
+                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Display Sort Order
+              </label>
+              <input
+                id="sort_order"
+                type="number"
+                min={0}
+                {...register("sort_order", { valueAsNumber: true })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+              />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Lower values display first on navigation menus and category listing pages.
+              </p>
+              {errors.sort_order && (
+                <p className="mt-1 text-xs text-red-500 font-medium">
+                  {errors.sort_order.message}
                 </p>
               )}
             </div>
@@ -593,65 +635,6 @@ export default function CategoryForm({
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: HIERARCHY & SORTING */}
-      {activeTab === "hierarchy" && (
-        <div className="space-y-4 animate-in fade-in duration-150">
-          <div>
-            <label
-              htmlFor="parent_id"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-            >
-              Parent Category (Optional)
-            </label>
-            <select
-              id="parent_id"
-              {...register("parent_id", {
-                setValueAs: (v) =>
-                  v === "" || v === null ? undefined : Number(v),
-              })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
-            >
-              <option value="">None (Top Level Category)</option>
-              {parentCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-            {errors.parent_id && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
-                {errors.parent_id.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="sort_order"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-            >
-              Display Sort Order
-            </label>
-            <input
-              id="sort_order"
-              type="number"
-              min={0}
-              {...register("sort_order", { valueAsNumber: true })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
-            />
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              Lower values display first on navigation menus and category
-              listing pages.
-            </p>
-            {errors.sort_order && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
-                {errors.sort_order.message}
-              </p>
-            )}
           </div>
         </div>
       )}

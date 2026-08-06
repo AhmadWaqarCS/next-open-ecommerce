@@ -96,42 +96,56 @@ export async function scanMediaStorage(): Promise<MediaScanResult> {
 
   await walkDir(uploadsDir);
 
-  // 2. Fetch all DB image references in parallel
-  const [categories, products, productImages, productVariants, siteConfig] = await Promise.all([
-    prisma.category.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, slug: true, image_url: true },
-    }),
-    prisma.product.findMany({
-      where: { deleted_at: null },
-      select: { id: true, name: true, slug: true, feature_image_url: true, sku: true },
-    }),
-    prisma.product_image.findMany({
-      where: { deleted_at: null },
-      select: {
-        id: true,
-        product_id: true,
-        url: true,
-        alt_text: true,
-        product: { select: { name: true, slug: true } },
-      },
-    }),
-    prisma.product_variant.findMany({
-      where: { deleted_at: null },
-      select: {
-        id: true,
-        product_id: true,
-        name: true,
-        sku: true,
-        image_url: true,
-        product: { select: { name: true, slug: true } },
-      },
-    }),
-    prisma.site_config.findFirst({
-      where: { deleted_at: null },
-      select: { id: true, light_logo_url: true, dark_logo_url: true, favicon_url: true },
-    }),
-  ]);
+  // 2. Fetch all DB image references inside a single Prisma transaction
+  const [categories, products, productImages, productVariants, siteConfig] =
+    await prisma.$transaction(async (tx) => {
+      return Promise.all([
+        tx.category.findMany({
+          where: { deleted_at: null },
+          select: { id: true, name: true, slug: true, image_url: true },
+        }),
+        tx.product.findMany({
+          where: { deleted_at: null },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            feature_image_url: true,
+            sku: true,
+          },
+        }),
+        tx.product_image.findMany({
+          where: { deleted_at: null },
+          select: {
+            id: true,
+            product_id: true,
+            url: true,
+            alt_text: true,
+            product: { select: { name: true, slug: true } },
+          },
+        }),
+        tx.product_variant.findMany({
+          where: { deleted_at: null },
+          select: {
+            id: true,
+            product_id: true,
+            name: true,
+            sku: true,
+            image_url: true,
+            product: { select: { name: true, slug: true } },
+          },
+        }),
+        tx.site_config.findFirst({
+          where: { deleted_at: null },
+          select: {
+            id: true,
+            light_logo_url: true,
+            dark_logo_url: true,
+            favicon_url: true,
+          },
+        }),
+      ]);
+    });
 
   // Set of physical files for quick lookup
   const diskPathsSet = new Set(diskFiles.map((f) => f.relativePath));

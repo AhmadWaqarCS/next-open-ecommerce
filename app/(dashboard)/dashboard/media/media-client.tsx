@@ -13,10 +13,16 @@ import { CRUD } from "@/lib/types";
 import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import Modal from "@/app/(dashboard)/_components/modal";
 import {
+  ImageOptimizeModal,
+  OptimizationItem,
+} from "@/app/(dashboard)/_components/image-optimize-modal";
+import { urlToFile } from "@/lib/image-optimizer";
+import {
   deleteMediaAction,
   bulkDeleteMediaAction,
   reconnectMediaAction,
   clearBrokenMediaAction,
+  replaceOptimizedMediaAction,
 } from "@/actions/media-actions";
 
 interface CategoryOption {
@@ -100,6 +106,91 @@ export default function MediaClient({
   // Clear Broken Link Modal State
   const [selectedClearBroken, setSelectedClearBroken] =
     useState<BrokenLinkItem | null>(null);
+
+  // Optimization Modal State
+  const [isOptimizeModalOpen, setIsOptimizeModalOpen] = useState(false);
+  const [optimizeItems, setOptimizeItems] = useState<OptimizationItem[]>([]);
+  const [isPreparingOptimize, setIsPreparingOptimize] = useState(false);
+
+  const handleOptimizeSingleFile = async (fileItem: MediaFileItem) => {
+    setIsPreparingOptimize(true);
+    const fileObj = await urlToFile(fileItem.relativePath, fileItem.fileName);
+    setIsPreparingOptimize(false);
+
+    if (!fileObj) {
+      toast("Failed to load image file for optimization", "error");
+      return;
+    }
+
+    setOptimizeItems([
+      {
+        id: fileItem.relativePath,
+        label: fileItem.fileName,
+        originalFile: fileObj,
+      },
+    ]);
+    setIsOptimizeModalOpen(true);
+  };
+
+  const handleOptimizeBatch = async (filesToOptimize: MediaFileItem[]) => {
+    if (!filesToOptimize || filesToOptimize.length === 0) return;
+    setIsPreparingOptimize(true);
+
+    const items: OptimizationItem[] = [];
+    for (const item of filesToOptimize) {
+      const fileObj = await urlToFile(item.relativePath, item.fileName);
+      if (fileObj) {
+        items.push({
+          id: item.relativePath,
+          label: item.fileName,
+          originalFile: fileObj,
+        });
+      }
+    }
+
+    setIsPreparingOptimize(false);
+
+    if (items.length === 0) {
+      toast("Failed to load image files for optimization", "error");
+      return;
+    }
+
+    setOptimizeItems(items);
+    setIsOptimizeModalOpen(true);
+  };
+
+  const handleSaveOptimizedFiles = (optimizedMap: Record<string, File>) => {
+    startTransition(async () => {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const [oldPath, newFile] of Object.entries(optimizedMap)) {
+        const formData = new FormData();
+        formData.append("oldRelativePath", oldPath);
+        formData.append("file", newFile);
+
+        const res = await replaceOptimizedMediaAction(formData);
+        if (res.success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      setIsOptimizeModalOpen(false);
+      if (successCount > 0) {
+        toast(
+          `Successfully optimized and saved ${successCount} image file(s).`,
+          "success",
+        );
+      }
+      if (failCount > 0) {
+        toast(`Failed to save ${failCount} image file(s).`, "error");
+      }
+
+      window.location.reload();
+    });
+  };
 
   // List of unique subfolders found in files
   const availableSubfolders = useMemo(() => {
@@ -397,7 +488,34 @@ export default function MediaClient({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-start md:self-auto">
+        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+          {permissions.update && filteredFiles.length > 0 && (
+            <button
+              onClick={() => handleOptimizeBatch(filteredFiles)}
+              disabled={isPreparingOptimize}
+              className="px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                />
+              </svg>
+              <span>
+                {isPreparingOptimize
+                  ? "Loading Files..."
+                  : `Optimize All (${filteredFiles.length})`}
+              </span>
+            </button>
+          )}
+
           {permissions.delete && scanData.stats.orphanFilesCount > 0 && (
             <button
               onClick={handleSelectAllOrphans}
@@ -1351,6 +1469,33 @@ export default function MediaClient({
           <div className="h-6 w-px bg-zinc-700/60" />
 
           <div className="flex items-center gap-3">
+            {permissions.update && (
+              <button
+                onClick={() => handleOptimizeBatch(selectedFilesList)}
+                disabled={isPreparingOptimize}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                  />
+                </svg>
+                <span>
+                  {isPreparingOptimize
+                    ? "Loading..."
+                    : `Optimize Selected (${selectedPaths.size})`}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={handleClearSelection}
               className="text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
@@ -1511,6 +1656,7 @@ export default function MediaClient({
       <Modal
         isOpen={Boolean(selectedPreviewFile)}
         onClose={() => setSelectedPreviewFile(null)}
+        className="max-w-4xl"
       >
         {selectedPreviewFile && (
           <div className="space-y-5">
@@ -1634,7 +1780,36 @@ export default function MediaClient({
             </div>
 
             {/* Actions Bar */}
-            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex-wrap">
+              {permissions.update && (
+                <button
+                  onClick={() => {
+                    const fileItem = selectedPreviewFile;
+                    setSelectedPreviewFile(null);
+                    handleOptimizeSingleFile(fileItem);
+                  }}
+                  disabled={isPreparingOptimize}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                    />
+                  </svg>
+                  <span>
+                    {isPreparingOptimize ? "Loading..." : "Optimize Image"}
+                  </span>
+                </button>
+              )}
+
               {permissions.update && (
                 <button
                   onClick={() => {
@@ -1955,6 +2130,15 @@ export default function MediaClient({
           </div>
         )}
       </Modal>
+
+      {/* ── MODAL 6: IMAGE OPTIMIZATION MODAL ── */}
+      <ImageOptimizeModal
+        isOpen={isOptimizeModalOpen}
+        onClose={() => setIsOptimizeModalOpen(false)}
+        items={optimizeItems}
+        onSave={handleSaveOptimizedFiles}
+        title="Optimize Media Storage Images"
+      />
     </div>
   );
 }

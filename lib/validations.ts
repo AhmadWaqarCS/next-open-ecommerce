@@ -61,8 +61,7 @@ export const relativePathSchema = z
   .min(1, "File relative path is required")
   .max(500, "File path cannot exceed 500 characters")
   .refine(
-    (path) =>
-      !path.includes("..") && !path.includes("\0") && !path.startsWith("/"),
+    (path) => !path.includes("..") && !path.includes("\0"),
     "Invalid file path or path traversal detected",
   );
 
