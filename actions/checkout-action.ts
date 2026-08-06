@@ -16,11 +16,15 @@ import {
   deleteCodOtpTransaction,
 } from "@/services/order-services";
 
+import { createStripeCheckoutSession, isStripeConfigured } from "@/lib/stripe";
+import { getSiteConfig } from "@/lib/storefront";
+
 export type PlaceOrderResponse = ActionResponse & {
   orderNumber?: string;
   requiresOtp?: boolean;
   verificationId?: number;
   email?: string;
+  checkoutUrl?: string;
 };
 
 /**
@@ -156,6 +160,10 @@ export async function placeOrder(
     payment_method === "cash_on_delivery" ||
     payment_method.toLowerCase().includes("cod");
 
+  const isStripe =
+    payment_method === "stripe" ||
+    payment_method.toLowerCase().includes("stripe");
+
   // ─── COD PIPELINE: SEND OTP EMAIL BEFORE CREATING DB ORDER ────────────────
   if (isCod) {
     try {
@@ -226,15 +234,65 @@ export async function placeOrder(
     }
   }
 
-  // ─── NON-COD PIPELINE: IMMEDIATE ORDER CREATION ────────────────────────────
+  // ─── STRIPE PIPELINE: CREATE ORDER + GENERATE STRIPE CHECKOUT SESSION ────
+  if (isStripe) {
+    if (!isStripeConfigured()) {
+      return {
+        success: false,
+        message:
+          "Stripe payment gateway is currently unavailable. Please choose another payment method or contact support.",
+      };
+    }
+
+    try {
+      const order = await processCheckoutTransaction(checkoutInputPayload);
+
+      const siteConfig = await getSiteConfig();
+      const siteUrl =
+        siteConfig?.site_url ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        "http://localhost:3000";
+
+      const session = await createStripeCheckoutSession({
+        orderNumber: order.order_number,
+        customerEmail: customer_email,
+        totalAmount: Number(order.total),
+        currency: order.currency || "USD",
+        items: checkoutInputPayload.items.map((i) => ({
+          productName: i.productName,
+          variantName: i.variantName,
+          unitPrice: i.unitPrice,
+          quantity: i.quantity,
+          imageUrl: i.imageUrl,
+        })),
+        siteUrl,
+      });
+
+      return {
+        success: true,
+        message: "Redirecting to Stripe payment portal...",
+        orderNumber: order.order_number,
+        checkoutUrl: session.url || undefined,
+      };
+    } catch (error: any) {
+      console.error("[placeOrder Stripe Error]", error);
+      return {
+        success: false,
+        message:
+          error?.message ||
+          "Failed to create Stripe payment session. Please try again.",
+      };
+    }
+  }
+
+  // ─── NON-COD / NON-STRIPE DEFAULT PIPELINE ─────────────────────────────────
   try {
     const order = await processCheckoutTransaction(checkoutInputPayload);
 
-    try {
-      await sendInvoiceAndOrderEmailsForOrder(order.id, 0);
-    } catch (emailErr) {
+    // Dispatch emails asynchronously in background without blocking action response
+    sendInvoiceAndOrderEmailsForOrder(order.id, 0).catch((emailErr) => {
       console.error("[placeOrder] Non-fatal email/invoice generation error:", emailErr);
-    }
+    });
 
     return {
       success: true,
@@ -309,11 +367,10 @@ export async function verifyCodOtpAndPlaceOrder(params: {
     const storedPayload = otpRecord.order_payload as unknown as ProcessCheckoutInput;
     const order = await processCheckoutTransaction(storedPayload);
 
-    try {
-      await sendInvoiceAndOrderEmailsForOrder(order.id, 0);
-    } catch (emailErr) {
+    // Dispatch emails asynchronously in background without blocking action response
+    sendInvoiceAndOrderEmailsForOrder(order.id, 0).catch((emailErr) => {
       console.error("[verifyCodOtpAndPlaceOrder] Non-fatal email error:", emailErr);
-    }
+    });
 
     // Clean up used OTP record immediately upon order creation via transaction
     try {

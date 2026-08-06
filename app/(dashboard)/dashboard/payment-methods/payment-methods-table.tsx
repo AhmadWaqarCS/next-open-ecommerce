@@ -166,21 +166,8 @@ export default function PaymentMethodsTable({
     <>
       <DataTable
         title="Payment Methods"
-        description="Manage checkout payment options including COD, Stripe, PayPal, and more."
+        description="Manage storefront payment options. Payment methods are pre-configured; enable methods to make them available at checkout."
         viewTrashHref="/dashboard/payment-methods/trash"
-        createButton={
-          permissions.create ? (
-            <Link
-              href="/dashboard/payment-methods/create"
-              className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold shadow-xs transition-all cursor-pointer"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Payment Method</span>
-            </Link>
-          ) : undefined
-        }
         filterBar={
           <GlobalFilterBar
             searchKey="name"
@@ -256,18 +243,7 @@ export default function PaymentMethodsTable({
         onBulkDelete={handleBulkDelete}
         emptyState={{
           title: "No payment methods found",
-          description: "Get started by adding your store's first payment method.",
-          action: permissions.create ? (
-            <Link
-              href="/dashboard/payment-methods/create"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Payment Method</span>
-            </Link>
-          ) : undefined,
+          description: "All payment methods are pre-configured by system seeding.",
         }}
       />
 

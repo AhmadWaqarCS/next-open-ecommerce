@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCart } from "@/lib/cart";
@@ -179,13 +179,36 @@ export default function CheckoutForm({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [otpState?.active]);
 
-  // Redirect to home if cart is empty — only after hydration is done and we
-  // haven't just placed an order (clearCart fires before router.push completes)
+  const searchParams = useSearchParams();
+  const [successModal, setSuccessModal] = useState<{
+    open: boolean;
+    orderNumber: string;
+  }>({ open: false, orderNumber: "" });
+
+  // ── Stripe Return / Order Success Detection ──────────────────────────────
   useEffect(() => {
-    if (hydrated && !isSubmitted && itemCount === 0 && !otpState?.active) {
+    const isSuccess = searchParams.get("success") === "1";
+    const orderNum = searchParams.get("order");
+    if (isSuccess && orderNum) {
+      setIsSubmitted(true);
+      clearCart();
+      setSuccessModal({ open: true, orderNumber: orderNum });
+    }
+  }, [searchParams, clearCart]);
+
+  // Redirect to home if cart is empty — only after hydration is done and we
+  // haven't just placed an order or shown success modal
+  useEffect(() => {
+    if (
+      hydrated &&
+      !isSubmitted &&
+      !successModal.open &&
+      itemCount === 0 &&
+      !otpState?.active
+    ) {
       router.replace("/");
     }
-  }, [hydrated, isSubmitted, itemCount, otpState?.active, router]);
+  }, [hydrated, isSubmitted, successModal.open, itemCount, otpState?.active, router]);
 
   const billingSame = watch("billing_same_as_shipping");
   const selectedMethodId = watch("shipping_method_id");
@@ -235,10 +258,18 @@ export default function CheckoutForm({
         return;
       }
 
-      if (result.orderNumber) {
-        setIsSubmitted(true); // prevent the empty-cart redirect from firing
+      if (result.checkoutUrl) {
+        setIsSubmitted(true);
         clearCart();
-        router.push(`/order/${result.orderNumber}?new=1`);
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+
+      if (result.orderNumber) {
+        setIsSubmitted(true);
+        clearCart();
+        setSuccessModal({ open: true, orderNumber: result.orderNumber });
+        setIsSubmitting(false);
         return;
       }
     }
@@ -260,7 +291,8 @@ export default function CheckoutForm({
     if (res.success && res.orderNumber) {
       setIsSubmitted(true);
       clearCart();
-      router.push(`/order/${res.orderNumber}?new=1`);
+      setOtpState(null);
+      setSuccessModal({ open: true, orderNumber: res.orderNumber });
     } else {
       setOtpError(res.message ?? "Invalid verification code.");
       setIsVerifyingOtp(false);
@@ -290,8 +322,8 @@ export default function CheckoutForm({
   // While cart is still being read from localStorage, show nothing
   if (!hydrated) return null;
 
-  if (itemCount === 0 && !isSubmitted && !otpState?.active) {
-    return null; // Will redirect in useEffect
+  if (itemCount === 0 && !isSubmitted && !otpState?.active && !successModal.open) {
+    return null;
   }
 
   return (
@@ -1014,6 +1046,62 @@ export default function CheckoutForm({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* ── Order Confirmation Success Modal ───────────────────────────────── */}
+      {successModal.open &&
+        mounted &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+              {/* Success Icon */}
+              <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+
+              {/* Title & Description */}
+              <div className="space-y-2">
+                <h3 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
+                  Order Placed Successfully!
+                </h3>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  An order confirmation email containing your order summary and invoice has been sent to your email address.
+                </p>
+              </div>
+
+              {/* Order Number Badge */}
+              {successModal.orderNumber && (
+                <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-2xl">
+                  <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
+                    Order Reference Number
+                  </span>
+                  <span className="text-base font-bold font-mono text-zinc-900 dark:text-zinc-100">
+                    #{successModal.orderNumber}
+                  </span>
+                </div>
+              )}
+
+              {/* Notice */}
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 italic">
+                Please check your email inbox (and spam folder) for your order receipt.
+              </p>
+
+              {/* Action Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessModal({ open: false, orderNumber: "" });
+                  router.push("/");
+                }}
+                className="w-full py-3.5 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-sm font-bold shadow-md transition-all cursor-pointer active:scale-[0.98]"
+              >
+                Continue Shopping
+              </button>
             </div>
           </div>,
           document.body,

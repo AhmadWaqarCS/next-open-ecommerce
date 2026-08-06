@@ -4,6 +4,7 @@
 
 import { cacheLife, cacheTag } from "next/cache";
 import prisma from "./prisma";
+import { isStripeConfigured } from "./stripe";
 
 const CURRENCY_SYMBOL = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
@@ -831,108 +832,24 @@ export async function getAllCategoriesPageData(): Promise<{
   };
 }
 
-// ─── 13. Order Page Data (Confirmation, Tracking, Invoice & Cancellation Hub) ──
-
-export async function getOrderPageData(
-  orderNumber: string,
-): Promise<{ order: PublicOrder | null }> {
-  const row = await prisma.order.findUnique({
-    where: { order_number: orderNumber.trim(), deleted_at: null },
-    select: {
-      id: true,
-      order_number: true,
-      customer_first_name: true,
-      customer_last_name: true,
-      customer_email: true,
-      customer_phone: true,
-      shipping_address_line1: true,
-      shipping_address_line2: true,
-      shipping_city: true,
-      shipping_state: true,
-      shipping_postal_code: true,
-      shipping_country: true,
-      shipping_method_name: true,
-      shipping_cost: true,
-      subtotal: true,
-      tax_amount: true,
-      discount_amount: true,
-      total: true,
-      currency: true,
-      payment_method: true,
-      payment_method_name: true,
-      payment_status: true,
-      fulfillment_status: true,
-      tracking_number: true,
-      tracking_url: true,
-      carrier_name: true,
-      shipped_at: true,
-      delivered_at: true,
-      cancelled_at: true,
-      customer_notes: true,
-      placed_at: true,
-      items: {
-        select: {
-          product_name: true,
-          variant_name: true,
-          quantity: true,
-          unit_price: true,
-          line_total: true,
-          image_url: true,
-          options: true,
-        },
-      },
-      invoice: {
-        select: {
-          invoice_number: true,
-          status: true,
-          issued_at: true,
-          paid_at: true,
-          subtotal: true,
-          tax_amount: true,
-          shipping_cost: true,
-          discount_amount: true,
-          total: true,
-          currency: true,
-          notes: true,
-        },
-      },
-    },
-  });
-
-  if (!row) return { order: null };
-
-  return {
-    order: {
-      ...row,
-      shipping_cost: String(row.shipping_cost),
-      subtotal: String(row.subtotal),
-      tax_amount: String(row.tax_amount),
-      discount_amount: String(row.discount_amount),
-      total: String(row.total),
-      items: row.items.map((i) => ({
-        ...i,
-        unit_price: String(i.unit_price),
-        line_total: String(i.line_total),
-      })),
-      invoice: row.invoice
-        ? {
-            ...row.invoice,
-            subtotal: String(row.invoice.subtotal),
-            tax_amount: String(row.invoice.tax_amount),
-            shipping_cost: String(row.invoice.shipping_cost),
-            discount_amount: String(row.invoice.discount_amount),
-            total: String(row.invoice.total),
-          }
-        : null,
-    },
+export function maskEmail(email: string): string {
+  if (!email || !email.includes("@")) return "***";
+  const [user, domain] = email.split("@");
+  const maskStr = (str: string) => {
+    if (str.length <= 2) return str[0] + "*";
+    return str[0] + "*".repeat(Math.max(1, str.length - 2)) + str[str.length - 1];
   };
+  const domainParts = domain.split(".");
+  const maskedDomainName = maskStr(domainParts[0]);
+  const maskedDomain = [maskedDomainName, ...domainParts.slice(1)].join(".");
+  return `${maskStr(user)}@${maskedDomain}`;
 }
-
-export const getOrderConfirmationPageData = getOrderPageData;
 
 // ─── 14. Checkout Page Data ───────────────────────────────────────────────────
 
 export async function getCheckoutPageData(): Promise<CheckoutPageData> {
+  const stripeActive = isStripeConfigured();
+
   const [shippingMethods, paymentMethods, config] = await Promise.all([
     prisma.shipping_method.findMany({
       where: { is_active: true, deleted_at: null },
@@ -961,6 +878,13 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
     }),
     getSiteConfig(),
   ]);
+
+  const activePaymentMethods = (paymentMethods || []).filter((m) => {
+    if (m.provider === "stripe") {
+      return stripeActive;
+    }
+    return true;
+  });
 
   return {
     shippingMethods: (shippingMethods || []).map((m) => ({

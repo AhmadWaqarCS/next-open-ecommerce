@@ -142,6 +142,9 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
             pass,
           }
         : undefined,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
     });
 
     await transporter.sendMail({
@@ -424,13 +427,10 @@ export function renderInvoiceEmailHtml(params: {
           : ""
       }
 
-      <!-- Order Action Buttons -->
+      <!-- Storefront Action Button -->
       <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e4e4e7; text-align: center;">
-        <p style="font-size: 14px; color: #52525b; margin-bottom: 16px;">Track your delivery or manage your order details online:</p>
-        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-          <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}" style="display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">View Order Status</a>
-          <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}?action=cancel" style="display: inline-block; padding: 12px 24px; background-color: #f4f4f5; color: #dc2626; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; border: 1px solid #fee2e2;">Cancel Order</a>
-        </div>
+        <p style="font-size: 14px; color: #52525b; margin-bottom: 16px;">Thank you for shopping with ${storeName}!</p>
+        <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}" style="display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">Visit Storefront</a>
       </div>
     </div>
 

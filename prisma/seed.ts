@@ -462,25 +462,41 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   console.log("  ✓ Minimal Shipping Method created");
 
   // 8. Payment Method
-  const existingCOD = await prisma.payment_method.findFirst({
-    where: { provider: "cash_on_delivery" },
+  await prisma.payment_method.upsert({
+    where: { id: 1 },
+    update: { is_active: false },
+    create: {
+      id: 1,
+      name: "Cash on Delivery",
+      description: "Pay with cash upon delivery.",
+      provider: "cash_on_delivery",
+      extra_charge: null,
+      instructions: "Please prepare exact payment upon delivery.",
+      is_active: false,
+      sort_order: 1,
+      created_by: 0,
+      updated_by: 0,
+    },
   });
-  if (!existingCOD) {
-    await prisma.payment_method.create({
-      data: {
-        name: "Cash on Delivery",
-        description: "Pay with cash upon delivery.",
-        provider: "cash_on_delivery",
-        extra_charge: null,
-        instructions: "Please prepare exact payment upon delivery.",
-        is_active: true,
-        sort_order: 1,
-        created_by: 0,
-        updated_by: 0,
-      },
-    });
-  }
   console.log("  ✓ Payment Method: Cash on Delivery");
+
+  await prisma.payment_method.upsert({
+    where: { id: 2 },
+    update: { is_active: false },
+    create: {
+      id: 2,
+      name: "Credit / Debit Card (Stripe)",
+      description: "Pay securely with Credit/Debit card or digital wallets via Stripe.",
+      provider: "stripe",
+      extra_charge: null,
+      instructions: null,
+      is_active: false,
+      sort_order: 2,
+      created_by: 0,
+      updated_by: 0,
+    },
+  });
+  console.log("  ✓ Payment Method: Credit / Debit Card (Stripe)");
 
   // 9. Email Config
   const existingEmail = await prisma.email_config.findFirst({

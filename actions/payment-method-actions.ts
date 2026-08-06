@@ -23,56 +23,19 @@ import {
   PaymentMethodFilterParams,
   getPaymentMethodFilterWhere,
 } from "@/lib/filters/payment-method-filters";
+import { verifyStripeCredentials } from "@/lib/stripe";
+
+import prisma from "@/lib/prisma";
 
 export async function createPaymentMethod(
-  data: PaymentMethodCreateInput,
+  _data: PaymentMethodCreateInput,
 ): Promise<ActionResponse> {
-  const { user } = await assertPermission("create", "/dashboard/payment-methods");
+  await assertPermission("create", "/dashboard/payment-methods");
 
-  const validatedFields = paymentMethodCreateSchema.safeParse(data);
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      errors: formatZodErrors(validatedFields.error),
-      message: "Invalid Fields",
-    };
-  }
-
-  const {
-    name,
-    description,
-    provider,
-    provider_config,
-    extra_charge,
-    instructions,
-    is_active,
-    sort_order,
-  } = validatedFields.data;
-
-  try {
-    await createPaymentMethodTransaction(
-      {
-        name,
-        description: description || null,
-        provider,
-        provider_config: provider_config ?? null,
-        extra_charge: extra_charge ?? null,
-        instructions: instructions || null,
-        is_active,
-        sort_order,
-      },
-      Number(user.id),
-    );
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods");
-
-    return { success: true, message: "Payment method created successfully." };
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: "Failed to create payment method." };
-  }
+  return {
+    success: false,
+    message: "Creating new payment methods is disabled. Payment methods are fixed by seed configuration.",
+  };
 }
 
 export async function updatePaymentMethod(
@@ -102,6 +65,28 @@ export async function updatePaymentMethod(
     is_active,
     sort_order,
   } = validatedFields.data;
+
+  // ── SERVER ACTION GUARD: Prevent enabling Stripe unless API credentials are verified ──
+  if (is_active === true) {
+    let targetProvider: string | undefined = provider;
+    if (!targetProvider) {
+      const existing = await prisma.payment_method.findUnique({
+        where: { id },
+        select: { provider: true },
+      });
+      targetProvider = existing?.provider;
+    }
+
+    if (targetProvider === "stripe" || targetProvider?.toLowerCase().includes("stripe")) {
+      const verification = await verifyStripeCredentials();
+      if (!verification.success) {
+        return {
+          success: false,
+          message: `Cannot enable Stripe: ${verification.message}`,
+        };
+      }
+    }
+  }
 
   try {
     await updatePaymentMethodTransaction(
@@ -304,4 +289,9 @@ export async function bulkPermanentlyDeletePaymentMethods(
       message: "Failed to permanently delete selected payment methods.",
     };
   }
+}
+
+export async function verifyStripeCredentialsAction() {
+  await assertPermission("read", "/dashboard/payment-methods");
+  return await verifyStripeCredentials();
 }

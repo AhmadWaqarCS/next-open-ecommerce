@@ -40,7 +40,6 @@ const SOCIAL_ICONS: Record<string, React.ReactNode> = {
 const CUSTOMER_CARE_LINKS = [
   { label: "About Us", href: "/about" },
   { label: "Contact Us", href: "/contact" },
-  { label: "Track & Manage Orders", href: "/order" },
   { label: "FAQ", href: "/faq" },
   { label: "Order Cancellation Policy", href: "/order-cancellation-policy" },
   { label: "Return & Refund Policy", href: "/return-and-refund-policy" },

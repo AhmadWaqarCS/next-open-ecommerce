@@ -271,7 +271,7 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
           },
         },
       },
-      select: { id: true, order_number: true, total: true },
+      select: { id: true, order_number: true, total: true, currency: true },
     });
 
     if (couponId) {
