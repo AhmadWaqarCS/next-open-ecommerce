@@ -1449,83 +1449,11 @@ const paymentProviders = [
 ] as const;
 export type PaymentProvider = (typeof paymentProviders)[number];
 
-export const paymentMethodCreateSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Payment method name is required")
-    .max(255, "Name cannot exceed 255 characters"),
-  description: z
-    .string()
-    .trim()
-    .max(1000, "Description cannot exceed 1000 characters")
-    .optional()
-    .nullable(),
-  provider: z.enum(paymentProviders, {
-    error: () => ({ message: "Please select a valid provider" }),
-  }),
-  provider_config: z
-    .record(z.string().max(100), z.unknown())
-    .optional()
-    .nullable(),
-  extra_charge: z.coerce
-    .number()
-    .min(0, "Extra charge must be 0 or greater")
-    .max(100000, "Extra charge is too high")
-    .optional()
-    .nullable(),
-  instructions: z
-    .string()
-    .trim()
-    .max(5000, "Instructions cannot exceed 5000 characters")
-    .optional()
-    .nullable(),
-  is_active: z.boolean().default(true),
-  sort_order: z.coerce.number().int().min(-10000).max(10000).default(0),
+export const paymentMethodToggleSchema = z.object({
+  is_active: z.boolean(),
 });
-export type PaymentMethodCreateInput = z.infer<
-  typeof paymentMethodCreateSchema
->;
-
-export const paymentMethodUpdateSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Payment method name is required")
-    .max(255, "Name cannot exceed 255 characters")
-    .optional(),
-  description: z
-    .string()
-    .trim()
-    .max(1000, "Description cannot exceed 1000 characters")
-    .optional()
-    .nullable(),
-  provider: z
-    .enum(paymentProviders, {
-      error: () => ({ message: "Please select a valid provider" }),
-    })
-    .optional(),
-  provider_config: z
-    .record(z.string().max(100), z.unknown())
-    .optional()
-    .nullable(),
-  extra_charge: z.coerce
-    .number()
-    .min(0)
-    .max(100000, "Extra charge is too high")
-    .optional()
-    .nullable(),
-  instructions: z
-    .string()
-    .trim()
-    .max(5000, "Instructions cannot exceed 5000 characters")
-    .optional()
-    .nullable(),
-  is_active: z.boolean().optional(),
-  sort_order: z.coerce.number().int().min(-10000).max(10000).optional(),
-});
-export type PaymentMethodUpdateInput = z.infer<
-  typeof paymentMethodUpdateSchema
+export type PaymentMethodToggleInput = z.infer<
+  typeof paymentMethodToggleSchema
 >;
 
 // ============================================================

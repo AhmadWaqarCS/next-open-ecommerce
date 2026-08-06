@@ -335,7 +335,7 @@ export async function getHeaderData(): Promise<HeaderData> {
       orderBy: { sort_order: "asc" },
     }),
     prisma.site_page.findMany({
-      where: { is_active: true, show_in_header: true, deleted_at: null },
+      where: { is_active: true, show_in_header: true },
       select: { title: true, slug: true },
       orderBy: { sort_order: "asc" },
     }),
@@ -372,7 +372,7 @@ export async function getFooterData(): Promise<FooterData> {
         orderBy: { sort_order: "asc" },
       }),
       prisma.site_page.findMany({
-        where: { is_active: true, show_in_footer: true, deleted_at: null },
+        where: { is_active: true, show_in_footer: true },
         select: { title: true, slug: true },
         orderBy: { sort_order: "asc" },
       }),
@@ -390,7 +390,7 @@ export async function getFooterData(): Promise<FooterData> {
         orderBy: { sort_order: "asc" },
       }),
       prisma.payment_method.findMany({
-        where: { is_active: true, deleted_at: null },
+        where: { is_active: true },
         select: {
           id: true,
           name: true,
@@ -724,7 +724,7 @@ export async function getPageData(
   slug: string,
 ): Promise<{ page: SitePage | null }> {
   const row = await prisma.site_page.findUnique({
-    where: { slug, is_active: true, deleted_at: null },
+    where: { slug, is_active: true },
     select: {
       title: true,
       content: true,
@@ -865,7 +865,7 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
       orderBy: { sort_order: "asc" },
     }),
     prisma.payment_method.findMany({
-      where: { is_active: true, deleted_at: null },
+      where: { is_active: true },
       select: {
         id: true,
         name: true,

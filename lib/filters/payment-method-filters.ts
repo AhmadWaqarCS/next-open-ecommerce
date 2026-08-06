@@ -16,16 +16,8 @@ export interface PaymentMethodFilterParams {
 
 export function buildPaymentMethodWhereInput(
   params: PaymentMethodFilterParams,
-  isTrash: boolean = false,
 ): Prisma.payment_methodWhereInput {
   const where: Prisma.payment_methodWhereInput = {};
-
-  // Soft delete filter
-  if (isTrash) {
-    where.NOT = { deleted_at: null };
-  } else {
-    where.deleted_at = null;
-  }
 
   // ID search
   if (params.id && !isNaN(Number(params.id))) {
@@ -95,7 +87,6 @@ export function buildPaymentMethodWhereInput(
 
 export async function getPaymentMethodFilterWhere(
   params: PaymentMethodFilterParams,
-  isTrash: boolean = false,
 ): Promise<Prisma.payment_methodWhereInput> {
-  return buildPaymentMethodWhereInput(params, isTrash);
+  return buildPaymentMethodWhereInput(params);
 }

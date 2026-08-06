@@ -139,7 +139,7 @@ export async function getSitemapDataTransaction() {
       select: { slug: true, updated_at: true },
     });
     const pages = await tx.site_page.findMany({
-      where: { deleted_at: null, is_active: true },
+      where: { is_active: true },
       select: { slug: true, updated_at: true },
     });
 

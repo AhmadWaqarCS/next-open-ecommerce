@@ -456,7 +456,6 @@ export async function getOrdersDashboardDataInDB(
     });
 
     const paymentMethodsRaw = await tx.payment_method.findMany({
-      where: { deleted_at: null },
       select: { provider: true, name: true },
       orderBy: { sort_order: "asc" },
     });

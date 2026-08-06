@@ -3,6 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 export interface ActivityLogFilterParams {
   search?: string;
   user_email?: string;
+  ip_address?: string;
   action?: string;
   entity_type?: string;
   status?: string;
@@ -19,6 +20,7 @@ export function getActivityLogFilterWhere(
     const query = params.search.trim();
     where.OR = [
       { user_email: { contains: query, mode: "insensitive" } },
+      { ip_address: { contains: query, mode: "insensitive" } },
       { action: { contains: query, mode: "insensitive" } },
       { entity_type: { contains: query, mode: "insensitive" } },
       { entity_id: { contains: query, mode: "insensitive" } },
@@ -27,6 +29,10 @@ export function getActivityLogFilterWhere(
 
   if (params.user_email?.trim()) {
     where.user_email = { contains: params.user_email.trim(), mode: "insensitive" };
+  }
+
+  if (params.ip_address?.trim()) {
+    where.ip_address = { contains: params.ip_address.trim(), mode: "insensitive" };
   }
 
   if (params.action?.trim()) {

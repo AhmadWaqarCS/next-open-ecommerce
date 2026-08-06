@@ -1,12 +1,14 @@
 "use client";
 
+import { toggleSitePageStatus } from "@/actions/page-actions";
 import ActivityCell from "@/app/(dashboard)/_components/activity-cell";
 import DataTable, { ColumnDef } from "@/app/(dashboard)/_components/data-table";
 import GlobalFilterBar from "@/app/(dashboard)/_components/global-filter-bar";
+import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import { site_page } from "@/lib/generated/prisma/client";
 import { CRUD } from "@/lib/types";
-import Link from "next/link";
 import { PageFilterParams } from "@/lib/filters/page-filters";
+import { useState, useTransition } from "react";
 
 interface PagesTableProps {
   pages: site_page[];
@@ -23,31 +25,36 @@ export default function PagesTable({
   totalCount,
   filterParams = {},
 }: PagesTableProps) {
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [isTransitionPending, startTransition] = useTransition();
+  const { toast } = useToast();
+
+  const handleToggleStatus = (id: number, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    setPendingId(id);
+    startTransition(async () => {
+      const response = await toggleSitePageStatus(id, newStatus);
+      setPendingId(null);
+      if (!response.success) {
+        toast(response.message ?? "Failed to update page status", "error");
+        return;
+      }
+      toast(response.message ?? `Page ${newStatus ? "enabled" : "disabled"}`, "success");
+    });
+  };
+
   const columns: ColumnDef<site_page>[] = [
     {
       header: "Page Title",
       className: "max-w-xs sm:max-w-sm",
-      render: (page) =>
-        permissions.update ? (
-          <Link
-            href={`/dashboard/pages/${page.id}/edit`}
-            className="group/item flex flex-col gap-0.5 cursor-pointer max-w-xs sm:max-w-sm"
-          >
-            <span className="font-bold text-zinc-900 dark:text-zinc-50 group-hover/item:text-indigo-600 dark:group-hover/item:text-indigo-400 transition-colors truncate">
-              {page.title}
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal truncate">
-              {page.content ? page.content.replace(/<[^>]*>?/gm, "") : ""}
-            </span>
-          </Link>
-        ) : (
-          <div className="flex flex-col gap-0.5 max-w-xs sm:max-w-sm">
-            <span className="font-bold text-zinc-900 dark:text-zinc-50 truncate">{page.title}</span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal truncate">
-              {page.content ? page.content.replace(/<[^>]*>?/gm, "") : ""}
-            </span>
-          </div>
-        ),
+      render: (page) => (
+        <div className="flex flex-col gap-0.5 max-w-xs sm:max-w-sm">
+          <span className="font-bold text-zinc-900 dark:text-zinc-50 truncate">{page.title}</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400 font-normal truncate">
+            {page.content ? page.content.replace(/<[^>]*>?/gm, "") : ""}
+          </span>
+        </div>
+      ),
     },
     {
       header: "Storefront Slug",
@@ -67,29 +74,65 @@ export default function PagesTable({
     },
     {
       header: "Status",
-      render: (page) => (
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-            page.is_active
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900/50"
-              : "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
-          }`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              page.is_active ? "bg-emerald-500" : "bg-zinc-400"
-            }`}
-          />
-          {page.is_active ? "Active" : "Disabled"}
-        </span>
-      ),
+      render: (page) => {
+        const isPending = pendingId === page.id && isTransitionPending;
+        return (
+          <div className="flex items-center gap-3">
+            {permissions.update ? (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleToggleStatus(page.id, page.is_active)}
+                className="group flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                title={page.is_active ? "Click to disable page" : "Click to enable page"}
+              >
+                <span
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    page.is_active ? "bg-violet-600" : "bg-zinc-300 dark:bg-zinc-700"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      page.is_active ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    page.is_active
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-zinc-500 dark:text-zinc-400"
+                  }`}
+                >
+                  {isPending ? "Updating..." : page.is_active ? "Active" : "Disabled"}
+                </span>
+              </button>
+            ) : (
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                  page.is_active
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900/50"
+                    : "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    page.is_active ? "bg-emerald-500" : "bg-zinc-400"
+                  }`}
+                />
+                {page.is_active ? "Active" : "Disabled"}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
   return (
     <DataTable
       title="Pages"
-      description="View and update static storefront page titles, descriptions, and SEO metadata."
+      description="Manage storefront pages. Site pages are pre-configured system records; toggle active status to enable or disable them."
       permissions={permissions}
       data={pages}
       totalCount={totalCount}
@@ -102,21 +145,6 @@ export default function PagesTable({
           updatedBy={page.updated_by}
           userNames={userNames}
         />
-      )}
-      renderActions={(page) => (
-        <div className="flex items-center justify-end gap-2">
-          {permissions.update && (
-            <Link
-              href={`/dashboard/pages/${page.id}/edit`}
-              className="p-2 rounded-xl text-zinc-500 hover:text-indigo-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-indigo-400 dark:hover:bg-zinc-800 transition-all cursor-pointer"
-              title="Edit Page"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </Link>
-          )}
-        </div>
       )}
       filterBar={
         <GlobalFilterBar
@@ -144,3 +172,4 @@ export default function PagesTable({
     />
   );
 }
+

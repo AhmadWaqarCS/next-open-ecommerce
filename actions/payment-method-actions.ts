@@ -1,83 +1,32 @@
 "use server";
 
-import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
+import { ActionResponse, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import {
-  PaymentMethodCreateInput,
-  PaymentMethodUpdateInput,
-  paymentMethodCreateSchema,
-  paymentMethodUpdateSchema,
-} from "@/lib/validations";
-import {
-  createPaymentMethodTransaction,
-  updatePaymentMethodTransaction,
-  deletePaymentMethodTransaction,
-  restorePaymentMethodTransaction,
-  permanentlyDeletePaymentMethodTransaction,
-  bulkDeletePaymentMethodsTransaction,
-  bulkRestorePaymentMethodsTransaction,
-  bulkPermanentlyDeletePaymentMethodsTransaction,
-} from "@/services/payment-method-services";
+import { togglePaymentMethodStatusTransaction } from "@/services/payment-method-services";
 import { revalidatePath, revalidateTag } from "next/cache";
-import {
-  PaymentMethodFilterParams,
-  getPaymentMethodFilterWhere,
-} from "@/lib/filters/payment-method-filters";
 import { verifyStripeCredentials } from "@/lib/stripe";
-
 import prisma from "@/lib/prisma";
 
-export async function createPaymentMethod(
-  _data: PaymentMethodCreateInput,
-): Promise<ActionResponse> {
-  await assertPermission("create", "/dashboard/payment-methods");
-
-  return {
-    success: false,
-    message: "Creating new payment methods is disabled. Payment methods are fixed by seed configuration.",
-  };
-}
-
-export async function updatePaymentMethod(
+export async function togglePaymentMethodStatus(
   id: number,
-  data: PaymentMethodUpdateInput,
+  is_active: boolean,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/payment-methods");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid payment method ID." };
 
-  const validatedFields = paymentMethodUpdateSchema.safeParse(data);
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      errors: formatZodErrors(validatedFields.error),
-      message: "Invalid Fields",
-    };
-  }
+  // Guard: Prevent enabling Stripe unless API credentials are verified
+  if (is_active) {
+    const existing = await prisma.payment_method.findUnique({
+      where: { id },
+      select: { provider: true, name: true },
+    });
 
-  const {
-    name,
-    description,
-    provider,
-    provider_config,
-    extra_charge,
-    instructions,
-    is_active,
-    sort_order,
-  } = validatedFields.data;
-
-  // ── SERVER ACTION GUARD: Prevent enabling Stripe unless API credentials are verified ──
-  if (is_active === true) {
-    let targetProvider: string | undefined = provider;
-    if (!targetProvider) {
-      const existing = await prisma.payment_method.findUnique({
-        where: { id },
-        select: { provider: true },
-      });
-      targetProvider = existing?.provider;
+    if (!existing) {
+      return { success: false, message: "Payment method not found." };
     }
 
-    if (targetProvider === "stripe" || targetProvider?.toLowerCase().includes("stripe")) {
+    if (existing.provider === "stripe" || existing.provider.toLowerCase().includes("stripe")) {
       const verification = await verifyStripeCredentials();
       if (!verification.success) {
         return {
@@ -89,21 +38,9 @@ export async function updatePaymentMethod(
   }
 
   try {
-    await updatePaymentMethodTransaction(
+    const { updated } = await togglePaymentMethodStatusTransaction(
       id,
-      {
-        name,
-        description: description !== undefined ? description || null : undefined,
-        provider,
-        provider_config:
-          provider_config !== undefined ? provider_config ?? null : undefined,
-        extra_charge:
-          extra_charge !== undefined ? extra_charge ?? null : undefined,
-        instructions:
-          instructions !== undefined ? instructions || null : undefined,
-        is_active,
-        sort_order,
-      },
+      is_active,
       Number(user.id),
     );
 
@@ -117,10 +54,13 @@ export async function updatePaymentMethod(
       entity_id: id,
       user,
       status: "SUCCESS",
-      details: { id, name },
+      details: { id, name: updated.name, is_active },
     });
 
-    return { success: true, message: "Payment method updated successfully." };
+    return {
+      success: true,
+      message: `${updated.name} ${is_active ? "enabled" : "disabled"} successfully.`,
+    };
   } catch (error) {
     console.error(error);
     await logActivity({
@@ -129,278 +69,9 @@ export async function updatePaymentMethod(
       entity_id: id,
       user,
       status: "FAILED",
-      details: { id, error: String(error) },
+      details: { id, is_active, error: String(error) },
     });
-    return { success: false, message: "Failed to update payment method." };
-  }
-}
-
-export async function deletePaymentMethod(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    await deletePaymentMethodTransaction(id, Number(user.id));
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods");
-    revalidatePath("/dashboard/payment-methods/trash");
-
-    await logActivity({
-      action: "delete_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Payment method deleted successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "delete_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to delete payment method." };
-  }
-}
-
-export async function restorePaymentMethod(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    await restorePaymentMethodTransaction(id, Number(user.id));
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods/trash");
-    revalidatePath("/dashboard/payment-methods");
-
-    await logActivity({
-      action: "restore_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Payment method restored successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "restore_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to restore payment method." };
-  }
-}
-
-export async function permanentlyDeletePaymentMethod(
-  id: number,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    await permanentlyDeletePaymentMethodTransaction(id);
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods/trash");
-
-    await logActivity({
-      action: "permanently_delete_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return {
-      success: true,
-      message: "Payment method permanently deleted.",
-    };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "permanently_delete_payment_method",
-      entity_type: "payment_method",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return {
-      success: false,
-      message: "Failed to permanently delete payment method.",
-    };
-  }
-}
-
-export async function bulkDeletePaymentMethods(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterParams?: PaymentMethodFilterParams,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-  const filterWhere =
-    selectAllScope && filterParams
-      ? await getPaymentMethodFilterWhere(filterParams, false)
-      : undefined;
-
-  try {
-    await bulkDeletePaymentMethodsTransaction(
-      ids,
-      selectAllScope,
-      filterWhere,
-      Number(user.id),
-    );
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods");
-    revalidatePath("/dashboard/payment-methods/trash");
-
-    await logActivity({
-      action: "bulk_delete_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "SUCCESS",
-      details: { ids },
-    });
-
-    return {
-      success: true,
-      message: "Selected payment methods moved to trash.",
-    };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "bulk_delete_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return {
-      success: false,
-      message: "Failed to delete selected payment methods.",
-    };
-  }
-}
-
-export async function bulkRestorePaymentMethods(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterParams?: PaymentMethodFilterParams,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-  const filterWhere =
-    selectAllScope && filterParams
-      ? await getPaymentMethodFilterWhere(filterParams, true)
-      : undefined;
-
-  try {
-    await bulkRestorePaymentMethodsTransaction(
-      ids,
-      selectAllScope,
-      filterWhere,
-      Number(user.id),
-    );
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods/trash");
-    revalidatePath("/dashboard/payment-methods");
-
-    await logActivity({
-      action: "bulk_restore_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "SUCCESS",
-      details: { ids },
-    });
-
-    return { success: true, message: "Selected payment methods restored." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "bulk_restore_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return {
-      success: false,
-      message: "Failed to restore selected payment methods.",
-    };
-  }
-}
-
-export async function bulkPermanentlyDeletePaymentMethods(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterParams?: PaymentMethodFilterParams,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
-  const filterWhere =
-    selectAllScope && filterParams
-      ? await getPaymentMethodFilterWhere(filterParams, true)
-      : undefined;
-
-  try {
-    await bulkPermanentlyDeletePaymentMethodsTransaction(
-      ids,
-      selectAllScope,
-      filterWhere,
-    );
-
-    revalidateTag("site-footer", "max");
-    revalidateTag("checkout", "max");
-    revalidatePath("/dashboard/payment-methods/trash");
-
-    await logActivity({
-      action: "bulk_permanently_delete_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "SUCCESS",
-      details: { ids },
-    });
-
-    return {
-      success: true,
-      message: "Selected payment methods permanently deleted.",
-    };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "bulk_permanently_delete_payment_methods",
-      entity_type: "payment_method",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return {
-      success: false,
-      message: "Failed to permanently delete selected payment methods.",
-    };
+    return { success: false, message: "Failed to update payment method status." };
   }
 }
 
@@ -408,3 +79,4 @@ export async function verifyStripeCredentialsAction() {
   await assertPermission("read", "/dashboard/payment-methods");
   return await verifyStripeCredentials();
 }
+

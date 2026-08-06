@@ -1,20 +1,8 @@
 "use server";
 
-import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
+import { ActionResponse, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import {
-  SitePageCreateInput,
-  SitePageUpdateInput,
-  sitePageCreateSchema,
-  sitePageUpdateSchema,
-} from "@/lib/validations";
-import {
-  createSitePageTransaction,
-  updateSitePageTransaction,
-  deleteSitePageTransaction,
-  restoreSitePageTransaction,
-  permanentlyDeleteSitePageTransaction,
-} from "@/services/page-services";
+import { toggleSitePageStatusTransaction } from "@/services/page-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 function revalidatePageTags(slug: string) {
@@ -30,161 +18,28 @@ function revalidatePageTags(slug: string) {
   }
 }
 
-export async function createSitePage(
-  data: SitePageCreateInput,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("create", "/dashboard/pages");
-
-  const validatedFields = sitePageCreateSchema.safeParse(data);
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      errors: formatZodErrors(validatedFields.error),
-      message: "Invalid Fields",
-    };
-  }
-
-  const {
-    slug,
-    title,
-    content,
-    is_active,
-    show_in_header,
-    show_in_footer,
-    sort_order,
-    theme_config,
-    components_config,
-    meta_info,
-  } = validatedFields.data;
-
-  try {
-    await createSitePageTransaction(
-      {
-        slug,
-        title,
-        content,
-        is_active,
-        show_in_header,
-        show_in_footer,
-        sort_order,
-        theme_config,
-        components_config,
-        meta_info,
-      },
-      Number(user.id),
-    );
-
-    revalidateTag("site-pages", "max");
-    revalidatePageTags(slug);
-    if (show_in_header) revalidateTag("site-header", "max");
-    if (show_in_footer) revalidateTag("site-footer", "max");
-
-    revalidatePath("/dashboard/pages");
-
-    await logActivity({
-      action: "create_site_page",
-      entity_type: "site_page",
-      entity_id: slug,
-      user,
-      status: "SUCCESS",
-      details: { title, slug },
-    });
-
-    return { success: true, message: "Page created successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "create_site_page",
-      entity_type: "site_page",
-      user,
-      status: "FAILED",
-      details: { title, slug, error: String(error) },
-    });
-    return { success: false, message: "Failed to create page." };
-  }
-}
-
-export async function updateSitePage(
+export async function toggleSitePageStatus(
   id: number,
-  data: SitePageUpdateInput,
+  is_active: boolean,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/pages");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  const validatedFields = sitePageUpdateSchema.safeParse(data);
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      errors: formatZodErrors(validatedFields.error),
-      message: "Invalid Fields",
-    };
-  }
-
-  const {
-    slug,
-    title,
-    content,
-    is_active,
-    show_in_header,
-    show_in_footer,
-    sort_order,
-    theme_config,
-    components_config,
-    meta_info,
-  } = validatedFields.data;
+  if (id < 1) return { success: false, message: "Invalid page ID." };
 
   try {
-    const { existing, updated } = await updateSitePageTransaction(
+    const { existing, updated } = await toggleSitePageStatusTransaction(
       id,
-      {
-        slug,
-        title,
-        content,
-        is_active,
-        show_in_header,
-        show_in_footer,
-        sort_order,
-        theme_config,
-        components_config,
-        meta_info,
-      },
+      is_active,
       Number(user.id),
     );
 
     revalidateTag("site-pages", "max");
-
     if (existing?.slug) revalidatePageTags(existing.slug);
-    if (updated.slug && updated.slug !== existing?.slug) {
-      revalidatePageTags(updated.slug);
-    }
-
-    const headerVisibilityChanged =
-      show_in_header !== undefined && show_in_header !== existing?.show_in_header;
-    const isHeaderRelevant = existing?.show_in_header || updated.show_in_header;
-    const headerFieldsChanged =
-      title !== undefined ||
-      slug !== undefined ||
-      sort_order !== undefined ||
-      is_active !== undefined;
-    if (headerVisibilityChanged || (isHeaderRelevant && headerFieldsChanged)) {
-      revalidateTag("site-header", "max");
-    }
-
-    const footerVisibilityChanged =
-      show_in_footer !== undefined && show_in_footer !== existing?.show_in_footer;
-    const isFooterRelevant = existing?.show_in_footer || updated.show_in_footer;
-    const footerFieldsChanged =
-      title !== undefined ||
-      slug !== undefined ||
-      sort_order !== undefined ||
-      is_active !== undefined;
-    if (footerVisibilityChanged || (isFooterRelevant && footerFieldsChanged)) {
-      revalidateTag("site-footer", "max");
-    }
+    if (existing?.show_in_header) revalidateTag("site-header", "max");
+    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
 
     revalidatePath("/dashboard/pages");
-    revalidatePath(`/${updated.slug}`);
+    if (updated?.slug) revalidatePath(`/${updated.slug}`);
 
     await logActivity({
       action: "update_site_page",
@@ -192,10 +47,13 @@ export async function updateSitePage(
       entity_id: id,
       user,
       status: "SUCCESS",
-      details: { id, title: updated.title, slug: updated.slug },
+      details: { id, title: updated.title, slug: updated.slug, is_active },
     });
 
-    return { success: true, message: "Page updated successfully." };
+    return {
+      success: true,
+      message: `${updated.title} ${is_active ? "enabled" : "disabled"} successfully.`,
+    };
   } catch (error) {
     console.error(error);
     await logActivity({
@@ -204,127 +62,9 @@ export async function updateSitePage(
       entity_id: id,
       user,
       status: "FAILED",
-      details: { id, error: String(error) },
+      details: { id, is_active, error: String(error) },
     });
-    return { success: false, message: "Failed to update page." };
+    return { success: false, message: "Failed to update page status." };
   }
 }
 
-export async function deleteSitePage(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/pages");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    const { existing } = await deleteSitePageTransaction(id, Number(user.id));
-
-    revalidateTag("site-pages", "max");
-    if (existing?.slug) revalidatePageTags(existing.slug);
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-
-    revalidatePath("/dashboard/pages");
-
-    await logActivity({
-      action: "delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Page deleted successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to delete page." };
-  }
-}
-
-export async function restoreSitePage(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/pages");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    const { existing } = await restoreSitePageTransaction(id, Number(user.id));
-
-    revalidateTag("site-pages", "max");
-    if (existing?.slug) revalidatePageTags(existing.slug);
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-
-    revalidatePath("/dashboard/pages");
-
-    await logActivity({
-      action: "restore_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Page restored successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "restore_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to restore page." };
-  }
-}
-
-export async function permanentlyDeleteSitePage(
-  id: number,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/pages");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    const { existing } = await permanentlyDeleteSitePageTransaction(id);
-
-    revalidateTag("site-pages", "max");
-    if (existing?.slug) revalidatePageTags(existing.slug);
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-
-    revalidatePath("/dashboard/pages");
-
-    await logActivity({
-      action: "permanently_delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Page permanently deleted." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "permanently_delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to permanently delete page." };
-  }
-}

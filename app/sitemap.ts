@@ -88,7 +88,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const pages = await prisma.site_page.findMany({
       where: {
-        deleted_at: null,
         is_active: true,
       },
       select: {

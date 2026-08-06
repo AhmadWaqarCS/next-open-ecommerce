@@ -17,16 +17,8 @@ export interface SiteComponentFilterParams {
 
 export function buildSiteComponentWhereInput(
   params: SiteComponentFilterParams,
-  isTrash: boolean = false,
 ): Prisma.site_componentWhereInput {
   const where: Prisma.site_componentWhereInput = {};
-
-  // Soft delete check
-  if (isTrash) {
-    where.NOT = { deleted_at: null };
-  } else {
-    where.deleted_at = null;
-  }
 
   // ID filter
   if (params.id && !isNaN(Number(params.id))) {

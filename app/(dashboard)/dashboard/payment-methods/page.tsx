@@ -40,7 +40,7 @@ export default async function DashboardPaymentMethodsPage({
     updated_from: typeof params?.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
-  const whereCondition = buildPaymentMethodWhereInput(filterParams, false);
+  const whereCondition = buildPaymentMethodWhereInput(filterParams);
 
   const { paymentMethods: paymentMethodsRaw, totalPaymentMethods, dashboardUsers } =
     await getPaymentMethodsDashboardDataInDB(whereCondition, skipCount, pageSize);

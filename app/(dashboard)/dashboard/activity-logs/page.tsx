@@ -29,6 +29,7 @@ export default async function DashboardActivityLogsPage({
   const filterParams: ActivityLogFilterParams = {
     search: typeof params?.search === "string" ? params.search : undefined,
     user_email: typeof params?.user_email === "string" ? params.user_email : undefined,
+    ip_address: typeof params?.ip_address === "string" ? params.ip_address : undefined,
     action: typeof params?.action === "string" ? params.action : undefined,
     entity_type: typeof params?.entity_type === "string" ? params.entity_type : undefined,
     status: typeof params?.status === "string" ? params.status : undefined,

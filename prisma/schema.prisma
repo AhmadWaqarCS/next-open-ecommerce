@@ -139,12 +139,10 @@ model site_page {
   theme_config      Json @default("{}")
   components_config Json @default("[]")
 
-  created_at DateTime  @default(now())
+  created_at DateTime @default(now())
   created_by Int
-  updated_at DateTime  @updatedAt
+  updated_at DateTime @updatedAt
   updated_by Int
-  deleted_at DateTime?
-  deleted_by Int?
 
   @@index([is_active, show_in_header])
   @@index([is_active, show_in_footer])
@@ -161,12 +159,10 @@ model site_component {
   thumbnail_url String?
   is_active     Boolean @default(true)
 
-  created_at DateTime  @default(now())
-  created_by Int       @default(1)
-  updated_at DateTime  @updatedAt
-  updated_by Int       @default(1)
-  deleted_at DateTime?
-  deleted_by Int?
+  created_at DateTime @default(now())
+  created_by Int      @default(1)
+  updated_at DateTime @updatedAt
+  updated_by Int      @default(1)
 
   @@index([is_active])
   @@map("site_components")
@@ -241,12 +237,10 @@ model payment_method {
 
   orders order[]
 
-  created_at DateTime  @default(now())
+  created_at DateTime @default(now())
   created_by Int
-  updated_at DateTime  @updatedAt
+  updated_at DateTime @updatedAt
   updated_by Int
-  deleted_at DateTime?
-  deleted_by Int?
 
   @@index([provider])
   @@index([is_active])

@@ -78,6 +78,12 @@ export default function ActivityLogTable({
       placeholder: "Filter by action name...",
     },
     {
+      key: "ip_address",
+      label: "IP Address",
+      type: "text",
+      placeholder: "Filter by IP address...",
+    },
+    {
       key: "created_from",
       label: "Created From",
       type: "date",

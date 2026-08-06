@@ -58,7 +58,7 @@ export default async function DashboardSiteComponentsPage({
       typeof params.updated_to === "string" ? params.updated_to : undefined,
   };
 
-  const where = buildSiteComponentWhereInput(filterParams, false);
+  const where = buildSiteComponentWhereInput(filterParams);
 
   const { components, totalComponents, dashboardUsers } =
     await getSiteComponentsDashboardDataInDB(where, skipCount, pageSize);

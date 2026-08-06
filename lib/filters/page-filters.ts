@@ -10,9 +10,7 @@ export interface PageFilterParams {
 export function buildPageWhereInput(
   params: PageFilterParams,
 ): Prisma.site_pageWhereInput {
-  const where: Prisma.site_pageWhereInput = {
-    deleted_at: null,
-  };
+  const where: Prisma.site_pageWhereInput = {};
 
   if (params.id && !isNaN(Number(params.id))) {
     where.id = Number(params.id);
