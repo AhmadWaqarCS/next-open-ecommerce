@@ -151,7 +151,6 @@ export default function ProductForm({
       slug: initialData?.slug ?? "",
       description: initialData?.description ?? "",
       short_description: initialData?.short_description ?? "",
-      feature_image_url: initialData?.feature_image_url ?? "",
       feature_image_alt_text: initialData?.feature_image_alt_text ?? "",
       price: initialData?.price ? parseFloat(initialData.price) : 0,
       compare_at_price: initialData?.compare_at_price
@@ -228,7 +227,7 @@ export default function ProductForm({
       const previewUrl = URL.createObjectURL(file);
       return {
         url: "",
-        alt_text: file.name.split(".")[0] || "Product image",
+        alt_text: "",
         file,
         previewUrl,
         sort_order: currentCount + idx,
@@ -549,7 +548,7 @@ export default function ProductForm({
       );
     }
     if (tab === "gallery") {
-      return Boolean(errors.feature_image_url || errors.feature_image_alt_text);
+      return Boolean(errors.feature_image_alt_text);
     }
     if (tab === "shipping") {
       return Boolean(errors.weight || errors.dimensions);
@@ -1374,9 +1373,6 @@ export default function ProductForm({
                     key={vIdx}
                     label={`Image for ${vItem.name || `Variant #${vIdx + 1}`}`}
                     value={vItem.image_url}
-                    onChange={(url) =>
-                      updateVariantItem(vIdx, { image_url: url })
-                    }
                     altValue={vItem.image_url_alt_text || ""}
                     onAltChange={(alt) =>
                       updateVariantItem(vIdx, { image_url_alt_text: alt })
@@ -1566,24 +1562,12 @@ export default function ProductForm({
                         </button>
                       }
                       value={item.url}
-                      onChange={(url) => updateGalleryItem(index, { url })}
                       altValue={item.alt_text}
                       onAltChange={(alt) =>
                         updateGalleryItem(index, { alt_text: alt })
                       }
                       onFileSelect={(file) => updateGalleryItem(index, { file })}
                       file={item.file}
-                      onSizeFetch={(sz) => {
-                        const key = item.previewUrl || item.url;
-                        if (key) {
-                          setItemSizes((prev) =>
-                            prev[key] === sz ? prev : { ...prev, [key]: sz },
-                          );
-                        }
-                      }}
-                      onPreviewFetch={(url) =>
-                        updateGalleryItem(index, { previewUrl: url })
-                      }
                       uploadFolder="products"
                       className={
                         index === 0
@@ -1634,7 +1618,7 @@ export default function ProductForm({
                 className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
               >
                 {galleryItems.map((item, index) => {
-                  const displayUrl = item.previewUrl;
+                  const displayUrl = item.file ? item.previewUrl : (item.previewUrl || item.url);
                   const isFeature = index === 0;
                   const isBeingDragged = draggedIndex === index;
 

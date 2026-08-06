@@ -74,7 +74,6 @@ export default function CategoryForm({
       name: initialData?.name ?? "",
       slug: initialData?.slug ?? "",
       description: initialData?.description ?? "",
-      image_url: initialData?.image_url ?? "",
       image_alt_text: initialData?.image_alt_text ?? "",
       bg_color: initialData?.bg_color ?? "from-zinc-800 to-zinc-950",
       parent_id: initialData?.parent_id ?? undefined,
@@ -95,9 +94,11 @@ export default function CategoryForm({
   });
 
   const nameValue = watch("name");
-  const imageUrlValue = watch("image_url");
   const imageAltValue = watch("image_alt_text");
   const bgColorValue = watch("bg_color");
+
+  // The current saved image URL — read-only, used only for preview display
+  const currentImageUrl = initialData?.image_url ?? "";
 
   // Reset staged file state whenever initialData changes (e.g. after edit/save)
   useEffect(() => {
@@ -122,7 +123,7 @@ export default function CategoryForm({
   const onSubmit = (data: CategoryCreateInput) => {
     setGlobalError(null);
     startTransition(async () => {
-      let finalImageUrl = data.image_url;
+      let finalImageUrl = initialData?.image_url || "";
 
       // If a new pending file was chosen on the client, upload it now before saving category
       if (pendingFile) {
@@ -209,7 +210,7 @@ export default function CategoryForm({
     }
     if (tab === "media") {
       return Boolean(
-        errors.image_url || errors.image_alt_text || errors.bg_color,
+        errors.image_alt_text || errors.bg_color,
       );
     }
     if (tab === "hierarchy") {
@@ -491,13 +492,7 @@ export default function CategoryForm({
           >
             <ImageInput
               label="Category Image File & Details"
-              value={imageUrlValue || ""}
-              onChange={(url) =>
-                setValue("image_url", url, {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                })
-              }
+              value={currentImageUrl}
               altValue={imageAltValue || ""}
               onAltChange={(alt) =>
                 setValue("image_alt_text", alt, {
@@ -515,7 +510,7 @@ export default function CategoryForm({
                   );
                 }
               }}
-              error={errors.image_url?.message}
+              error={errors.image_alt_text?.message}
               altError={errors.image_alt_text?.message}
               uploadFolder="categories"
               showAltField={true}
@@ -585,15 +580,14 @@ export default function CategoryForm({
                 </p>
               </div>
 
-              {imageUrlValue && (
+              {(pendingFile ? URL.createObjectURL(pendingFile) : currentImageUrl) && (
                 <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/20 shrink-0 bg-black/20">
                   <Image
-                    src={imageUrlValue}
+                    src={pendingFile ? URL.createObjectURL(pendingFile) : currentImageUrl}
                     alt={
                       imageAltValue || nameValue || "Category banner preview"
                     }
                     fill
-                    // unoptimized
                     className="object-cover"
                   />
                 </div>

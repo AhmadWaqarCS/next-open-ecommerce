@@ -326,12 +326,6 @@ export default function MetaInput({
             <ImageInput
               label="OpenGraph Social Image (og:image)"
               value={ogImage}
-              onChange={(url) =>
-                setValue(`${prefix}.og_image`, url, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                })
-              }
               onFileSelect={onOgImageFileSelect}
               file={pendingOgImageFile}
               showAltField={false}

@@ -121,13 +121,10 @@ export default function SiteConfigForm({
     },
   });
 
-  // Watch color and branding image values
+  // Watch color values only
   const primaryColor = watch("primary_color");
   const secondaryColor = watch("secondary_color");
   const accentColor = watch("accent_color");
-  const lightLogoValue = watch("light_logo_url");
-  const darkLogoValue = watch("dark_logo_url");
-  const faviconValue = watch("favicon_url");
 
   const onSubmit = (data: SiteConfigUpdateInput) => {
     if (!permissions.update) {
@@ -416,18 +413,17 @@ export default function SiteConfigForm({
                 title="Logos & Assets"
                 description="Specify public URLs for storefront branding images."
               >
-                <div className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <ImageInput
                     label="Light Logo"
-                    value={lightLogoValue || ""}
-                    onChange={(url) =>
-                      setValue("light_logo_url", url, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
+                    value={initialData.light_logo_url || ""}
                     file={pendingLightLogo}
-                    onFileSelect={setPendingLightLogo}
+                    onFileSelect={(f) => {
+                      setPendingLightLogo(f);
+                      setValue("light_logo_url", initialData.light_logo_url || "", {
+                        shouldDirty: true,
+                      });
+                    }}
                     error={errors.light_logo_url?.message}
                     disabled={!permissions.update}
                     uploadFolder="branding"
@@ -436,15 +432,14 @@ export default function SiteConfigForm({
 
                   <ImageInput
                     label="Dark Logo"
-                    value={darkLogoValue || ""}
-                    onChange={(url) =>
-                      setValue("dark_logo_url", url, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
+                    value={initialData.dark_logo_url || ""}
                     file={pendingDarkLogo}
-                    onFileSelect={setPendingDarkLogo}
+                    onFileSelect={(f) => {
+                      setPendingDarkLogo(f);
+                      setValue("dark_logo_url", initialData.dark_logo_url || "", {
+                        shouldDirty: true,
+                      });
+                    }}
                     error={errors.dark_logo_url?.message}
                     disabled={!permissions.update}
                     uploadFolder="branding"
@@ -453,15 +448,14 @@ export default function SiteConfigForm({
 
                   <ImageInput
                     label="Favicon"
-                    value={faviconValue || ""}
-                    onChange={(url) =>
-                      setValue("favicon_url", url, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
+                    value={initialData.favicon_url || ""}
                     file={pendingFavicon}
-                    onFileSelect={setPendingFavicon}
+                    onFileSelect={(f) => {
+                      setPendingFavicon(f);
+                      setValue("favicon_url", initialData.favicon_url || "", {
+                        shouldDirty: true,
+                      });
+                    }}
                     error={errors.favicon_url?.message}
                     disabled={!permissions.update}
                     uploadFolder="branding"

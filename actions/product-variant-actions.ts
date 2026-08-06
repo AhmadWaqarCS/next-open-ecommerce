@@ -19,7 +19,10 @@ import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function createProductVariant(
-  data: ProductVariantCreateInput,
+  data: ProductVariantCreateInput & {
+    image_url?: string | null;
+    image_url_alt_text?: string | null;
+  },
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("create", "/dashboard/products");
 
@@ -32,6 +35,7 @@ export async function createProductVariant(
     };
   }
 
+  const { image_url, image_url_alt_text } = data;
   const {
     product_id,
     name,
@@ -40,8 +44,6 @@ export async function createProductVariant(
     compare_at_price,
     stock_quantity,
     options,
-    image_url,
-    image_url_alt_text,
     is_active,
     sort_order,
   } = validatedFields.data;
@@ -78,7 +80,10 @@ export async function createProductVariant(
 
 export async function updateProductVariant(
   id: number,
-  data: ProductVariantUpdateInput,
+  data: ProductVariantUpdateInput & {
+    image_url?: string | null;
+    image_url_alt_text?: string | null;
+  },
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/products");
 
@@ -93,6 +98,7 @@ export async function updateProductVariant(
     };
   }
 
+  const { image_url, image_url_alt_text } = data;
   const {
     name,
     sku,
@@ -100,8 +106,6 @@ export async function updateProductVariant(
     compare_at_price,
     stock_quantity,
     options,
-    image_url,
-    image_url_alt_text,
     is_active,
     sort_order,
   } = validatedFields.data;

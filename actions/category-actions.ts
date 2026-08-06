@@ -84,7 +84,7 @@ export async function uploadCategoryImage(
 }
 
 export async function createCategory(
-  data: CategoryCreateInput,
+  data: CategoryCreateInput & { image_url?: string | null },
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("create", "/dashboard/categories");
 
@@ -97,11 +97,11 @@ export async function createCategory(
     };
   }
 
+  const { image_url } = data;
   const {
     name,
     slug,
     description,
-    image_url,
     image_alt_text,
     bg_color,
     show_in_header,
@@ -150,7 +150,7 @@ export async function createCategory(
 
 export async function updateCategory(
   id: number,
-  data: CategoryUpdateInput,
+  data: CategoryUpdateInput & { image_url?: string | null },
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/categories");
 
@@ -165,11 +165,11 @@ export async function updateCategory(
     };
   }
 
+  const { image_url } = data;
   const {
     name,
     slug,
     description,
-    image_url,
     image_alt_text,
     bg_color,
     show_in_header,

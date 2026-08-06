@@ -7,9 +7,10 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  className?: string;
 }
 
-export default function Modal({ isOpen, onClose, children }: ModalProps) {
+export default function Modal({ isOpen, onClose, children, className }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -31,10 +32,11 @@ export default function Modal({ isOpen, onClose, children }: ModalProps) {
     <dialog
       ref={dialogRef}
       onClose={onClose}
-      className="fixed inset-0 m-auto w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl outline-none transition-all dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50"
+      className={`fixed inset-0 m-auto w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl outline-none transition-all dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 ${className || "max-w-lg"}`}
     >
       <div className="relative">
         <button
+          type="button"
           onClick={onClose}
           className="absolute -top-2 -right-2 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-all"
           aria-label="Close dialog"

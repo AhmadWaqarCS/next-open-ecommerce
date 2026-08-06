@@ -275,7 +275,6 @@ export default function SiteComponentForm({ initialData }: SiteComponentFormProp
         <ImageInput
           label="Thumbnail Image"
           value={thumbnailUrl}
-          onChange={(url) => setThumbnailUrl(url)}
         />
       </div>
 

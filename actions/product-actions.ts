@@ -102,6 +102,7 @@ export async function uploadProductImage(
 
 export async function createProduct(
   data: ProductCreateInput & {
+    feature_image_url?: string | null;
     gallery_images?: ProductGalleryImageInput[];
     variants?: ProductVariantInput[];
   },
@@ -124,12 +125,12 @@ export async function createProduct(
     };
   }
 
+  const { feature_image_url } = data;
   const {
     name,
     slug,
     description,
     short_description,
-    feature_image_url,
     feature_image_alt_text,
     price,
     compare_at_price,
@@ -193,6 +194,7 @@ export async function createProduct(
 export async function updateProduct(
   id: number,
   data: ProductUpdateInput & {
+    feature_image_url?: string | null;
     gallery_images?: ProductGalleryImageInput[];
     variants?: ProductVariantInput[];
   },
@@ -217,12 +219,12 @@ export async function updateProduct(
     };
   }
 
+  const { feature_image_url } = data;
   const {
     name,
     slug,
     description,
     short_description,
-    feature_image_url,
     feature_image_alt_text,
     price,
     compare_at_price,

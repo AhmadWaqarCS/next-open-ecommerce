@@ -1039,7 +1039,6 @@ export const categoryCreateSchema = z.object({
     .max(2000, "Description cannot exceed 2000 characters")
     .optional()
     .or(z.literal("")),
-  image_url: urlSchema.optional().or(z.literal("")),
   image_alt_text: z
     .string()
     .trim()
@@ -1082,7 +1081,6 @@ export const productCreateSchema = z.object({
     .max(2000, "Short description cannot exceed 2000 characters")
     .optional()
     .or(z.literal("")),
-  feature_image_url: urlSchema.optional().or(z.literal("")),
   feature_image_alt_text: z
     .string()
     .trim()
@@ -1188,13 +1186,6 @@ export const productVariantCreateSchema = z.object({
     .optional(),
   stock_quantity: z.number().int().min(0).max(1000000).default(0),
   options: z.record(z.string().trim().max(50), z.string().trim().max(100)),
-  image_url: urlSchema.optional().or(z.literal("")),
-  image_url_alt_text: z
-    .string()
-    .trim()
-    .max(255, "Alt text cannot exceed 255 characters")
-    .optional()
-    .or(z.literal("")),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(-10000).max(10000).default(0),
 });
@@ -1224,13 +1215,6 @@ export const productVariantUpdateSchema = z.object({
   options: z
     .record(z.string().trim().max(50), z.string().trim().max(100))
     .optional(),
-  image_url: urlSchema.optional().or(z.literal("")),
-  image_url_alt_text: z
-    .string()
-    .trim()
-    .max(255, "Alt text cannot exceed 255 characters")
-    .optional()
-    .or(z.literal("")),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().min(-10000).max(10000).optional(),
 });
