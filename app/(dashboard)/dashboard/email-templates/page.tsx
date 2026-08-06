@@ -30,7 +30,7 @@ export default async function EmailTemplatesPage() {
   }));
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6 flex-1 flex flex-col">
       <EmailTemplateClient
         templates={templates}
         userPermissions={permissions}

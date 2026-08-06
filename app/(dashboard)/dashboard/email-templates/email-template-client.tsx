@@ -103,7 +103,7 @@ export function EmailTemplateClient({ templates, userPermissions }: EmailTemplat
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
         <div

@@ -30,7 +30,7 @@ export default async function EditEmailTemplatePage({ params }: PageProps) {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="space-y-6 flex-1 flex flex-col">
       <EmailTemplateEditor
         initialData={{
           id: template.id,

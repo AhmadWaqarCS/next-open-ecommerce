@@ -185,11 +185,11 @@ export function EmailTemplateEditor({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 flex-1 flex flex-col w-full">
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl font-medium text-sm transition-all animate-bounce ${
+          className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-2xl font-semibold text-sm transition-all animate-bounce ${
             toastMessage.type === "success"
               ? "bg-emerald-600 text-white"
               : "bg-red-600 text-white"
@@ -205,14 +205,16 @@ export function EmailTemplateEditor({
           <div className="flex items-center gap-2">
             <Link
               href="/dashboard/email-templates"
-              className="text-xs font-semibold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              className="text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors"
             >
               ← Templates
             </Link>
             <span className="text-zinc-300 dark:text-zinc-700">/</span>
-            <span className="text-xs font-semibold text-zinc-500">{isEditMode ? "Edit Template" : "New Template"}</span>
+            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              {isEditMode ? "Edit Template" : "New Template"}
+            </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
+          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">
             {isEditMode ? `Edit Template: ${initialData?.name}` : "Create Email Template"}
           </h1>
         </div>
@@ -222,7 +224,7 @@ export function EmailTemplateEditor({
             <button
               type="button"
               onClick={() => setShowTestModal(true)}
-              className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-xl transition-all"
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-xl transition-all shadow-xs"
             >
               ✉ Send Test Email
             </button>
@@ -239,8 +241,8 @@ export function EmailTemplateEditor({
       </div>
 
       {/* Settings Grid */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
               Email Use Case
@@ -249,7 +251,7 @@ export function EmailTemplateEditor({
               value={key}
               onChange={(e) => handleUseCaseChange(e.target.value)}
               disabled={isEditMode}
-              className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             >
               {EMAIL_USE_CASES.map((uc) => (
                 <option key={uc.key} value={uc.key}>
@@ -269,7 +271,7 @@ export function EmailTemplateEditor({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Standard Customer Invoice"
               required
-              className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
             />
           </div>
         </div>
@@ -284,25 +286,25 @@ export function EmailTemplateEditor({
             onChange={(e) => setSubject(e.target.value)}
             placeholder="e.g. Invoice {{invoice_number}} for Order #{{order_number}} — {{store_name}}"
             required
-            className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 font-mono text-xs"
+            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-medium text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 font-mono text-xs"
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center gap-2.5">
             <input
               type="checkbox"
               id="isActiveToggle"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700"
+              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 dark:border-zinc-700 cursor-pointer"
             />
-            <label htmlFor="isActiveToggle" className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer">
+            <label htmlFor="isActiveToggle" className="text-xs font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer">
               Set as active template for this use case
             </label>
           </div>
 
-          <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
             {isActive
               ? "Activating this template will deactivate any other template for this use case."
               : "Keep inactive to test or save as draft."}
@@ -310,13 +312,15 @@ export function EmailTemplateEditor({
         </div>
       </div>
 
-      {/* Available Variables Pills Helper */}
-      <div className="bg-zinc-900 text-zinc-100 p-5 rounded-2xl border border-zinc-800 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+      {/* Available Data Tags Helper Box */}
+      <div className="bg-zinc-50 dark:bg-zinc-900/80 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-extrabold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
             Available Data Tags for {selectedUseCase.name}
           </h4>
-          <span className="text-[11px] text-zinc-500">Click a tag pill to insert into body</span>
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Click a tag pill to append into HTML body
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -326,10 +330,10 @@ export function EmailTemplateEditor({
               type="button"
               onClick={() => insertVariableTag(v.name)}
               title={v.description}
-              className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 font-mono text-xs font-semibold rounded-lg border border-zinc-700 transition-all flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-mono text-xs font-bold rounded-xl border border-emerald-300/70 dark:border-emerald-800/70 transition-all flex items-center gap-1.5 shadow-2xs"
             >
               <span>{`{{${v.name}}}`}</span>
-              <span className="text-[10px] text-zinc-400 font-sans font-normal opacity-75">({v.description})</span>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-sans font-normal opacity-90">({v.description})</span>
             </button>
           ))}
         </div>
@@ -338,7 +342,7 @@ export function EmailTemplateEditor({
       {/* Code Editor & Live Preview Panel */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+          <span className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
             Template HTML & Styling Editor
           </span>
 
@@ -346,7 +350,7 @@ export function EmailTemplateEditor({
             <button
               type="button"
               onClick={() => setViewMode("split")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 viewMode === "split"
                   ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
@@ -357,7 +361,7 @@ export function EmailTemplateEditor({
             <button
               type="button"
               onClick={() => setViewMode("editor")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 viewMode === "editor"
                   ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
@@ -368,7 +372,7 @@ export function EmailTemplateEditor({
             <button
               type="button"
               onClick={() => setViewMode("preview")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
                 viewMode === "preview"
                   ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm"
                   : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
@@ -379,7 +383,7 @@ export function EmailTemplateEditor({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[500px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[650px]">
           {/* HTML Code Textarea */}
           {(viewMode === "split" || viewMode === "editor") && (
             <div className={`p-4 border-r border-zinc-200 dark:border-zinc-800 ${viewMode === "editor" ? "col-span-2" : ""}`}>
@@ -387,8 +391,8 @@ export function EmailTemplateEditor({
                 value={bodyHtml}
                 onChange={(e) => setBodyHtml(e.target.value)}
                 placeholder="Enter email HTML template with CSS <style> blocks and {{tags}}..."
-                rows={22}
-                className="w-full p-4 bg-zinc-950 text-emerald-400 font-mono text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 leading-relaxed resize-y"
+                rows={28}
+                className="w-full p-4 bg-zinc-950 text-emerald-300 font-mono text-xs font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 leading-relaxed resize-y border border-zinc-800 shadow-inner"
               />
             </div>
           )}
@@ -396,14 +400,15 @@ export function EmailTemplateEditor({
           {/* Live Preview Pane */}
           {(viewMode === "split" || viewMode === "preview") && (
             <div className={`p-4 bg-zinc-100 dark:bg-zinc-950 overflow-y-auto ${viewMode === "preview" ? "col-span-2" : ""}`}>
-              <div className="bg-white rounded-xl shadow-lg border border-zinc-200 overflow-hidden min-h-[480px]">
-                <div className="p-3 bg-zinc-100 border-b border-zinc-200 text-xs font-mono text-zinc-600 flex items-center justify-between">
-                  <span className="truncate">Subject: <strong>{renderedPreview.subject || subject}</strong></span>
-                  <span className="text-[10px] uppercase font-bold text-zinc-400">Live Preview</span>
+              <div className="bg-white rounded-2xl shadow-xl border border-zinc-200 overflow-hidden min-h-[620px]">
+                <div className="p-3.5 bg-zinc-100 border-b border-zinc-200 text-xs font-mono text-zinc-700 flex items-center justify-between">
+                  <span className="truncate max-w-lg">Subject: <strong>{renderedPreview.subject || subject}</strong></span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-zinc-200 text-zinc-600">Live Preview</span>
                 </div>
-                <div
-                  className="p-4"
-                  dangerouslySetInnerHTML={{ __html: renderedPreview.bodyHtml }}
+                <iframe
+                  srcDoc={renderedPreview.bodyHtml}
+                  className="w-full h-[620px] border-0 bg-white rounded-b-2xl"
+                  title="Email Live Preview"
                 />
               </div>
             </div>
