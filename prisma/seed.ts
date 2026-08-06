@@ -46,11 +46,6 @@ async function main() {
   console.log(`  ✓ Superadmin Account: ${adminUser.email}`);
 
   // 3. Dashboard Features & Permissions
-  await prisma.site_feature.deleteMany({
-    where: {
-      path: { in: ["/dashboard/secrets-vault", "/dashboard/secrets"] },
-    },
-  });
 
   const featuresData = [
     { name: "Dashboard", path: "/dashboard", enabled: true, is_super: false },
@@ -90,7 +85,12 @@ async function main() {
       enabled: true,
       is_super: false,
     },
-    { name: "Pages", path: "/dashboard/pages", enabled: true, is_super: false },
+    {
+      name: "Site Pages",
+      path: "/dashboard/pages",
+      enabled: true,
+      is_super: false,
+    },
     {
       name: "Site Components",
       path: "/dashboard/site-components",
@@ -122,21 +122,31 @@ async function main() {
       is_super: false,
     },
     {
-      name: "Newsletter",
+      name: "Newsletter Subscribers",
       path: "/dashboard/newsletter",
       enabled: true,
       is_super: false,
     },
     {
-      name: "Settings",
+      name: "Site Settings",
       path: "/dashboard/settings",
       enabled: true,
       is_super: false,
     },
-    { name: "Media", path: "/dashboard/media", enabled: true, is_super: false },
+    {
+      name: "Media Gallery",
+      path: "/dashboard/media",
+      enabled: true,
+      is_super: false,
+    },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
-    { name: "Activity Logs", path: "/dashboard/activity-logs", enabled: true, is_super: true },
+    {
+      name: "Activity Logs",
+      path: "/dashboard/activity-logs",
+      enabled: true,
+      is_super: true,
+    },
   ];
 
   const features = [];
@@ -447,10 +457,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   console.log(`  ✓ Active Storefront Pages (${pages.length}) seeded`);
 
   // 7. Shipping Method
-  const existingShipping = await prisma.shipping_method.findFirst({
-    where: { name: "Standard Shipping" },
-  });
-  if (!existingShipping) {
+  const shippingCount = await prisma.shipping_method.count();
+  if (shippingCount === 0) {
     await prisma.shipping_method.create({
       data: {
         name: "Standard Shipping",
@@ -465,13 +473,15 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         updated_by: 0,
       },
     });
+    console.log("  ✓ Minimal Shipping Method created");
+  } else {
+    console.log("  ✓ Shipping Methods exist, skipping initial seed");
   }
-  console.log("  ✓ Minimal Shipping Method created");
 
   // 8. Payment Method
   await prisma.payment_method.upsert({
     where: { id: 1 },
-    update: { is_active: false },
+    update: {},
     create: {
       id: 1,
       name: "Cash on Delivery",
@@ -485,11 +495,11 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       updated_by: 0,
     },
   });
-  console.log("  ✓ Payment Method: Cash on Delivery");
+  console.log("  ✓ Payment Method: Cash on Delivery checked");
 
   await prisma.payment_method.upsert({
     where: { id: 2 },
-    update: { is_active: false },
+    update: {},
     create: {
       id: 2,
       name: "Credit / Debit Card (Stripe)",
@@ -504,7 +514,7 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       updated_by: 0,
     },
   });
-  console.log("  ✓ Payment Method: Credit / Debit Card (Stripe)");
+  console.log("  ✓ Payment Method: Credit / Debit Card (Stripe) checked");
 
   // 9. Email Config
   const existingEmail = await prisma.email_config.findFirst({
@@ -532,80 +542,88 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   console.log("  ✓ Email Config created");
 
   // 10. Sample Category & Product
-  const category = await prisma.category.upsert({
-    where: { slug: "general" },
-    update: {},
-    create: {
-      name: "General",
-      slug: "general",
-      description: "Default product category.",
-      image_url:
-        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-      bg_color: "from-zinc-800 to-zinc-950",
-      show_in_header: true,
-      show_in_footer: true,
-      show_in_home: true,
-      product_count: 1,
-      sort_order: 1,
-      is_active: true,
-      created_by: 0,
-      updated_by: 0,
-    },
-  });
+  const categoryCount = await prisma.category.count();
+  const productCount = await prisma.product.count();
 
-  const productSlug = "sample-product";
-  const existingProduct = await prisma.product.findUnique({
-    where: { slug: productSlug },
-  });
-  if (!existingProduct) {
-    await prisma.product.create({
-      data: {
-        name: "Sample Product",
-        slug: productSlug,
-        short_description: "A simple sample product to get started.",
-        description: "This is a sample product seeded during initial setup.",
-        price: 29.99,
-        stock_quantity: 50,
-        category_id: category.id,
-        category_name: category.name,
-        feature_image_url:
+  if (categoryCount === 0 && productCount === 0) {
+    const category = await prisma.category.upsert({
+      where: { slug: "general" },
+      update: {},
+      create: {
+        name: "General",
+        slug: "general",
+        description: "Default product category.",
+        image_url:
           "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-        feature_image_alt_text: "Sample Product",
-        is_featured: true,
-        is_active: true,
+        bg_color: "from-zinc-800 to-zinc-950",
+        show_in_header: true,
+        show_in_footer: true,
+        show_in_home: true,
+        product_count: 1,
         sort_order: 1,
-        meta_info: {
-          title: "Sample Product",
-          description: "A simple sample product.",
-        },
+        is_active: true,
         created_by: 0,
         updated_by: 0,
-        images: {
-          create: [
-            {
-              url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-              alt_text: "Sample Product Front",
-              sort_order: 0,
-              created_by: 0,
-              updated_by: 0,
-            },
-          ],
-        },
-        variants: {
-          create: [
-            {
-              name: "Standard",
-              price: 29.99,
-              stock_quantity: 50,
-              options: { size: "Standard" },
-              sort_order: 0,
-              created_by: 0,
-              updated_by: 0,
-            },
-          ],
-        },
       },
     });
+
+    const productSlug = "sample-product";
+    const existingProduct = await prisma.product.findUnique({
+      where: { slug: productSlug },
+    });
+    if (!existingProduct) {
+      await prisma.product.create({
+        data: {
+          name: "Sample Product",
+          slug: productSlug,
+          short_description: "A simple sample product to get started.",
+          description: "This is a sample product seeded during initial setup.",
+          price: 29.99,
+          stock_quantity: 50,
+          category_id: category.id,
+          category_name: category.name,
+          feature_image_url:
+            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
+          feature_image_alt_text: "Sample Product",
+          is_featured: true,
+          is_active: true,
+          sort_order: 1,
+          meta_info: {
+            title: "Sample Product",
+            description: "A simple sample product.",
+          },
+          created_by: 0,
+          updated_by: 0,
+          images: {
+            create: [
+              {
+                url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
+                alt_text: "Sample Product Front",
+                sort_order: 0,
+                created_by: 0,
+                updated_by: 0,
+              },
+            ],
+          },
+          variants: {
+            create: [
+              {
+                name: "Standard",
+                price: 29.99,
+                stock_quantity: 50,
+                options: { size: "Standard" },
+                sort_order: 0,
+                created_by: 0,
+                updated_by: 0,
+              },
+            ],
+          },
+        },
+      });
+    }
+    console.log("  ✓ Sample Category & Product seeded");
+  } else {
+    console.log("  ✓ Catalog already exists, skipping sample category/product seed");
   }
 
   // 12. Default Email Templates
@@ -613,8 +631,10 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "invoice",
       name: "Default Customer Invoice & Order Confirmation",
-      description: "Sent to customers after an order is placed, containing complete invoice details and item summary.",
-      subject: "Invoice {{invoice_number}} for Order #{{order_number}} — {{store_name}}",
+      description:
+        "Sent to customers after an order is placed, containing complete invoice details and item summary.",
+      subject:
+        "Invoice {{invoice_number}} for Order #{{order_number}} — {{store_name}}",
       body_html: `<!DOCTYPE html>
 <html>
 <head>
@@ -712,7 +732,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "order_notification",
       name: "Default Admin New Order Notification",
-      description: "Sent to admin notification email address whenever a new order is received.",
+      description:
+        "Sent to admin notification email address whenever a new order is received.",
       subject: "[New Order] #{{order_number}} ({{store_name}})",
       body_html: `<!DOCTYPE html>
 <html>
@@ -801,7 +822,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "cod_otp",
       name: "Default COD Verification OTP Code",
-      description: "Sent to customers during Cash on Delivery checkout containing their OTP verification code.",
+      description:
+        "Sent to customers during Cash on Delivery checkout containing their OTP verification code.",
       subject: "{{otp_code}} is your order verification code — {{store_name}}",
       body_html: `<!DOCTYPE html>
 <html>
@@ -851,8 +873,10 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "order_cancellation_otp",
       name: "Default Order Cancellation Verification Code",
-      description: "Sent to customers when they request to cancel an order to verify authorization.",
-      subject: "{{otp_code}} is your cancellation code for Order #{{order_number}} — {{store_name}}",
+      description:
+        "Sent to customers when they request to cancel an order to verify authorization.",
+      subject:
+        "{{otp_code}} is your cancellation code for Order #{{order_number}} — {{store_name}}",
       body_html: `<!DOCTYPE html>
 <html>
 <head>
@@ -901,7 +925,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "order_cancelled_confirmation",
       name: "Default Order Cancelled Confirmation",
-      description: "Sent to customers once an order has been successfully cancelled.",
+      description:
+        "Sent to customers once an order has been successfully cancelled.",
       subject: "Order #{{order_number}} Has Been Cancelled — {{store_name}}",
       body_html: `<!DOCTYPE html>
 <html>
@@ -943,7 +968,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     {
       key: "newsletter_confirmation",
       name: "Default Newsletter Subscription Confirmation",
-      description: "Sent to double opt-in subscribers with a secure token link to confirm their email address.",
+      description:
+        "Sent to double opt-in subscribers with a secure token link to confirm their email address.",
       subject: "Confirm your newsletter subscription — {{store_name}}",
       body_html: `<!DOCTYPE html>
 <html>
@@ -984,7 +1010,7 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
 
   for (const tmpl of defaultTemplates) {
     const existing = await prisma.email_template.findFirst({
-      where: { key: tmpl.key, is_active: true, deleted_at: null },
+      where: { key: tmpl.key },
     });
     if (!existing) {
       await prisma.email_template.create({
