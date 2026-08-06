@@ -90,6 +90,10 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
         throw new Error("COUPON_INVALID");
       }
 
+      if (coupon.max_uses !== null && coupon.times_used >= coupon.max_uses) {
+        throw new Error("COUPON_MAX_USES_REACHED");
+      }
+
       if (
         coupon.minimum_order_amount !== null &&
         subtotal < Number(coupon.minimum_order_amount)
@@ -103,6 +107,7 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
             coupon_id: coupon.id,
             customer_email: input.customer_email.toLowerCase(),
             deleted_at: null,
+            cancelled_at: null,
           },
         });
         if (usageCount >= coupon.max_uses_per_email) {

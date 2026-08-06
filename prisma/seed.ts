@@ -486,7 +486,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     create: {
       id: 2,
       name: "Credit / Debit Card (Stripe)",
-      description: "Pay securely with Credit/Debit card or digital wallets via Stripe.",
+      description:
+        "Pay securely with Credit/Debit card or digital wallets via Stripe.",
       provider: "stripe",
       extra_charge: null,
       instructions: null,
@@ -600,7 +601,26 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     });
   }
 
-  console.log("  ✓ 1 Category & 1 Sample Product seeded");
+  // 11. Sample Coupon
+  await prisma.coupon.upsert({
+    where: { code: "WELCOME10" },
+    update: {},
+    create: {
+      code: "WELCOME10",
+      discount_type: "percentage",
+      discount_value: 10.0,
+      minimum_order_amount: 10.0,
+      max_uses: 1000,
+      max_uses_per_email: 5,
+      is_active: false,
+      created_by: 0,
+      updated_by: 0,
+    },
+  });
+
+  console.log(
+    "  ✓ 1 Category, 1 Sample Product & Sample Coupon WELCOME10 seeded",
+  );
   console.log("\n✅ Minimal Database Seeding Complete!");
 }
 

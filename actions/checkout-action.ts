@@ -492,10 +492,130 @@ function handleCheckoutError(error: any): PlaceOrderResponse {
         message: "Coupon already used.",
       };
     }
+    if (error.message === "COUPON_MAX_USES_REACHED") {
+      return {
+        success: false,
+        errors: { coupon_code: "This coupon has reached its maximum usage limit" },
+        message: "Coupon maximum usage limit reached.",
+      };
+    }
   }
   console.error("[placeOrder/verifyCodOtp] Failed:", error);
   return {
     success: false,
     message: "Failed to place order. Please try again.",
   };
+}
+
+export type ValidateCouponResponse = {
+  success: boolean;
+  message: string;
+  coupon?: {
+    id: number;
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    discount_amount: number;
+  };
+};
+
+/**
+ * Public action: Validates a coupon code entered on the storefront checkout page.
+ */
+export async function validateCouponCode(params: {
+  code: string;
+  subtotal: number;
+  customerEmail?: string | null;
+}): Promise<ValidateCouponResponse> {
+  const { code, subtotal, customerEmail } = params;
+
+  if (!code || !code.trim()) {
+    return {
+      success: false,
+      message: "Please enter a coupon code.",
+    };
+  }
+
+  const cleanCode = code.trim().toUpperCase();
+  const now = new Date();
+
+  try {
+    const coupon = await prisma.coupon.findFirst({
+      where: {
+        code: cleanCode,
+        is_active: true,
+        deleted_at: null,
+        starts_at: { lte: now },
+        OR: [{ expires_at: null }, { expires_at: { gte: now } }],
+      },
+    });
+
+    if (!coupon) {
+      return {
+        success: false,
+        message: "Coupon code is invalid or has expired.",
+      };
+    }
+
+    if (coupon.max_uses !== null && coupon.times_used >= coupon.max_uses) {
+      return {
+        success: false,
+        message: "This coupon has reached its maximum redemption limit.",
+      };
+    }
+
+    if (
+      coupon.minimum_order_amount !== null &&
+      subtotal < Number(coupon.minimum_order_amount)
+    ) {
+      return {
+        success: false,
+        message: `Minimum order amount for this coupon is $${Number(coupon.minimum_order_amount).toFixed(2)}.`,
+      };
+    }
+
+    if (customerEmail && customerEmail.trim() && coupon.max_uses_per_email > 0) {
+      const usageCount = await prisma.order.count({
+        where: {
+          coupon_id: coupon.id,
+          customer_email: customerEmail.trim().toLowerCase(),
+          deleted_at: null,
+          cancelled_at: null,
+        },
+      });
+
+      if (usageCount >= coupon.max_uses_per_email) {
+        return {
+          success: false,
+          message: "You have already redeemed this coupon the maximum allowed times.",
+        };
+      }
+    }
+
+    let discountAmount = 0;
+    if (coupon.discount_type === "percentage") {
+      discountAmount = (subtotal * Number(coupon.discount_value)) / 100;
+    } else {
+      discountAmount = Math.min(subtotal, Number(coupon.discount_value));
+    }
+    discountAmount = Math.round(discountAmount * 100) / 100;
+
+    return {
+      success: true,
+      message: `Coupon "${coupon.code}" applied successfully!`,
+      coupon: {
+        id: coupon.id,
+        code: coupon.code,
+        discount_type: coupon.discount_type,
+        discount_value: Number(coupon.discount_value),
+        discount_amount: discountAmount,
+      },
+    };
+  } catch (error) {
+    console.error("[validateCouponCode] Error:", error);
+    return {
+      success: false,
+      message: "An error occurred while validating the coupon.",
+    };
+  }
 }

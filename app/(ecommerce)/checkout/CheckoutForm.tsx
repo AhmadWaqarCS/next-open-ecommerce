@@ -16,6 +16,7 @@ import {
   placeOrder,
   verifyCodOtpAndPlaceOrder,
   resendCodOtp,
+  validateCouponCode,
 } from "@/actions/checkout-action";
 import Image from "next/image";
 import Link from "next/link";
@@ -108,6 +109,20 @@ export default function CheckoutForm({
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
+
+  // ── Coupon State ────────────────────────────────────────────────────────────
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponState, setCouponState] = useState<{
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    discount_amount: number;
+  } | null>(null);
+  const [couponMessage, setCouponMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -232,7 +247,58 @@ export default function CheckoutForm({
 
   const paymentCharge = selectedPaymentMethod?.extra_charge ?? 0;
 
-  const total = subtotal + effectiveShipping + paymentCharge;
+  const customerEmailValue = watch("customer_email");
+
+  const handleApplyCoupon = async () => {
+    if (!couponCodeInput.trim()) {
+      setCouponMessage({ type: "error", text: "Please enter a coupon code." });
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    setCouponMessage(null);
+
+    const res = await validateCouponCode({
+      code: couponCodeInput.trim(),
+      subtotal,
+      customerEmail: customerEmailValue,
+    });
+
+    if (res.success && res.coupon) {
+      setCouponState(res.coupon);
+      setValue("coupon_code", res.coupon.code);
+      setCouponMessage({ type: "success", text: res.message });
+      setCouponCodeInput("");
+    } else {
+      setCouponMessage({ type: "error", text: res.message });
+    }
+    setIsApplyingCoupon(false);
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponState(null);
+    setValue("coupon_code", undefined);
+    setCouponMessage(null);
+    setCouponCodeInput("");
+  };
+
+  // Dynamic discount calculation
+  let couponDiscountAmount = 0;
+  if (couponState) {
+    if (couponState.discount_type === "percentage") {
+      couponDiscountAmount = (subtotal * couponState.discount_value) / 100;
+    } else {
+      couponDiscountAmount = Math.min(subtotal, couponState.discount_value);
+    }
+    couponDiscountAmount = Math.round(couponDiscountAmount * 100) / 100;
+  }
+
+  const total = Math.max(
+    0,
+    Math.round(
+      (subtotal + effectiveShipping + paymentCharge - couponDiscountAmount) * 100,
+    ) / 100,
+  );
 
   const onSubmit: SubmitHandler<CheckoutFormInput> = async (data) => {
     setIsSubmitting(true);
@@ -801,6 +867,65 @@ export default function CheckoutForm({
               ))}
             </div>
 
+            {/* Coupon Code Section */}
+            <div className="px-5 py-4 border-t border-zinc-100 flex flex-col gap-2.5">
+              <label className="text-xs font-semibold text-zinc-600 uppercase tracking-wide">
+                Coupon Code
+              </label>
+              {couponState ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-xs uppercase px-2 py-0.5 rounded bg-emerald-600 text-white">
+                      {couponState.code}
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-700">
+                      -{config.currency_symbol}{couponDiscountAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-xs text-zinc-400 hover:text-zinc-700 font-bold p-1 cursor-pointer"
+                    title="Remove coupon"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    id="coupon_code_input"
+                    type="text"
+                    placeholder="Enter promo code"
+                    value={couponCodeInput}
+                    onChange={(e) => {
+                      setCouponCodeInput(e.target.value);
+                      if (couponMessage) setCouponMessage(null);
+                    }}
+                    className="flex-1 px-3 py-2 text-xs rounded-xl border border-zinc-200 bg-white text-zinc-900 placeholder-zinc-400 uppercase font-mono outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100"
+                  />
+                  <button
+                    id="apply-coupon-btn"
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={isApplyingCoupon || !couponCodeInput.trim()}
+                    className="px-3.5 py-2 text-xs font-bold rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    {isApplyingCoupon ? "..." : "Apply"}
+                  </button>
+                </div>
+              )}
+              {couponMessage && (
+                <p
+                  className={`text-xs font-medium ${
+                    couponMessage.type === "success" ? "text-emerald-600" : "text-red-500"
+                  }`}
+                >
+                  {couponMessage.text}
+                </p>
+              )}
+            </div>
+
             {/* Totals */}
             <div className="px-5 py-4 border-t border-zinc-100 flex flex-col gap-2">
               <div className="flex justify-between text-sm text-zinc-600">
@@ -826,6 +951,15 @@ export default function CheckoutForm({
                   <span>
                     +{config.currency_symbol}
                     {paymentCharge.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {couponDiscountAmount > 0 && (
+                <div className="flex justify-between text-sm text-emerald-600 font-medium">
+                  <span>Discount ({couponState?.code})</span>
+                  <span>
+                    -{config.currency_symbol}
+                    {couponDiscountAmount.toFixed(2)}
                   </span>
                 </div>
               )}
