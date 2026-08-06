@@ -3,9 +3,9 @@
 import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
 import { getProductPageData, getProductPageSlugs } from "@/lib/storefront";
-import ProductDetailMain from "./ProductDetailMain";
 
-interface ProductPageProps {
+interface ProductLayoutProps {
+  children: React.ReactNode;
   params: Promise<{ slug: string }>;
 }
 
@@ -16,10 +16,16 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({
   params,
-}: ProductPageProps): Promise<Metadata> {
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
   const { slug } = await params;
+  cacheTag(`product-${slug}`);
+  cacheLife("max");
+
   const { product } = await getProductPageData(slug);
   if (!product) return { title: "Product Not Found" };
+
   const meta = product.meta_info;
   return {
     title: meta.title ?? product.name,
@@ -34,13 +40,13 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductPage({ params }: ProductPageProps) {
+export default async function ProductLayout({
+  children,
+  params,
+}: ProductLayoutProps) {
   const { slug } = await params;
-
   cacheTag(`product-${slug}`);
   cacheLife("max");
 
-  const productPageData = await getProductPageData(slug);
-
-  return <ProductDetailMain content={productPageData} />;
+  return <>{children}</>;
 }

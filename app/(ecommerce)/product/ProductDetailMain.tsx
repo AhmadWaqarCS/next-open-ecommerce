@@ -2,12 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ProductFull } from "@/lib/storefront";
-import AddToCartButton from "../../_components/AddToCartButton";
-import CartProvider from "../../_components/CartProvider";
-import FeaturedProducts from "../../_components/FeaturedProducts";
+import AddToCartButton from "../_components/AddToCartButton";
+import CartProvider from "../_components/CartProvider";
+import FeaturedProducts from "../_components/FeaturedProducts";
 
 export interface ProductDetailMainProps {
   content: { product: ProductFull | null };
+  initialVariationParam?: string;
 }
 
 const productDetailScopedStyles = `
@@ -21,9 +22,12 @@ const productDetailScopedStyles = `
 
 /**
  * ProductDetailMain — Page-Specific Main Component for Product Detail View.
- * Located beside `app/(ecommerce)/product/[slug]/page.tsx`.
+ * Located at `app/(ecommerce)/product/ProductDetailMain.tsx`.
  */
-export default function ProductDetailMain({ content }: ProductDetailMainProps) {
+export default function ProductDetailMain({
+  content,
+  initialVariationParam,
+}: ProductDetailMainProps) {
   const { product } = content;
   const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
@@ -35,21 +39,6 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
   const name = product.meta_info?.title || product.name || "Product Details";
   const shortDescription = product.short_description || null;
   const description = product.description || null;
-
-  const price = Number(product.price);
-  const comparePrice = product.compare_at_price
-    ? Number(product.compare_at_price)
-    : null;
-  const isOnSale = comparePrice !== null && comparePrice > price;
-  const discountPct = isOnSale
-    ? Math.round(((comparePrice! - price) / comparePrice!) * 100)
-    : null;
-
-  const inStock = !product.track_inventory || product.stock_quantity > 0;
-  const lowStock =
-    product.track_inventory &&
-    product.stock_quantity > 0 &&
-    product.stock_quantity <= product.low_stock_threshold;
 
   // Gallery compilation: feature_image_url first, followed by additional images
   const galleryImages: { url: string; alt: string }[] = [];
@@ -128,11 +117,6 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
                   </svg>
                 </div>
               )}
-              {isOnSale && discountPct && (
-                <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                  -{discountPct}%
-                </span>
-              )}
             </div>
 
             {/* Thumbnail Strip */}
@@ -170,25 +154,6 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
               </h1>
             </div>
 
-            {/* Pricing Section */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold text-zinc-900">
-                {currencySymbol}
-                {price.toFixed(2)}
-              </span>
-              {isOnSale && (
-                <span className="text-xl text-zinc-400 line-through">
-                  {currencySymbol}
-                  {comparePrice!.toFixed(2)}
-                </span>
-              )}
-              {isOnSale && discountPct && (
-                <span className="text-sm font-semibold text-red-500 bg-red-50 px-2.5 py-0.5 rounded-full">
-                  Save {discountPct}%
-                </span>
-              )}
-            </div>
-
             {/* Short Description */}
             {shortDescription && (
               <p className="text-zinc-600 text-base leading-relaxed">
@@ -196,38 +161,12 @@ export default function ProductDetailMain({ content }: ProductDetailMainProps) {
               </p>
             )}
 
-            {/* Stock Availability Indicator */}
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${
-                  inStock
-                    ? lowStock
-                      ? "bg-amber-400"
-                      : "bg-emerald-400"
-                    : "bg-red-400"
-                }`}
-              />
-              <span className="text-sm font-medium text-zinc-600">
-                {!inStock
-                  ? "Out of stock"
-                  : lowStock
-                    ? `Only ${product.stock_quantity} left in stock`
-                    : "In stock and ready to ship"}
-              </span>
-            </div>
-
-            {/* SKU Badge */}
-            {product.sku && (
-              <p className="text-xs text-zinc-400 font-mono">
-                SKU: {product.sku}
-              </p>
-            )}
-
-            {/* Add to Cart Trigger */}
+            {/* Interactive Add to Cart & Variation Section */}
             <CartProvider>
               <AddToCartButton
                 product={product}
                 currencySymbol={currencySymbol}
+                initialVariationParam={initialVariationParam}
               />
             </CartProvider>
 

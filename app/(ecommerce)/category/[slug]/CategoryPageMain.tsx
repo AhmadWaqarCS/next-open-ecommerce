@@ -122,7 +122,7 @@ export default function CategoryPageMain({ data }: CategoryPageMainProps) {
                     href={
                       page - 1 === 1
                         ? `/category/${slug}`
-                        : `/category/${slug}/page/${page - 1}`
+                        : `/category/${slug}/${page - 1}`
                     }
                     className="pagination-link px-4 py-2 text-sm border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50"
                   >
@@ -156,7 +156,7 @@ export default function CategoryPageMain({ data }: CategoryPageMainProps) {
                           href={
                             item === 1
                               ? `/category/${slug}`
-                              : `/category/${slug}/page/${item}`
+                              : `/category/${slug}/${item}`
                           }
                           className={`pagination-link w-9 h-9 flex items-center justify-center text-sm rounded-lg ${
                             item === page
@@ -172,7 +172,7 @@ export default function CategoryPageMain({ data }: CategoryPageMainProps) {
 
                 {page < pageCount && (
                   <Link
-                    href={`/category/${slug}/page/${page + 1}`}
+                    href={`/category/${slug}/${page + 1}`}
                     className="pagination-link px-4 py-2 text-sm border border-zinc-200 rounded-lg text-zinc-700 hover:bg-zinc-50"
                   >
                     Next →
