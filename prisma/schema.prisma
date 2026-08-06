@@ -110,6 +110,7 @@ model site_config {
 
   require_phone     Boolean @default(false)
   allow_order_notes Boolean @default(true)
+  captcha_provider  String  @default("none")
 
   meta_info Json @default("{}")
 

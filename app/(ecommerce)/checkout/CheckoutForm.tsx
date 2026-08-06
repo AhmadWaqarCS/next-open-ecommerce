@@ -20,6 +20,7 @@ import {
 } from "@/actions/checkout-action";
 import Image from "next/image";
 import Link from "next/link";
+import CaptchaWidget from "../_components/CaptchaWidget";
 
 interface CheckoutFormProps {
   config: CheckoutConfig;
@@ -979,6 +980,13 @@ export default function CheckoutForm({
                   <p className="text-xs text-red-600">{serverError}</p>
                 </div>
               )}
+              <CaptchaWidget
+                provider={config.captcha_provider}
+                turnstileSiteKey={config.turnstile_site_key}
+                recaptchaSiteKey={config.recaptcha_site_key}
+                actionName="place_order"
+                onVerify={(token) => setValue("captcha_token", token)}
+              />
               <button
                 id="place-order-btn"
                 type="submit"

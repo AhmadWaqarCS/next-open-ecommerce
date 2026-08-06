@@ -25,6 +25,7 @@ const TABS = [
   { id: "style", label: "Branding & Style", icon: "🎨" },
   { id: "checkout", label: "Business & Checkout", icon: "💳" },
   { id: "seo", label: "SEO & Socials", icon: "🔍" },
+  { id: "captcha", label: "Security & CAPTCHA", icon: "🛡️" },
 ];
 
 export default function SiteConfigForm({
@@ -904,6 +905,129 @@ export default function SiteConfigForm({
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: CAPTCHA & SECURITY */}
+          {activeTab === "captcha" && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <span>Storefront Abuse & Bot Protection</span>
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    Active Choice
+                  </span>
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Select which CAPTCHA provider to run on sensitive actions (Checkout Place Order button & Newsletter Subscription). Keys are configured via environment variables (`.env`).
+                </p>
+              </div>
+
+              {/* Provider Selection Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* None */}
+                <label
+                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    watch("captcha_provider") === "none"
+                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
+                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl">🚫</span>
+                      <input
+                        type="radio"
+                        value="none"
+                        disabled={!permissions.update}
+                        {...register("captcha_provider")}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Disabled</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      No CAPTCHA verification required. Form submissions proceed without bot checks.
+                    </p>
+                  </div>
+                  <span className="mt-4 text-[11px] font-semibold text-zinc-400">Default / Dev Mode</span>
+                </label>
+
+                {/* Turnstile */}
+                <label
+                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    watch("captcha_provider") === "turnstile"
+                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
+                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl">🌀</span>
+                      <input
+                        type="radio"
+                        value="turnstile"
+                        disabled={!permissions.update}
+                        {...register("captcha_provider")}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Cloudflare Turnstile</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Recommended. Non-interactive & smart protection. Privacy-friendly with zero annoying puzzles.
+                    </p>
+                  </div>
+                  <span className="mt-4 text-[11px] font-semibold text-amber-500">⭐ Recommended</span>
+                </label>
+
+                {/* Google reCAPTCHA v3 */}
+                <label
+                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                    watch("captcha_provider") === "recaptcha_v3"
+                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
+                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl">🟢</span>
+                      <input
+                        type="radio"
+                        value="recaptcha_v3"
+                        disabled={!permissions.update}
+                        {...register("captcha_provider")}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Google reCAPTCHA v3</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Invisible background risk scoring. Evaluates traffic score in the background without user interaction.
+                    </p>
+                  </div>
+                  <span className="mt-4 text-[11px] font-semibold text-emerald-500">Google Risk Engine</span>
+                </label>
+              </div>
+
+              {/* Keys & Environment Status Instructions */}
+              <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                  Required Environment Variables (`.env`)
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                  <div className="p-3.5 rounded-xl bg-zinc-900 text-zinc-200 space-y-1">
+                    <p className="font-bold text-amber-400 font-sans text-xs mb-1">Cloudflare Turnstile Keys:</p>
+                    <p className="text-zinc-400">NEXT_PUBLIC_TURNSTILE_SITE_KEY="..."</p>
+                    <p className="text-zinc-400">TURNSTILE_SECRET_KEY="..."</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-zinc-900 text-zinc-200 space-y-1">
+                    <p className="font-bold text-emerald-400 font-sans text-xs mb-1">Google reCAPTCHA v3 Keys:</p>
+                    <p className="text-zinc-400">NEXT_PUBLIC_RECAPTCHA_SITE_KEY="..."</p>
+                    <p className="text-zinc-400">RECAPTCHA_SECRET_KEY="..."</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                  💡 Note: If environment secret keys are not configured, the system will automatically bypass server-side verification to keep testing uninterrupted.
+                </p>
               </div>
             </div>
           )}

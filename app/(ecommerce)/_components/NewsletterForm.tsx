@@ -5,16 +5,28 @@ import { subscribeNewsletter } from "../../../actions/newsletter-actions";
 import { useForm } from "react-hook-form";
 import { EmailInput, EmailSchema } from "@/lib/validations";
 import { zodResolver } from "@hookform/resolvers/zod";
+import CaptchaWidget from "./CaptchaWidget";
 
 const initialState = { success: false, message: "" };
 
-export default function NewsletterForm() {
+export interface NewsletterFormProps {
+  captchaProvider?: string;
+  turnstileSiteKey?: string | null;
+  recaptchaSiteKey?: string | null;
+}
+
+export default function NewsletterForm({
+  captchaProvider = "none",
+  turnstileSiteKey,
+  recaptchaSiteKey,
+}: NewsletterFormProps) {
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState(initialState);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<EmailInput>({
     resolver: zodResolver(EmailSchema),
@@ -66,6 +78,15 @@ export default function NewsletterForm() {
           {isPending ? "…" : "Subscribe"}
         </button>
       </div>
+
+      <CaptchaWidget
+        provider={captchaProvider}
+        turnstileSiteKey={turnstileSiteKey}
+        recaptchaSiteKey={recaptchaSiteKey}
+        actionName="newsletter_subscribe"
+        onVerify={(token) => setValue("captcha_token", token)}
+      />
+
       {errors.email && (
         <p className="text-red-400 text-xs px-3">{errors.email.message}</p>
       )}

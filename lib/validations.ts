@@ -14,10 +14,14 @@ const emailSchema = z
   .trim()
   .max(254, "Email address cannot exceed 254 characters");
 
-export const EmailSchema = z.object({ email: emailSchema });
+export const EmailSchema = z.object({
+  email: emailSchema,
+  captcha_token: z.string().optional(),
+});
 
 const emailObject = z.object({
   email: emailSchema,
+  captcha_token: z.string().optional(),
 });
 
 export type EmailInput = z.infer<typeof emailObject>;
@@ -356,9 +360,10 @@ export const siteConfigCreateSchema = z.object({
     .max(50, "Tax label cannot exceed 50 characters")
     .default("Tax"),
 
-  // Checkout
+  // Checkout & Security
   require_phone: z.boolean().default(false),
   allow_order_notes: z.boolean().default(true),
+  captcha_provider: z.string().default("none"),
 
   header_config: z
     .record(z.string().max(100), z.unknown())
@@ -892,6 +897,7 @@ export const orderCreateSchema = z.object({
   // Coupon
   coupon_id: z.number().int().positive().max(2147483647).optional(),
   coupon_code: z.string().trim().max(50).optional(),
+  captcha_token: z.string().optional(),
   discount_amount: z.number().min(0).max(100000000).default(0),
 
   // Totals
@@ -1387,6 +1393,8 @@ export const checkoutFormSchema = z
       .trim()
       .max(2000, "Customer notes cannot exceed 2000 characters")
       .optional(),
+
+    captcha_token: z.string().optional(),
 
     // Cart items — sent from client so we can validate server-side
     items: z

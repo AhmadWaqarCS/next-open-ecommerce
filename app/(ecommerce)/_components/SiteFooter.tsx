@@ -288,7 +288,11 @@ export default async function SiteFooter() {
           <p className="text-zinc-500 text-xs mb-3 max-w-sm">
             Subscribe for exclusive offers and update notifications.
           </p>
-          <NewsletterForm />
+          <NewsletterForm
+            captchaProvider={content?.siteConfig?.captchaProvider}
+            turnstileSiteKey={content?.siteConfig?.turnstileSiteKey}
+            recaptchaSiteKey={content?.siteConfig?.recaptchaSiteKey}
+          />
         </div>
       </div>
 

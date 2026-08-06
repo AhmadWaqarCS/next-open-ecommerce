@@ -18,6 +18,7 @@ import {
 
 import { createStripeCheckoutSession, isStripeConfigured } from "@/lib/stripe";
 import { getSiteConfig } from "@/lib/storefront";
+import { verifyCaptchaToken } from "@/lib/captcha";
 
 export type PlaceOrderResponse = ActionResponse & {
   orderNumber?: string;
@@ -42,6 +43,14 @@ export async function placeOrder(
       success: false,
       errors: formatZodErrors(validatedFields.error),
       message: "Please fix the errors below.",
+    };
+  }
+
+  const captchaRes = await verifyCaptchaToken(validatedFields.data.captcha_token);
+  if (!captchaRes.success) {
+    return {
+      success: false,
+      message: captchaRes.error || "Security verification failed. Please try again.",
     };
   }
 

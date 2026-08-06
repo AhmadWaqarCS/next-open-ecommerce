@@ -9,6 +9,7 @@ import CartButton from "./CartButton";
 import CartDrawer from "./CartDrawer";
 import CartProvider from "./CartProvider";
 import { cacheLife, cacheTag } from "next/cache";
+import { Suspense } from "react";
 
 export interface SiteHeaderProps {
   content: HeaderData;
@@ -164,7 +165,10 @@ export default async function SiteHeader() {
               {navCategories.map((cat) => {
                 const hasChildren = cat.children && cat.children.length > 0;
                 return hasChildren ? (
-                  <div key={cat.slug} className="relative group/menu py-5 flex items-center">
+                  <div
+                    key={cat.slug}
+                    className="relative group/menu py-5 flex items-center"
+                  >
                     <button className="header-nav-link flex items-center gap-1 text-sm font-medium tracking-wide transition-colors duration-300">
                       {cat.name}
                       <svg
@@ -225,11 +229,14 @@ export default async function SiteHeader() {
 
             {/* Right Action Icons */}
             <div className="flex items-center gap-3">
-              <SearchButton />
-              <CartProvider>
-                <CartButton />
-                <CartDrawer />
-              </CartProvider>
+              <Suspense>
+                <SearchButton />
+                <CartProvider>
+                  <CartButton />
+                  <CartDrawer />
+                </CartProvider>
+              </Suspense>
+
               <MobileMenuToggle />
             </div>
           </div>

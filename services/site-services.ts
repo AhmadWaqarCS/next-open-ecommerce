@@ -77,6 +77,7 @@ export async function updateSiteConfigTransaction(
     tax_label?: string;
     require_phone?: boolean;
     allow_order_notes?: boolean;
+    captcha_provider?: string;
     meta_info?: object;
   },
   userId: number,

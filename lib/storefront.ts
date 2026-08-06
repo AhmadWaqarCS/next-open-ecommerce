@@ -38,6 +38,9 @@ export interface StorefrontConfig {
   tax_rate: number | null;
   tax_inclusive: boolean;
   tax_label: string;
+  captcha_provider: string;
+  turnstile_site_key: string | null;
+  recaptcha_site_key: string | null;
 }
 
 export interface NavCategory {
@@ -88,6 +91,9 @@ export interface FooterData {
     email: string | null;
     phone: string | null;
     address: string | null;
+    captchaProvider?: string;
+    turnstileSiteKey?: string | null;
+    recaptchaSiteKey?: string | null;
   };
   categories: FooterCategory[];
   sitePages: { title: string; slug: string }[];
@@ -251,6 +257,9 @@ export interface CheckoutConfig {
   tax_rate: number | null;
   tax_inclusive: boolean;
   tax_label: string;
+  captcha_provider: string;
+  turnstile_site_key: string | null;
+  recaptcha_site_key: string | null;
 }
 
 export interface CheckoutPageData {
@@ -296,6 +305,7 @@ export async function getSiteConfig(): Promise<StorefrontConfig | null> {
       tax_rate: true,
       tax_inclusive: true,
       tax_label: true,
+      captcha_provider: true,
     },
   });
 
@@ -307,6 +317,9 @@ export async function getSiteConfig(): Promise<StorefrontConfig | null> {
     social_links: (row.social_links ?? {}) as Record<string, string | null>,
     meta_info: (row.meta_info ?? {}) as Record<string, string>,
     tax_rate: row.tax_rate !== null ? Number(row.tax_rate) : null,
+    captcha_provider: row.captcha_provider ?? "none",
+    turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
+    recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
   };
 }
 
@@ -410,6 +423,9 @@ export async function getFooterData(): Promise<FooterData> {
       email: config?.email || null,
       phone: config?.phone || null,
       address: config?.address || null,
+      captchaProvider: config?.captcha_provider || "none",
+      turnstileSiteKey: config?.turnstile_site_key || null,
+      recaptchaSiteKey: config?.recaptcha_site_key || null,
     },
     categories: categories || [],
     sitePages: sitePages || [],
@@ -913,6 +929,9 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
           tax_rate: config.tax_rate,
           tax_inclusive: config.tax_inclusive,
           tax_label: config.tax_label,
+          captcha_provider: config.captcha_provider,
+          turnstile_site_key: config.turnstile_site_key,
+          recaptcha_site_key: config.recaptcha_site_key,
         }
       : null,
   };

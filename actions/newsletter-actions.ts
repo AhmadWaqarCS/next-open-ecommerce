@@ -13,6 +13,7 @@ import {
   getNewsletterFilterWhere,
 } from "@/lib/filters/newsletter-filters";
 import { revalidatePath } from "next/cache";
+import { verifyCaptchaToken } from "@/lib/captcha";
 
 export async function subscribeNewsletter(
   data: EmailInput,
@@ -23,6 +24,14 @@ export async function subscribeNewsletter(
     return {
       success: false,
       message: "Invalid email.",
+    };
+  }
+
+  const captchaRes = await verifyCaptchaToken(parsed.data.captcha_token);
+  if (!captchaRes.success) {
+    return {
+      success: false,
+      message: captchaRes.error || "Security verification failed. Please try again.",
     };
   }
 
