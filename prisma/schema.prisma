@@ -197,6 +197,31 @@ model email_config {
   @@map("email_config")
 }
 
+model email_template {
+  id Int @id @default(autoincrement())
+
+  key                 String
+  name                String
+  description         String?
+  subject             String
+  body_html           String  @db.Text
+  available_variables Json?
+
+  is_active Boolean @default(false)
+
+  created_at DateTime  @default(now())
+  created_by Int       @default(1)
+  updated_at DateTime  @updatedAt
+  updated_by Int       @default(1)
+  deleted_at DateTime?
+  deleted_by Int?
+
+  @@index([key])
+  @@index([is_active])
+  @@index([deleted_at])
+  @@map("email_templates")
+}
+
 model shipping_method {
   id          Int      @id @default(autoincrement())
   name        String

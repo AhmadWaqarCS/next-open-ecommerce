@@ -116,6 +116,12 @@ async function main() {
       is_super: false,
     },
     {
+      name: "Email Templates",
+      path: "/dashboard/email-templates",
+      enabled: true,
+      is_super: false,
+    },
+    {
       name: "Newsletter",
       path: "/dashboard/newsletter",
       enabled: true,
@@ -602,23 +608,403 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     });
   }
 
-  // 11. Sample Coupon
-  await prisma.coupon.upsert({
-    where: { code: "WELCOME10" },
-    update: {},
-    create: {
-      code: "WELCOME10",
-      discount_type: "percentage",
-      discount_value: 10.0,
-      minimum_order_amount: 10.0,
-      max_uses: 1000,
-      max_uses_per_email: 5,
-      is_active: false,
-      created_by: 0,
-      updated_by: 0,
+  // 12. Default Email Templates
+  const defaultTemplates = [
+    {
+      key: "invoice",
+      name: "Default Customer Invoice & Order Confirmation",
+      description: "Sent to customers after an order is placed, containing complete invoice details and item summary.",
+      subject: "Invoice {{invoice_number}} for Order #{{order_number}} — {{store_name}}",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice {{invoice_number}} — {{store_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px; text-align: left; }
+    .header h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 700; }
+    .header p { margin: 0; font-size: 14px; color: #a1a1aa; }
+    .badge { display: inline-block; padding: 4px 12px; background-color: {{status_badge_color}}; color: #ffffff; font-size: 12px; font-weight: 700; border-radius: 9999px; text-transform: uppercase; margin-top: 12px; }
+    .body { padding: 32px; }
+    .meta-label { font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .meta-value { font-size: 14px; font-weight: 600; color: #18181b; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px; }
+    th { background-color: #f4f4f5; padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 700; color: #52525b; text-transform: uppercase; border-bottom: 2px solid #e4e4e7; }
+    .totals { width: 100%; max-width: 280px; margin-left: auto; margin-top: 16px; }
+    .totals td { padding: 6px 12px; font-size: 14px; }
+    .totals .grand-total td { font-size: 18px; font-weight: 700; border-top: 2px solid #18181b; padding-top: 12px; color: #18181b; }
+    .footer { background-color: #f4f4f5; padding: 24px 32px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Thank you for your order!</h1>
+      <p>Your invoice {{invoice_number}} for order #{{order_number}} is ready.</p>
+      <div class="badge">{{status_badge_text}}</div>
+    </div>
+    <div class="body">
+      <table style="width: 100%; border: none; margin-bottom: 24px;">
+        <tr>
+          <td style="width: 50%; vertical-align: top; padding: 0;">
+            <div class="meta-label">Billed To</div>
+            <div class="meta-value">{{customer_name}}</div>
+            <div style="font-size: 13px; color: #52525b;">{{customer_email}}</div>
+          </td>
+          <td style="width: 50%; vertical-align: top; padding: 0; text-align: right;">
+            <div class="meta-label">Invoice Reference</div>
+            <div class="meta-value">{{invoice_number}}</div>
+            <div class="meta-label">Order Number</div>
+            <div class="meta-value">{{order_number}}</div>
+            <div class="meta-label">Date Issued</div>
+            <div style="font-size: 13px; color: #52525b;">{{issued_date}}</div>
+            <div class="meta-label" style="margin-top: 8px;">Payment Method</div>
+            <div style="font-size: 13px; color: #52525b;">{{payment_method}}</div>
+          </td>
+        </tr>
+      </table>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align: center;">Qty</th>
+            <th style="text-align: right;">Price</th>
+            <th style="text-align: right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{items_table}}
+        </tbody>
+      </table>
+      <table class="totals" style="border: none;">
+        <tr>
+          <td style="color: #71717a;">Subtotal:</td>
+          <td style="text-align: right; font-weight: 600;">{{subtotal}}</td>
+        </tr>
+        {{discount_row}}
+        {{tax_row}}
+        <tr>
+          <td style="color: #71717a;">Shipping:</td>
+          <td style="text-align: right; font-weight: 600;">{{shipping_cost}}</td>
+        </tr>
+        <tr class="grand-total">
+          <td>Total:</td>
+          <td style="text-align: right;">{{total}}</td>
+        </tr>
+      </table>
+      {{notes_section}}
+      <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e4e4e7; text-align: center;">
+        <p style="font-size: 14px; color: #52525b; margin-bottom: 16px;">Thank you for shopping with {{store_name}}!</p>
+        <a href="{{storefront_url}}" style="display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">Visit Storefront</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p style="margin: 0 0 6px 0;"><strong>{{store_name}}</strong></p>
+      <p style="margin: 0 0 4px 0;">{{store_address}}</p>
+      <p style="margin: 0;">Contact: {{store_email}} | {{store_phone}}</p>
+    </div>
+  </div>
+</body>
+</html>`,
     },
-  });
+    {
+      key: "order_notification",
+      name: "Default Admin New Order Notification",
+      description: "Sent to admin notification email address whenever a new order is received.",
+      subject: "[New Order] #{{order_number}} ({{store_name}})",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>New Order Received — {{store_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 650px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px; text-align: left; }
+    .header h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 700; }
+    .header p { margin: 0; font-size: 14px; color: #a1a1aa; }
+    .body { padding: 32px; }
+    .meta-label { font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .meta-value { font-size: 14px; font-weight: 600; color: #18181b; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px; }
+    th { background-color: #f4f4f5; padding: 10px 16px; text-align: left; font-size: 12px; font-weight: 700; color: #52525b; text-transform: uppercase; border-bottom: 2px solid #e4e4e7; }
+    .totals { width: 100%; max-width: 280px; margin-left: auto; margin-top: 16px; }
+    .totals td { padding: 6px 12px; font-size: 14px; }
+    .totals .grand-total td { font-size: 18px; font-weight: 700; border-top: 2px solid #18181b; padding-top: 12px; color: #18181b; }
+    .footer { background-color: #f4f4f5; padding: 24px 32px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>New Order Received & Invoice Issued</h1>
+      <p>Order #{{order_number}} has been received.</p>
+    </div>
+    <div class="body">
+      <table style="width: 100%; border: none; margin-bottom: 24px;">
+        <tr>
+          <td style="width: 50%; vertical-align: top; padding: 0;">
+            <div class="meta-label">Customer</div>
+            <div class="meta-value">{{customer_name}}</div>
+            <div style="font-size: 13px; color: #52525b;">{{customer_email}}</div>
+          </td>
+          <td style="width: 50%; vertical-align: top; padding: 0; text-align: right;">
+            <div class="meta-label">Invoice Reference</div>
+            <div class="meta-value">{{invoice_number}}</div>
+            <div class="meta-label">Order Number</div>
+            <div class="meta-value">{{order_number}}</div>
+            <div class="meta-label">Date Issued</div>
+            <div style="font-size: 13px; color: #52525b;">{{issued_date}}</div>
+          </td>
+        </tr>
+      </table>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align: center;">Qty</th>
+            <th style="text-align: right;">Price</th>
+            <th style="text-align: right;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{items_table}}
+        </tbody>
+      </table>
+      <table class="totals" style="border: none;">
+        <tr>
+          <td style="color: #71717a;">Subtotal:</td>
+          <td style="text-align: right; font-weight: 600;">{{subtotal}}</td>
+        </tr>
+        {{discount_row}}
+        {{tax_row}}
+        <tr>
+          <td style="color: #71717a;">Shipping:</td>
+          <td style="text-align: right; font-weight: 600;">{{shipping_cost}}</td>
+        </tr>
+        <tr class="grand-total">
+          <td>Total:</td>
+          <td style="text-align: right;">{{total}}</td>
+        </tr>
+      </table>
+      {{notes_section}}
+    </div>
+    <div class="footer">
+      <p style="margin: 0;"><strong>{{store_name}} Dashboard Notification</strong></p>
+    </div>
+  </div>
+</body>
+</html>`,
+    },
+    {
+      key: "cod_otp",
+      name: "Default COD Verification OTP Code",
+      description: "Sent to customers during Cash on Delivery checkout containing their OTP verification code.",
+      subject: "{{otp_code}} is your order verification code — {{store_name}}",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Order Verification Code — {{store_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .body { padding: 32px 28px; text-align: center; }
+    .greeting { font-size: 15px; color: #3f3f46; margin-bottom: 20px; }
+    .otp-card { background-color: #fafafa; border: 2px dashed #e4e4e7; border-radius: 12px; padding: 24px; margin: 24px 0; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #09090b; }
+    .expiry { font-size: 13px; color: #71717a; margin-top: 12px; }
+    .notice { font-size: 12px; color: #a1a1aa; line-height: 1.5; margin-top: 24px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{store_name}}</h1>
+    </div>
+    <div class="body">
+      <div class="greeting">
+        Hi {{customer_name}},<br/>
+        Please use the verification code below to confirm your Cash on Delivery order.
+      </div>
+      <div class="otp-card">
+        <div class="otp-code">{{otp_code}}</div>
+        <div class="expiry">Expires in {{expires_minutes}} minutes</div>
+      </div>
+      <div class="notice">
+        If you did not initiate this order, please disregard this email.<br/>
+        Do not share this verification code with anyone.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; {{year}} {{store_name}}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`,
+    },
+    {
+      key: "order_cancellation_otp",
+      name: "Default Order Cancellation Verification Code",
+      description: "Sent to customers when they request to cancel an order to verify authorization.",
+      subject: "{{otp_code}} is your cancellation code for Order #{{order_number}} — {{store_name}}",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cancel Order {{order_number}} Verification Code — {{store_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #dc2626; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    .body { padding: 32px 28px; text-align: center; }
+    .greeting { font-size: 15px; color: #3f3f46; margin-bottom: 20px; }
+    .otp-card { background-color: #fef2f2; border: 2px dashed #fca5a5; border-radius: 12px; padding: 24px; margin: 24px 0; }
+    .otp-code { font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #991b1b; }
+    .expiry { font-size: 13px; color: #71717a; margin-top: 12px; }
+    .notice { font-size: 12px; color: #a1a1aa; line-height: 1.5; margin-top: 24px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Order Cancellation Request</h1>
+    </div>
+    <div class="body">
+      <div class="greeting">
+        Hi {{customer_name}},<br/>
+        You requested to cancel order <strong>#{{order_number}}</strong> at <strong>{{store_name}}</strong>. Please use the verification code below to authorize this cancellation.
+      </div>
+      <div class="otp-card">
+        <div class="otp-code">{{otp_code}}</div>
+        <div class="expiry">Expires in {{expires_minutes}} minutes</div>
+      </div>
+      <div class="notice">
+        If you did not request to cancel your order, please ignore this email and your order will remain active.<br/>
+        Do not share this verification code with anyone.
+      </div>
+    </div>
+    <div class="footer">
+      &copy; {{year}} {{store_name}}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`,
+    },
+    {
+      key: "order_cancelled_confirmation",
+      name: "Default Order Cancelled Confirmation",
+      description: "Sent to customers once an order has been successfully cancelled.",
+      subject: "Order #{{order_number}} Has Been Cancelled — {{store_name}}",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Order #{{order_number}} Cancelled — {{store_name}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 24px; color: #18181b; }
+    .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #18181b; color: #ffffff; padding: 32px 24px; text-align: center; }
+    .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
+    .body { padding: 32px 28px; text-align: center; }
+    .status-badge { display: inline-block; padding: 6px 16px; background-color: #fef2f2; color: #991b1b; font-size: 13px; font-weight: 700; border-radius: 9999px; text-transform: uppercase; margin-bottom: 20px; }
+    .message { font-size: 15px; color: #3f3f46; line-height: 1.6; margin-bottom: 24px; }
+    .btn { display: inline-block; padding: 12px 24px; background-color: #18181b; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px; }
+    .footer { background-color: #f4f4f5; padding: 18px; text-align: center; font-size: 12px; color: #71717a; border-top: 1px solid #e4e4e7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>{{store_name}}</h1>
+    </div>
+    <div class="body">
+      <div class="status-badge">Order Cancelled</div>
+      <div class="message">
+        Hi {{customer_name}},<br/>
+        Your order <strong>#{{order_number}}</strong> has been successfully cancelled. If any payment was collected, a refund process will be initiated shortly.
+      </div>
+      <a href="{{order_details_url}}" class="btn">View Order Details</a>
+    </div>
+    <div class="footer">
+      &copy; {{year}} {{store_name}}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`,
+    },
+    {
+      key: "newsletter_confirmation",
+      name: "Default Newsletter Subscription Confirmation",
+      description: "Sent to double opt-in subscribers with a secure token link to confirm their email address.",
+      subject: "Confirm your newsletter subscription — {{store_name}}",
+      body_html: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Confirm Your Subscription</title>
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #09090b; color: #f4f4f5; margin: 0; padding: 40px 20px; }
+    .container { max-width: 540px; margin: 0 auto; background-color: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 40px; text-align: center; }
+    .brand { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 24px; }
+    .icon-badge { display: inline-block; background-color: #27272a; width: 56px; height: 56px; line-height: 56px; border-radius: 50%; margin-bottom: 20px; font-size: 24px; }
+    .heading { font-size: 20px; font-weight: 700; color: #f4f4f5; margin-bottom: 12px; margin-top: 0; }
+    .text { font-size: 14px; color: #a1a1aa; line-height: 1.6; margin-bottom: 28px; }
+    .btn { display: inline-block; background-color: #f4f4f5; color: #09090b; font-weight: 700; font-size: 14px; text-decoration: none; padding: 14px 32px; border-radius: 9999px; transition: all 0.2s; }
+    .footer { margin-top: 36px; font-size: 12px; color: #71717a; border-top: 1px solid #27272a; padding-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand">{{store_name}}</div>
+    <div class="icon-badge">📬</div>
+    <h1 class="heading">Confirm Your Newsletter Subscription</h1>
+    <p class="text">
+      You're almost subscribed! Please click the button below to confirm your email address (<strong>{{to_email}}</strong>) and activate your newsletter subscription.
+    </p>
+    <a href="{{confirmation_url}}" class="btn" target="_blank">Confirm Subscription</a>
+    <p class="text" style="margin-top: 24px; font-size: 12px; color: #71717a;">
+      If you didn't request this email, you can safely ignore it.
+    </p>
+    <div class="footer">
+      &copy; {{year}} {{store_name}}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>`,
+    },
+  ];
 
+  for (const tmpl of defaultTemplates) {
+    const existing = await prisma.email_template.findFirst({
+      where: { key: tmpl.key, is_active: true, deleted_at: null },
+    });
+    if (!existing) {
+      await prisma.email_template.create({
+        data: {
+          key: tmpl.key,
+          name: tmpl.name,
+          description: tmpl.description,
+          subject: tmpl.subject,
+          body_html: tmpl.body_html,
+          is_active: true,
+          created_by: 0,
+          updated_by: 0,
+        },
+      });
+    }
+  }
+
+  console.log(
+    `  ✓ Default Email Templates (${defaultTemplates.length} use cases) seeded`,
+  );
   console.log(
     "  ✓ 1 Category, 1 Sample Product & Sample Coupon WELCOME10 seeded",
   );

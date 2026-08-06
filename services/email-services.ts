@@ -1,6 +1,17 @@
 import nodemailer from "nodemailer";
 import prisma from "@/lib/prisma";
 import { generateInvoiceForOrderTransaction } from "./invoice-services";
+import { renderEmailTemplate } from "@/lib/email-template-engine";
+
+export async function getActiveEmailTemplateFromDB(key: string) {
+  return await prisma.email_template.findFirst({
+    where: {
+      key,
+      is_active: true,
+      deleted_at: null,
+    },
+  });
+}
 
 // ─── DB MUTATIONS FOR SENT EMAILS ──────────────────────────────────────────────
 
@@ -465,35 +476,112 @@ export async function sendInvoiceAndOrderEmailsForOrder(
   });
   const storeName = siteConfig?.name || "Our Store";
 
-  const customerHtml = renderInvoiceEmailHtml({
-    storeName,
-    storeEmail: siteConfig?.email || undefined,
-    storePhone: siteConfig?.phone || undefined,
-    storeAddress: siteConfig?.address || undefined,
-    logoUrl: siteConfig?.light_logo_url || undefined,
-    invoiceNumber: invoice.invoice_number,
-    orderNumber: order.order_number,
-    customerName: invoice.customer_name,
-    customerEmail: invoice.customer_email,
-    items: order.items,
-    subtotal: invoice.subtotal,
-    taxAmount: invoice.tax_amount,
-    shippingCost: invoice.shipping_cost,
-    discountAmount: invoice.discount_amount,
-    total: invoice.total,
-    currency: invoice.currency,
-    paymentMethodName: order.payment_method_name || order.payment_method,
-    issuedAt: invoice.issued_at,
-    paidAt: invoice.paid_at,
-    notes: invoice.notes,
-    isForAdmin: false,
+  const symbol = invoice.currency === "USD" ? "$" : `${invoice.currency} `;
+  const formattedIssuedDate = new Date(invoice.issued_at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
+  const isPaid = Boolean(invoice.paid_at);
+  const statusBadgeColor = isPaid ? "#16a34a" : "#ca8a04";
+  const statusBadgeText = isPaid ? "PAID" : "ISSUED / PENDING PAYMENT";
+
+  const itemRowsHtml = order.items
+    .map(
+      (item) => `
+      <tr>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e4e4e7; font-size: 14px; color: #18181b;">
+          <strong>${item.product_name}</strong>
+          ${item.variant_name ? `<br/><span style="font-size: 12px; color: #71717a;">${item.variant_name}</span>` : ""}
+        </td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e4e4e7; font-size: 14px; color: #18181b; text-align: center;">
+          ${item.quantity}
+        </td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e4e4e7; font-size: 14px; color: #18181b; text-align: right;">
+          ${symbol}${Number(item.unit_price).toFixed(2)}
+        </td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #e4e4e7; font-size: 14px; color: #18181b; text-align: right; font-weight: 600;">
+          ${symbol}${Number(item.line_total).toFixed(2)}
+        </td>
+      </tr>
+    `
+    )
+    .join("");
+
+  const commonVars: Record<string, any> = {
+    store_name: storeName,
+    store_email: siteConfig?.email || "",
+    store_phone: siteConfig?.phone || "",
+    store_address: siteConfig?.address || "",
+    logo_url: siteConfig?.light_logo_url || "",
+    storefront_url: (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, ""),
+    invoice_number: invoice.invoice_number,
+    order_number: order.order_number,
+    customer_name: invoice.customer_name,
+    customer_email: invoice.customer_email,
+    issued_date: formattedIssuedDate,
+    payment_method: order.payment_method_name || order.payment_method,
+    status_badge_text: statusBadgeText,
+    status_badge_color: statusBadgeColor,
+    items_table: itemRowsHtml,
+    subtotal: `${symbol}${Number(invoice.subtotal).toFixed(2)}`,
+    discount_row:
+      Number(invoice.discount_amount) > 0
+        ? `<tr><td style="color: #16a34a;">Discount:</td><td style="text-align: right; font-weight: 600; color: #16a34a;">-${symbol}${Number(invoice.discount_amount).toFixed(2)}</td></tr>`
+        : "",
+    tax_row:
+      Number(invoice.tax_amount) > 0
+        ? `<tr><td style="color: #71717a;">Tax:</td><td style="text-align: right; font-weight: 600;">${symbol}${Number(invoice.tax_amount).toFixed(2)}</td></tr>`
+        : "",
+    shipping_cost: Number(invoice.shipping_cost) === 0 ? "Free" : `${symbol}${Number(invoice.shipping_cost).toFixed(2)}`,
+    total: `${symbol}${Number(invoice.total).toFixed(2)}`,
+    currency_symbol: symbol,
+    notes_section: invoice.notes
+      ? `<div style="margin-top: 24px; padding: 16px; background-color: #f4f4f5; border-radius: 8px;"><div style="font-size:11px; font-weight:700; color:#71717a; text-transform:uppercase;">Notes</div><div style="font-size: 13px; color: #3f3f46;">${invoice.notes}</div></div>`
+      : "",
+    year: new Date().getFullYear(),
+  };
+
+  // Check custom template for invoice
+  const customInvoiceTemplate = await getActiveEmailTemplateFromDB("invoice");
+  let customerSubject = `Invoice ${invoice.invoice_number} for Order #${order.order_number} — ${storeName}`;
+  let customerHtml = "";
+
+  if (customInvoiceTemplate) {
+    const rendered = renderEmailTemplate(customInvoiceTemplate.body_html, customInvoiceTemplate.subject, commonVars);
+    customerSubject = rendered.subject;
+    customerHtml = rendered.bodyHtml;
+  } else {
+    customerHtml = renderInvoiceEmailHtml({
+      storeName,
+      storeEmail: siteConfig?.email || undefined,
+      storePhone: siteConfig?.phone || undefined,
+      storeAddress: siteConfig?.address || undefined,
+      logoUrl: siteConfig?.light_logo_url || undefined,
+      invoiceNumber: invoice.invoice_number,
+      orderNumber: order.order_number,
+      customerName: invoice.customer_name,
+      customerEmail: invoice.customer_email,
+      items: order.items,
+      subtotal: invoice.subtotal,
+      taxAmount: invoice.tax_amount,
+      shippingCost: invoice.shipping_cost,
+      discountAmount: invoice.discount_amount,
+      total: invoice.total,
+      currency: invoice.currency,
+      paymentMethodName: order.payment_method_name || order.payment_method,
+      issuedAt: invoice.issued_at,
+      paidAt: invoice.paid_at,
+      notes: invoice.notes,
+      isForAdmin: false,
+    });
+  }
 
   const customerResult = await sendEmailWithNodemailer({
     type: "invoice",
     toEmail: order.customer_email,
     toName: invoice.customer_name,
-    subject: `Invoice ${invoice.invoice_number} for Order #${order.order_number} — ${storeName}`,
+    subject: customerSubject,
     bodyHtml: customerHtml,
     orderNumber: order.order_number,
     orderId: order.id,
@@ -515,35 +603,45 @@ export async function sendInvoiceAndOrderEmailsForOrder(
     emailConfig.send_admin_new_order &&
     emailConfig.admin_notification_email
   ) {
-    const adminHtml = renderInvoiceEmailHtml({
-      storeName,
-      storeEmail: siteConfig?.email || undefined,
-      storePhone: siteConfig?.phone || undefined,
-      storeAddress: siteConfig?.address || undefined,
-      logoUrl: siteConfig?.light_logo_url || undefined,
-      invoiceNumber: invoice.invoice_number,
-      orderNumber: order.order_number,
-      customerName: invoice.customer_name,
-      customerEmail: invoice.customer_email,
-      items: order.items,
-      subtotal: invoice.subtotal,
-      taxAmount: invoice.tax_amount,
-      shippingCost: invoice.shipping_cost,
-      discountAmount: invoice.discount_amount,
-      total: invoice.total,
-      currency: invoice.currency,
-      paymentMethodName: order.payment_method_name || order.payment_method,
-      issuedAt: invoice.issued_at,
-      paidAt: invoice.paid_at,
-      notes: invoice.notes,
-      isForAdmin: true,
-    });
+    const customAdminTemplate = await getActiveEmailTemplateFromDB("order_notification");
+    let adminSubject = `[New Order] #${order.order_number} (${storeName})`;
+    let adminHtml = "";
+
+    if (customAdminTemplate) {
+      const rendered = renderEmailTemplate(customAdminTemplate.body_html, customAdminTemplate.subject, commonVars);
+      adminSubject = rendered.subject;
+      adminHtml = rendered.bodyHtml;
+    } else {
+      adminHtml = renderInvoiceEmailHtml({
+        storeName,
+        storeEmail: siteConfig?.email || undefined,
+        storePhone: siteConfig?.phone || undefined,
+        storeAddress: siteConfig?.address || undefined,
+        logoUrl: siteConfig?.light_logo_url || undefined,
+        invoiceNumber: invoice.invoice_number,
+        orderNumber: order.order_number,
+        customerName: invoice.customer_name,
+        customerEmail: invoice.customer_email,
+        items: order.items,
+        subtotal: invoice.subtotal,
+        taxAmount: invoice.tax_amount,
+        shippingCost: invoice.shipping_cost,
+        discountAmount: invoice.discount_amount,
+        total: invoice.total,
+        currency: invoice.currency,
+        paymentMethodName: order.payment_method_name || order.payment_method,
+        issuedAt: invoice.issued_at,
+        paidAt: invoice.paid_at,
+        notes: invoice.notes,
+        isForAdmin: true,
+      });
+    }
 
     await sendEmailWithNodemailer({
       type: "order_notification",
       toEmail: emailConfig.admin_notification_email,
       toName: "Store Admin",
-      subject: `[New Order] #${order.order_number} (${storeName})`,
+      subject: adminSubject,
       bodyHtml: adminHtml,
       orderNumber: order.order_number,
       orderId: order.id,
@@ -658,18 +756,34 @@ export async function sendCodOtpEmail(options: {
   });
   const storeName = siteConfig?.name || "Our Store";
 
-  const bodyHtml = renderCodOtpEmailHtml({
-    storeName,
-    customerName,
-    otpCode,
-    expiresMinutes,
-  });
+  const template = await getActiveEmailTemplateFromDB("cod_otp");
+  let subject = `${otpCode} is your order verification code — ${storeName}`;
+  let bodyHtml = "";
+
+  if (template) {
+    const rendered = renderEmailTemplate(template.body_html, template.subject, {
+      store_name: storeName,
+      customer_name: customerName || "there",
+      otp_code: otpCode,
+      expires_minutes: expiresMinutes,
+      year: new Date().getFullYear(),
+    });
+    subject = rendered.subject;
+    bodyHtml = rendered.bodyHtml;
+  } else {
+    bodyHtml = renderCodOtpEmailHtml({
+      storeName,
+      customerName,
+      otpCode,
+      expiresMinutes,
+    });
+  }
 
   return await sendEmailWithNodemailer({
     type: "cod_otp",
     toEmail,
     toName: customerName,
-    subject: `${otpCode} is your order verification code — ${storeName}`,
+    subject,
     bodyHtml,
   });
 }
@@ -747,19 +861,36 @@ export async function sendOrderCancellationOtpEmail(options: {
   });
   const storeName = siteConfig?.name || "Our Store";
 
-  const bodyHtml = renderOrderCancellationOtpEmailHtml({
-    storeName,
-    customerName,
-    orderNumber,
-    otpCode,
-    expiresMinutes,
-  });
+  const template = await getActiveEmailTemplateFromDB("order_cancellation_otp");
+  let subject = `${otpCode} is your cancellation code for Order #${orderNumber} — ${storeName}`;
+  let bodyHtml = "";
+
+  if (template) {
+    const rendered = renderEmailTemplate(template.body_html, template.subject, {
+      store_name: storeName,
+      customer_name: customerName || "there",
+      order_number: orderNumber,
+      otp_code: otpCode,
+      expires_minutes: expiresMinutes,
+      year: new Date().getFullYear(),
+    });
+    subject = rendered.subject;
+    bodyHtml = rendered.bodyHtml;
+  } else {
+    bodyHtml = renderOrderCancellationOtpEmailHtml({
+      storeName,
+      customerName,
+      orderNumber,
+      otpCode,
+      expiresMinutes,
+    });
+  }
 
   return await sendEmailWithNodemailer({
     type: "order_cancellation_otp",
     toEmail,
     toName: customerName,
-    subject: `${otpCode} is your cancellation code for Order #${orderNumber} — ${storeName}`,
+    subject,
     bodyHtml,
     orderNumber,
   });
@@ -777,7 +908,23 @@ export async function sendOrderCancelledConfirmationEmail(options: {
   });
   const storeName = siteConfig?.name || "Our Store";
 
-  const bodyHtml = `
+  const orderDetailsUrl = `${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}`;
+  const template = await getActiveEmailTemplateFromDB("order_cancelled_confirmation");
+  let subject = `Order #${orderNumber} Has Been Cancelled — ${storeName}`;
+  let bodyHtml = "";
+
+  if (template) {
+    const rendered = renderEmailTemplate(template.body_html, template.subject, {
+      store_name: storeName,
+      customer_name: customerName || "there",
+      order_number: orderNumber,
+      order_details_url: orderDetailsUrl,
+      year: new Date().getFullYear(),
+    });
+    subject = rendered.subject;
+    bodyHtml = rendered.bodyHtml;
+  } else {
+    bodyHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -806,7 +953,7 @@ export async function sendOrderCancelledConfirmationEmail(options: {
         Hi ${customerName || "there"},<br/>
         Your order <strong>#${orderNumber}</strong> has been successfully cancelled. If any payment was collected, a refund process will be initiated shortly.
       </div>
-      <a href="${(process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")}/order/${orderNumber}" class="btn">View Order Details</a>
+      <a href="${orderDetailsUrl}" class="btn">View Order Details</a>
     </div>
     <div class="footer">
       &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
@@ -815,12 +962,13 @@ export async function sendOrderCancelledConfirmationEmail(options: {
 </body>
 </html>
   `;
+  }
 
   return await sendEmailWithNodemailer({
     type: "order_cancelled_confirmation",
     toEmail,
     toName: customerName,
-    subject: `Order #${orderNumber} Has Been Cancelled — ${storeName}`,
+    subject,
     bodyHtml,
     orderNumber,
   });
@@ -839,7 +987,21 @@ export async function sendNewsletterConfirmationEmail(options: {
 
   const storeName = siteConfig?.name || "Our Store";
 
-  const bodyHtml = `
+  const template = await getActiveEmailTemplateFromDB("newsletter_confirmation");
+  let subject = `Confirm your newsletter subscription — ${storeName}`;
+  let bodyHtml = "";
+
+  if (template) {
+    const rendered = renderEmailTemplate(template.body_html, template.subject, {
+      store_name: storeName,
+      to_email: toEmail,
+      confirmation_url: confirmationUrl,
+      year: new Date().getFullYear(),
+    });
+    subject = rendered.subject;
+    bodyHtml = rendered.bodyHtml;
+  } else {
+    bodyHtml = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -875,11 +1037,12 @@ export async function sendNewsletterConfirmationEmail(options: {
 </body>
 </html>
   `;
+  }
 
   return await sendEmailWithNodemailer({
     type: "newsletter_confirmation",
     toEmail,
-    subject: `Confirm your newsletter subscription — ${storeName}`,
+    subject,
     bodyHtml,
   });
 }
