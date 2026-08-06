@@ -826,3 +826,62 @@ export async function sendOrderCancelledConfirmationEmail(options: {
   });
 }
 
+export async function sendNewsletterConfirmationEmail(options: {
+  toEmail: string;
+  confirmationUrl: string;
+}) {
+  const { toEmail, confirmationUrl } = options;
+
+  const siteConfig = await prisma.site_config.findFirst({
+    where: { deleted_at: null },
+    select: { name: true },
+  });
+
+  const storeName = siteConfig?.name || "Our Store";
+
+  const bodyHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Confirm Your Subscription</title>
+  <style>
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #09090b; color: #f4f4f5; margin: 0; padding: 40px 20px; }
+    .container { max-width: 540px; margin: 0 auto; background-color: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 40px; text-align: center; }
+    .brand { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 24px; }
+    .icon-badge { display: inline-block; background-color: #27272a; width: 56px; height: 56px; line-height: 56px; border-radius: 50%; margin-bottom: 20px; font-size: 24px; }
+    .heading { font-size: 20px; font-weight: 700; color: #f4f4f5; margin-bottom: 12px; margin-top: 0; }
+    .text { font-size: 14px; color: #a1a1aa; line-height: 1.6; margin-bottom: 28px; }
+    .btn { display: inline-block; background-color: #f4f4f5; color: #09090b; font-weight: 700; font-size: 14px; text-decoration: none; padding: 14px 32px; border-radius: 9999px; transition: all 0.2s; }
+    .footer { margin-top: 36px; font-size: 12px; color: #71717a; border-top: 1px solid #27272a; padding-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand">${storeName}</div>
+    <div class="icon-badge">📬</div>
+    <h1 class="heading">Confirm Your Newsletter Subscription</h1>
+    <p class="text">
+      You're almost subscribed! Please click the button below to confirm your email address (<strong>${toEmail}</strong>) and activate your newsletter subscription.
+    </p>
+    <a href="${confirmationUrl}" class="btn" target="_blank">Confirm Subscription</a>
+    <p class="text" style="margin-top: 24px; font-size: 12px; color: #71717a;">
+      If you didn't request this email, you can safely ignore it.
+    </p>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  return await sendEmailWithNodemailer({
+    type: "newsletter_confirmation",
+    toEmail,
+    subject: `Confirm your newsletter subscription — ${storeName}`,
+    bodyHtml,
+  });
+}
+
+

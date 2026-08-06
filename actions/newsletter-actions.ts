@@ -14,6 +14,9 @@ import {
 } from "@/lib/filters/newsletter-filters";
 import { revalidatePath } from "next/cache";
 import { verifyCaptchaToken } from "@/lib/captcha";
+import { headers } from "next/headers";
+import { encryptNewsletterToken, decryptNewsletterToken } from "@/lib/newsletter-token";
+import { sendNewsletterConfirmationEmail } from "@/services/email-services";
 
 export async function subscribeNewsletter(
   data: EmailInput,
@@ -23,7 +26,7 @@ export async function subscribeNewsletter(
   if (!parsed.success) {
     return {
       success: false,
-      message: "Invalid email.",
+      message: "Invalid email address.",
     };
   }
 
@@ -36,29 +39,84 @@ export async function subscribeNewsletter(
   }
 
   try {
-    await subscribeNewsletterTransaction(parsed.data.email);
-    await logActivity({
-      action: "subscribe_newsletter",
-      entity_type: "newsletter",
-      user: { email: parsed.data.email },
-      status: "SUCCESS",
-      details: { email: parsed.data.email },
+    const token = encryptNewsletterToken(parsed.data.email);
+
+    const headerList = await headers();
+    const host = headerList.get("host") || "localhost:3000";
+    const protocol = headerList.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+      ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+      : `${protocol}://${host}`;
+
+    const confirmationUrl = `${baseUrl}/newsletter/confirm?token=${encodeURIComponent(token)}`;
+
+    const emailResult = await sendNewsletterConfirmationEmail({
+      toEmail: parsed.data.email,
+      confirmationUrl,
     });
-    return { success: true, message: "You're subscribed! Thank you." };
+
+    if (!emailResult.success) {
+      return {
+        success: false,
+        message: emailResult.error || "Failed to send confirmation email. Please try again later.",
+      };
+    }
+
+    return {
+      success: true,
+      message: "A confirmation link has been sent to your email. Please check your inbox!",
+    };
   } catch (error) {
-    await logActivity({
-      action: "subscribe_newsletter",
-      entity_type: "newsletter",
-      user: { email: parsed.data.email },
-      status: "FAILED",
-      details: { email: parsed.data.email, error: String(error) },
-    });
+    console.error("Error dispatching newsletter confirmation:", error);
     return {
       success: false,
       message: "Something went wrong. Please try again.",
     };
   }
 }
+
+export async function confirmNewsletterSubscription(
+  token: string,
+): Promise<{ success: boolean; message: string; email?: string }> {
+  const result = decryptNewsletterToken(token);
+
+  if (!result.success) {
+    return {
+      success: false,
+      message: result.error,
+    };
+  }
+
+  try {
+    await subscribeNewsletterTransaction(result.email);
+    await logActivity({
+      action: "subscribe_newsletter",
+      entity_type: "newsletter",
+      user: { email: result.email },
+      status: "SUCCESS",
+      details: { email: result.email },
+    });
+    return {
+      success: true,
+      email: result.email,
+      message: "Your subscription has been confirmed! Thank you.",
+    };
+  } catch (error) {
+    console.error("Error confirming newsletter subscription:", error);
+    await logActivity({
+      action: "subscribe_newsletter",
+      entity_type: "newsletter",
+      user: { email: result.email },
+      status: "FAILED",
+      details: { email: result.email, error: String(error) },
+    });
+    return {
+      success: false,
+      message: "Failed to confirm subscription. Please try again.",
+    };
+  }
+}
+
 
 export async function deleteNewsletterSubscriber(
   id: number,
