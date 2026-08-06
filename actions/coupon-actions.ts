@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   CouponCreateInput,
@@ -72,9 +72,25 @@ export async function createCoupon(
     revalidateTag("coupons", "max");
     revalidatePath("/dashboard/coupons");
 
+    await logActivity({
+      action: "create_coupon",
+      entity_type: "coupon",
+      entity_id: code,
+      user,
+      status: "SUCCESS",
+      details: { code, discount_type, discount_value },
+    });
+
     return { success: true, message: "Coupon created successfully." };
   } catch (error: any) {
     console.error("Error creating coupon:", error);
+    await logActivity({
+      action: "create_coupon",
+      entity_type: "coupon",
+      user,
+      status: "FAILED",
+      details: { code: validatedFields.data.code, error: String(error) },
+    });
     if (error?.code === "P2002") {
       return {
         success: false,
@@ -144,9 +160,26 @@ export async function updateCoupon(
     revalidateTag(`coupon-${updated.code}`, "max");
     revalidatePath("/dashboard/coupons");
 
+    await logActivity({
+      action: "update_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, code: updated.code },
+    });
+
     return { success: true, message: "Coupon updated successfully." };
   } catch (error: any) {
     console.error("Error updating coupon:", error);
+    await logActivity({
+      action: "update_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error?.code === "P2002") {
       return {
         success: false,
@@ -171,9 +204,26 @@ export async function deleteCoupon(id: number): Promise<ActionResponse> {
     revalidatePath("/dashboard/coupons");
     revalidatePath("/dashboard/coupons/trash");
 
+    await logActivity({
+      action: "delete_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, code: existing.code },
+    });
+
     return { success: true, message: "Coupon moved to trash." };
   } catch (error) {
     console.error("Error deleting coupon:", error);
+    await logActivity({
+      action: "delete_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete coupon." };
   }
 }
@@ -191,9 +241,26 @@ export async function restoreCoupon(id: number): Promise<ActionResponse> {
     revalidatePath("/dashboard/coupons/trash");
     revalidatePath("/dashboard/coupons");
 
+    await logActivity({
+      action: "restore_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, code: existing.code },
+    });
+
     return { success: true, message: "Coupon restored successfully." };
   } catch (error) {
     console.error("Error restoring coupon:", error);
+    await logActivity({
+      action: "restore_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore coupon." };
   }
 }
@@ -212,9 +279,24 @@ export async function permanentlyDeleteCoupon(
     revalidateTag(`coupon-${existing.code}`, "max");
     revalidatePath("/dashboard/coupons/trash");
 
+    await logActivity({
+      action: "permanently_delete_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      status: "SUCCESS",
+      details: { id, code: existing.code },
+    });
+
     return { success: true, message: "Coupon permanently deleted." };
   } catch (error) {
     console.error("Error permanently deleting coupon:", error);
+    await logActivity({
+      action: "permanently_delete_coupon",
+      entity_type: "coupon",
+      entity_id: id,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete coupon." };
   }
 }
@@ -242,9 +324,24 @@ export async function bulkDeleteCoupons(
     revalidatePath("/dashboard/coupons");
     revalidatePath("/dashboard/coupons/trash");
 
+    await logActivity({
+      action: "bulk_delete_coupons",
+      entity_type: "coupon",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected coupons moved to trash." };
   } catch (error) {
     console.error("Error bulk deleting coupons:", error);
+    await logActivity({
+      action: "bulk_delete_coupons",
+      entity_type: "coupon",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to delete selected coupons." };
   }
 }
@@ -272,9 +369,24 @@ export async function bulkRestoreCoupons(
     revalidatePath("/dashboard/coupons/trash");
     revalidatePath("/dashboard/coupons");
 
+    await logActivity({
+      action: "bulk_restore_coupons",
+      entity_type: "coupon",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected coupons restored." };
   } catch (error) {
     console.error("Error bulk restoring coupons:", error);
+    await logActivity({
+      action: "bulk_restore_coupons",
+      entity_type: "coupon",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to restore selected coupons." };
   }
 }
@@ -296,9 +408,22 @@ export async function bulkPermanentlyDeleteCoupons(
     revalidateTag("coupons", "max");
     revalidatePath("/dashboard/coupons/trash");
 
+    await logActivity({
+      action: "bulk_permanently_delete_coupons",
+      entity_type: "coupon",
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected coupons permanently deleted." };
   } catch (error) {
     console.error("Error bulk permanently deleting coupons:", error);
+    await logActivity({
+      action: "bulk_permanently_delete_coupons",
+      entity_type: "coupon",
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected coupons.",

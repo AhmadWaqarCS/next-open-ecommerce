@@ -1,6 +1,8 @@
 import { ZodError } from "zod";
 import prisma from "@/lib/prisma";
 import { cacheLife, cacheTag } from "next/cache";
+import { headers } from "next/headers";
+import { createActivityLogInDB } from "@/services/activity-log-services";
 
 export type ActionResponse<T = any> = {
   success: boolean;
@@ -14,6 +16,55 @@ export function formatZodErrors(errors: ZodError<any>): Record<string, string> {
     errors.issues.map((issue) => [issue.path.join("."), issue.message]),
   );
 }
+
+export interface LogActivityOptions {
+  action: string;
+  entity_type: string;
+  entity_id?: string | number | null;
+  user?: {
+    id?: string | number | null;
+    email?: string | null;
+    role?: string | null;
+  } | null;
+  status?: "SUCCESS" | "FAILED";
+  details?: Record<string, any>;
+}
+
+export async function logActivity(options: LogActivityOptions): Promise<void> {
+  try {
+    let ip_address: string | null = null;
+    try {
+      const reqHeaders = await headers();
+      ip_address =
+        reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        reqHeaders.get("x-real-ip") ||
+        null;
+    } catch {
+      // In case headers() is called outside request context
+    }
+
+    let userId: number | null = null;
+    if (options.user?.id != null) {
+      const parsedId = Number(options.user.id);
+      if (!isNaN(parsedId)) userId = parsedId;
+    }
+
+    await createActivityLogInDB({
+      action: options.action,
+      entity_type: options.entity_type,
+      entity_id: options.entity_id,
+      user_id: userId,
+      user_email: options.user?.email ?? null,
+      user_role: options.user?.role ?? null,
+      status: options.status ?? "SUCCESS",
+      details: options.details,
+      ip_address,
+    });
+  } catch (err) {
+    console.error("Failed to execute logActivity:", err);
+  }
+}
+
 
 export async function getUserNameById(id: number): Promise<string> {
   "use cache";

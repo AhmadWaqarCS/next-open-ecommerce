@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   SiteComponentCreateInput,
@@ -65,9 +65,25 @@ export async function createSiteComponent(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "create_site_component",
+      entity_type: "site_component",
+      entity_id: component_key,
+      user,
+      status: "SUCCESS",
+      details: { name, component_key },
+    });
+
     return { success: true, message: "Site component created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_site_component",
+      entity_type: "site_component",
+      user,
+      status: "FAILED",
+      details: { name, component_key, error: String(error) },
+    });
     return { success: false, message: "Failed to create site component." };
   }
 }
@@ -125,9 +141,26 @@ export async function updateSiteComponent(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "update_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name },
+    });
+
     return { success: true, message: "Site component updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update site component." };
   }
 }
@@ -146,9 +179,26 @@ export async function deleteSiteComponent(id: number): Promise<ActionResponse> {
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "delete_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Site component soft-deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete site component." };
   }
 }
@@ -167,9 +217,26 @@ export async function restoreSiteComponent(id: number): Promise<ActionResponse> 
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "restore_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Site component restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore site component." };
   }
 }
@@ -192,9 +259,24 @@ export async function permanentlyDeleteSiteComponent(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "permanently_delete_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Site component permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_site_component",
+      entity_type: "site_component",
+      entity_id: id,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete component." };
   }
 }
@@ -220,9 +302,24 @@ export async function bulkSoftDeleteSiteComponents(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "bulk_delete_site_components",
+      entity_type: "site_component",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected components moved to trash." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_site_components",
+      entity_type: "site_component",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to bulk delete components." };
   }
 }
@@ -248,9 +345,24 @@ export async function bulkRestoreSiteComponents(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "bulk_restore_site_components",
+      entity_type: "site_component",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected components restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_site_components",
+      entity_type: "site_component",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to bulk restore components." };
   }
 }
@@ -272,9 +384,22 @@ export async function bulkPermanentlyDeleteSiteComponents(
     revalidateTag("site-components", "max");
     revalidatePath("/dashboard/site-components");
 
+    await logActivity({
+      action: "bulk_permanently_delete_site_components",
+      entity_type: "site_component",
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected components permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_site_components",
+      entity_type: "site_component",
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete components." };
   }
 }

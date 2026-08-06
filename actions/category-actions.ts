@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   CategoryCreateInput,
@@ -72,6 +72,12 @@ export async function uploadCategoryImage(
 
     const uploadResult = await saveFileToUploads(buffer, fileName, destination);
 
+    await logActivity({
+      action: "upload_category_image",
+      entity_type: "category",
+      details: { fileName: file.name, relativePath: uploadResult.relativePath },
+    });
+
     return {
       success: true,
       message: "Image uploaded successfully.",
@@ -79,6 +85,12 @@ export async function uploadCategoryImage(
     };
   } catch (error) {
     console.error("Error uploading category image:", error);
+    await logActivity({
+      action: "upload_category_image",
+      entity_type: "category",
+      status: "FAILED",
+      details: { fileName: file.name, error: String(error) },
+    });
     return { success: false, message: "Failed to save uploaded image." };
   }
 }
@@ -141,9 +153,25 @@ export async function createCategory(
 
     revalidatePath("/dashboard/categories");
 
+    await logActivity({
+      action: "create_category",
+      entity_type: "category",
+      entity_id: slug,
+      user,
+      status: "SUCCESS",
+      details: { name, slug },
+    });
+
     return { success: true, message: "Category created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_category",
+      entity_type: "category",
+      user,
+      status: "FAILED",
+      details: { name: validatedFields.data.name, error: String(error) },
+    });
     return { success: false, message: "Failed to create category." };
   }
 }
@@ -277,9 +305,26 @@ export async function updateCategory(
 
     revalidatePath("/dashboard/categories");
 
+    await logActivity({
+      action: "update_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name: validatedFields.data.name, slug: validatedFields.data.slug },
+    });
+
     return { success: true, message: "Category updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update category." };
   }
 }
@@ -302,9 +347,26 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
 
+    await logActivity({
+      action: "delete_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing.slug },
+    });
+
     return { success: true, message: "Category deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete category." };
   }
 }
@@ -327,9 +389,26 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
 
+    await logActivity({
+      action: "restore_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing.slug },
+    });
+
     return { success: true, message: "Category restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore category." };
   }
 }
@@ -337,7 +416,7 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
 export async function permanentlyDeleteCategory(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/categories");
+  const { user } = await assertPermission("delete", "/dashboard/categories");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -358,9 +437,26 @@ export async function permanentlyDeleteCategory(
 
     revalidatePath("/dashboard/categories/trash");
 
+    await logActivity({
+      action: "permanently_delete_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing.slug },
+    });
+
     return { success: true, message: "Category permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_category",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete category." };
   }
 }
@@ -396,9 +492,24 @@ export async function bulkDeleteCategories(
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
 
+    await logActivity({
+      action: "bulk_delete_categories",
+      entity_type: "category",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected categories moved to trash." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_categories",
+      entity_type: "category",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to delete selected categories." };
   }
 }
@@ -434,9 +545,24 @@ export async function bulkRestoreCategories(
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
 
+    await logActivity({
+      action: "bulk_restore_categories",
+      entity_type: "category",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected categories restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_categories",
+      entity_type: "category",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to restore selected categories." };
   }
 }
@@ -446,7 +572,7 @@ export async function bulkPermanentlyDeleteCategories(
   selectAllScope: boolean = false,
   filterParams?: CategoryFilterParams,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/categories");
+  const { user } = await assertPermission("delete", "/dashboard/categories");
   const filterWhere =
     selectAllScope && filterParams
       ? await getCategoryFilterWhere(filterParams, true)
@@ -475,9 +601,24 @@ export async function bulkPermanentlyDeleteCategories(
 
     revalidatePath("/dashboard/categories/trash");
 
+    await logActivity({
+      action: "bulk_permanently_delete_categories",
+      entity_type: "category",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected categories permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_categories",
+      entity_type: "category",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected categories.",

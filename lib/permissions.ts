@@ -20,11 +20,12 @@ const ALL_STANDARD_FEATURES = [
   { path: "/dashboard/orders", name: "Orders" },
   { path: "/dashboard/newsletter", name: "Newsletter" },
   { path: "/dashboard/sent-emails", name: "Sent Emails" },
+  { path: "/dashboard/activity-logs", name: "Activity Logs" },
 ];
 
 export async function getRolePermissions(role: string) {
   "use cache";
-  cacheTag(`admin-permissions-${role}`, "admin-permissions");
+  cacheTag(`admin-permissions-${role}`);
   cacheLife("max");
   try {
     if (role === "superadmin") {

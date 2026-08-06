@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse } from "@/lib/action-utils";
+import { ActionResponse, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import { sendEmailWithNodemailer, getSentEmailByIdFromDB } from "@/services/email-services";
 import { revalidatePath } from "next/cache";
@@ -31,6 +31,15 @@ export async function resendEmailAction(sentEmailId: number): Promise<ActionResp
     revalidatePath("/dashboard/sent-emails");
     revalidatePath(`/dashboard/sent-emails/${sentEmailId}`);
 
+    await logActivity({
+      action: "resend_email",
+      entity_type: "sent_email",
+      entity_id: sentEmailId,
+      user,
+      status: result.success ? "SUCCESS" : "FAILED",
+      details: { sentEmailId, recipient: existingLog.recipient_email },
+    });
+
     if (result.success) {
       return { success: true, message: "Email resent successfully." };
     } else {
@@ -41,6 +50,14 @@ export async function resendEmailAction(sentEmailId: number): Promise<ActionResp
     }
   } catch (error: any) {
     console.error("[resendEmailAction] Error:", error);
+    await logActivity({
+      action: "resend_email",
+      entity_type: "sent_email",
+      entity_id: sentEmailId,
+      user,
+      status: "FAILED",
+      details: { sentEmailId, error: String(error) },
+    });
     return {
       success: false,
       message: error?.message || "Failed to resend email.",

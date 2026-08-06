@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { checkoutFormSchema, CheckoutFormInput } from "@/lib/validations";
 import {
   sendInvoiceAndOrderEmailsForOrder,
@@ -294,12 +294,28 @@ export async function placeOrder(
       console.error("[placeOrder] Non-fatal email/invoice generation error:", emailErr);
     });
 
+    await logActivity({
+      action: "place_order",
+      entity_type: "order",
+      entity_id: order.order_number,
+      user: { email: customer_email },
+      status: "SUCCESS",
+      details: { order_number: order.order_number, total: String(order.total) },
+    });
+
     return {
       success: true,
       message: "Order placed successfully.",
       orderNumber: order.order_number,
     };
   } catch (error: any) {
+    await logActivity({
+      action: "place_order",
+      entity_type: "order",
+      user: { email: customer_email },
+      status: "FAILED",
+      details: { customer_email, error: String(error) },
+    });
     return handleCheckoutError(error);
   }
 }
@@ -377,12 +393,28 @@ export async function verifyCodOtpAndPlaceOrder(params: {
       await deleteCodOtpTransaction(verificationId);
     } catch {}
 
+    await logActivity({
+      action: "verify_cod_otp",
+      entity_type: "order",
+      entity_id: order.order_number,
+      user: { email: otpRecord.email },
+      status: "SUCCESS",
+      details: { verificationId, order_number: order.order_number },
+    });
+
     return {
       success: true,
       message: "Order verified and placed successfully!",
       orderNumber: order.order_number,
     };
   } catch (error: any) {
+    await logActivity({
+      action: "verify_cod_otp",
+      entity_type: "order",
+      user: { email: otpRecord.email },
+      status: "FAILED",
+      details: { verificationId, error: String(error) },
+    });
     return handleCheckoutError(error);
   }
 }
@@ -445,6 +477,14 @@ export async function resendCodOtp(params: {
       };
     }
 
+    await logActivity({
+      action: "resend_cod_otp",
+      entity_type: "order",
+      user: { email: otpRecord.email },
+      status: "SUCCESS",
+      details: { verificationId, newVerificationId: freshRecord.id },
+    });
+
     return {
       success: true,
       message: "A fresh verification code has been sent to your email.",
@@ -452,6 +492,13 @@ export async function resendCodOtp(params: {
     };
   } catch (error: any) {
     console.error("[resendCodOtp] Error:", error);
+    await logActivity({
+      action: "resend_cod_otp",
+      entity_type: "order",
+      user: { email: otpRecord.email },
+      status: "FAILED",
+      details: { verificationId, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to resend verification code. Please try again.",

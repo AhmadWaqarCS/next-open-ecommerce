@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   EmailConfigCreateInput,
@@ -61,9 +61,25 @@ export async function createEmailConfig(
     );
 
     revalidatePath("/dashboard/email-config");
+
+    await logActivity({
+      action: "create_email_config",
+      entity_type: "email_config",
+      user,
+      status: "SUCCESS",
+      details: { provider, from_email },
+    });
+
     return { success: true, message: "Email config created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_email_config",
+      entity_type: "email_config",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return { success: false, message: "Failed to create email config." };
   }
 }
@@ -121,9 +137,27 @@ export async function updateEmailConfig(
     );
 
     revalidatePath("/dashboard/email-config");
+
+    await logActivity({
+      action: "update_email_config",
+      entity_type: "email_config",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, provider, from_email },
+    });
+
     return { success: true, message: "Email config updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_email_config",
+      entity_type: "email_config",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update email config." };
   }
 }
@@ -131,18 +165,33 @@ export async function updateEmailConfig(
 // ─── VERIFY EMAIL CONFIG ACTION ────────────────────────────────────────────────
 
 export async function verifyEmailConfigAction(): Promise<ActionResponse> {
-  await assertPermission("update", "/dashboard/email-config");
+  const { user } = await assertPermission("update", "/dashboard/email-config");
 
   try {
     const { verifySmtpConnectionService } =
       await import("@/services/email-services");
     const result = await verifySmtpConnectionService();
+    await logActivity({
+      action: "verify_email_config",
+      entity_type: "email_config",
+      user,
+      status: result.success ? "SUCCESS" : "FAILED",
+      details: { message: result.message },
+    });
+
     return {
       success: result.success,
       message: result.message,
     };
   } catch (error: any) {
     console.error("[verifyEmailConfigAction] Error:", error);
+    await logActivity({
+      action: "verify_email_config",
+      entity_type: "email_config",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return {
       success: false,
       message: error?.message || "Failed to verify SMTP server configuration.",

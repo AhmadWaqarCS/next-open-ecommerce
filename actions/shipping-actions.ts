@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   ShippingMethodCreateInput,
@@ -67,9 +67,25 @@ export async function createShippingMethod(
     revalidateTag("site-footer", "max");
     revalidatePath("/dashboard/shipping");
 
+    await logActivity({
+      action: "create_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: name,
+      user,
+      status: "SUCCESS",
+      details: { name, price },
+    });
+
     return { success: true, message: "Shipping method created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_shipping_method",
+      entity_type: "shipping_method",
+      user,
+      status: "FAILED",
+      details: { name, error: String(error) },
+    });
     return { success: false, message: "Failed to create shipping method." };
   }
 }
@@ -123,9 +139,26 @@ export async function updateShippingMethod(
     revalidateTag("site-footer", "max");
     revalidatePath("/dashboard/shipping");
 
+    await logActivity({
+      action: "update_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name },
+    });
+
     return { success: true, message: "Shipping method updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update shipping method." };
   }
 }
@@ -142,9 +175,26 @@ export async function deleteShippingMethod(id: number): Promise<ActionResponse> 
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
+    await logActivity({
+      action: "delete_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Shipping method deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete shipping method." };
   }
 }
@@ -163,9 +213,26 @@ export async function restoreShippingMethod(
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
+    await logActivity({
+      action: "restore_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Shipping method restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore shipping method." };
   }
 }
@@ -173,7 +240,7 @@ export async function restoreShippingMethod(
 export async function permanentlyDeleteShippingMethod(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/shipping");
+  const { user } = await assertPermission("delete", "/dashboard/shipping");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -183,9 +250,26 @@ export async function permanentlyDeleteShippingMethod(
     revalidateTag("site-footer", "max");
     revalidatePath("/dashboard/shipping/trash");
 
+    await logActivity({
+      action: "permanently_delete_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Shipping method permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_shipping_method",
+      entity_type: "shipping_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete shipping method.",
@@ -216,9 +300,24 @@ export async function bulkDeleteShippingMethods(
     revalidatePath("/dashboard/shipping");
     revalidatePath("/dashboard/shipping/trash");
 
+    await logActivity({
+      action: "bulk_delete_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected shipping methods moved to trash." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to delete selected shipping methods.",
@@ -249,9 +348,24 @@ export async function bulkRestoreShippingMethods(
     revalidatePath("/dashboard/shipping/trash");
     revalidatePath("/dashboard/shipping");
 
+    await logActivity({
+      action: "bulk_restore_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected shipping methods restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to restore selected shipping methods.",
@@ -264,7 +378,7 @@ export async function bulkPermanentlyDeleteShippingMethods(
   selectAllScope: boolean = false,
   filterParams?: ShippingFilterParams,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/shipping");
+  const { user } = await assertPermission("delete", "/dashboard/shipping");
   const filterWhere =
     selectAllScope && filterParams
       ? await getShippingFilterWhere(filterParams, true)
@@ -280,12 +394,27 @@ export async function bulkPermanentlyDeleteShippingMethods(
     revalidateTag("site-footer", "max");
     revalidatePath("/dashboard/shipping/trash");
 
+    await logActivity({
+      action: "bulk_permanently_delete_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return {
       success: true,
       message: "Selected shipping methods permanently deleted.",
     };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_shipping_methods",
+      entity_type: "shipping_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected shipping methods.",

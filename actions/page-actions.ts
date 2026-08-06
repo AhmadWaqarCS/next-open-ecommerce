@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   SitePageCreateInput,
@@ -81,9 +81,25 @@ export async function createSitePage(
 
     revalidatePath("/dashboard/pages");
 
+    await logActivity({
+      action: "create_site_page",
+      entity_type: "site_page",
+      entity_id: slug,
+      user,
+      status: "SUCCESS",
+      details: { title, slug },
+    });
+
     return { success: true, message: "Page created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_site_page",
+      entity_type: "site_page",
+      user,
+      status: "FAILED",
+      details: { title, slug, error: String(error) },
+    });
     return { success: false, message: "Failed to create page." };
   }
 }
@@ -170,9 +186,26 @@ export async function updateSitePage(
     revalidatePath("/dashboard/pages");
     revalidatePath(`/${updated.slug}`);
 
+    await logActivity({
+      action: "update_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, title: updated.title, slug: updated.slug },
+    });
+
     return { success: true, message: "Page updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update page." };
   }
 }
@@ -192,9 +225,26 @@ export async function deleteSitePage(id: number): Promise<ActionResponse> {
 
     revalidatePath("/dashboard/pages");
 
+    await logActivity({
+      action: "delete_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Page deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete page." };
   }
 }
@@ -214,9 +264,26 @@ export async function restoreSitePage(id: number): Promise<ActionResponse> {
 
     revalidatePath("/dashboard/pages");
 
+    await logActivity({
+      action: "restore_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Page restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore page." };
   }
 }
@@ -224,7 +291,7 @@ export async function restoreSitePage(id: number): Promise<ActionResponse> {
 export async function permanentlyDeleteSitePage(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/pages");
+  const { user } = await assertPermission("delete", "/dashboard/pages");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -238,9 +305,26 @@ export async function permanentlyDeleteSitePage(
 
     revalidatePath("/dashboard/pages");
 
+    await logActivity({
+      action: "permanently_delete_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Page permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_site_page",
+      entity_type: "site_page",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete page." };
   }
 }

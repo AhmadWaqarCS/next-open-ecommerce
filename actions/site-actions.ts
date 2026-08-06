@@ -2,7 +2,7 @@
 
 import fs from "fs/promises";
 import path from "path";
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   SiteConfigCreateInput,
@@ -96,9 +96,25 @@ export async function createSiteConfig(
     revalidateTag("site-config", "max");
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/settings");
+
+    await logActivity({
+      action: "create_site_config",
+      entity_type: "site_config",
+      user,
+      status: "SUCCESS",
+      details: { name },
+    });
+
     return { success: true, message: "Site config created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_site_config",
+      entity_type: "site_config",
+      user,
+      status: "FAILED",
+      details: { name, error: String(error) },
+    });
     return { success: false, message: "Failed to create site config." };
   }
 }
@@ -230,9 +246,27 @@ export async function updateSiteConfig(
     if (layoutChanged) revalidateTag("layout", "max");
 
     revalidatePath("/dashboard/settings");
+
+    await logActivity({
+      action: "update_site_config",
+      entity_type: "site_config",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name },
+    });
+
     return { success: true, message: "Site config updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_site_config",
+      entity_type: "site_config",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update site config." };
   }
 }
@@ -356,12 +390,27 @@ export async function generateSitemapAction(): Promise<ActionResponse> {
     revalidatePath("/sitemap.xml");
     revalidatePath("/dashboard/settings");
 
+    await logActivity({
+      action: "generate_sitemap",
+      entity_type: "sitemap",
+      user,
+      status: "SUCCESS",
+      details: { urlCount: urls.length },
+    });
+
     return {
       success: true,
       message: `Sitemap successfully generated and saved with ${urls.length} URLs.`,
     };
   } catch (error) {
     console.error("Failed to generate sitemap:", error);
+    await logActivity({
+      action: "generate_sitemap",
+      entity_type: "sitemap",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to generate sitemap XML file.",

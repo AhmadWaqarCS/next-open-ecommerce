@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { signIn } from "@/lib/auth";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -47,8 +47,22 @@ export async function dashboardLogin(
       password: password,
       redirect: false,
     });
+    await logActivity({
+      action: "dashboard_login",
+      entity_type: "user",
+      user: { email },
+      status: "SUCCESS",
+      details: { email },
+    });
   } catch (error) {
     console.log(error);
+    await logActivity({
+      action: "dashboard_login",
+      entity_type: "user",
+      user: { email },
+      status: "FAILED",
+      details: { email, error: String(error) },
+    });
     return {
       success: false,
       message: "Invalid email or password.",
@@ -95,9 +109,27 @@ export async function updateUser(
 
     revalidateTag(`user-name-${id}`, "max");
     revalidatePath("/dashboard/users");
+
+    await logActivity({
+      action: "update_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, email, role_name },
+    });
+
     return { success: true, message: "User updated successfully." };
   } catch (error: any) {
     console.error("Error updating user:", error);
+    await logActivity({
+      action: "update_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error.message === "ONLY_SUPERADMIN_CAN_MODIFY") {
       return {
         success: false,
@@ -158,12 +190,29 @@ export async function createUser(
     );
 
     revalidatePath("/dashboard/users");
+
+    await logActivity({
+      action: "create_user",
+      entity_type: "user",
+      entity_id: email,
+      user,
+      status: "SUCCESS",
+      details: { email, role_name },
+    });
+
     return {
       success: true,
       message: "User created successfully.",
     };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_user",
+      entity_type: "user",
+      user,
+      status: "FAILED",
+      details: { email, role_name, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to create user.",
@@ -184,12 +233,30 @@ export async function deleteUser(id: number): Promise<ActionResponse> {
     await deleteUserTransaction(id, Number(user.id));
     revalidatePath("/dashboard/users");
     revalidatePath("/dashboard/users/trash");
+
+    await logActivity({
+      action: "delete_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return {
       success: true,
       message: "User deleted successfully.",
     };
   } catch (error: any) {
     console.error(error);
+    await logActivity({
+      action: "delete_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error.message === "CANNOT_DELETE_SUPERADMIN") {
       return { success: false, message: "Superadmin cannot be deleted." };
     }
@@ -216,12 +283,30 @@ export async function restoreUser(id: number): Promise<ActionResponse> {
     await restoreUserTransaction(id, Number(user.id));
     revalidatePath("/dashboard/users/trash");
     revalidatePath("/dashboard/users");
+
+    await logActivity({
+      action: "restore_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return {
       success: true,
       message: "User restored successfully.",
     };
   } catch (error: any) {
     console.error(error);
+    await logActivity({
+      action: "restore_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error.message === "CANNOT_RESTORE_SUPERADMIN") {
       return { success: false, message: "Superadmin cannot be restored." };
     }
@@ -249,12 +334,30 @@ export async function permanentlyDeleteUser(
   try {
     await permanentlyDeleteUserTransaction(id);
     revalidatePath("/dashboard/users/trash");
+
+    await logActivity({
+      action: "permanently_delete_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return {
       success: true,
       message: "User permanently deleted.",
     };
   } catch (error: any) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_user",
+      entity_type: "user",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error.message === "CANNOT_DELETE_SUPERADMIN") {
       return {
         success: false,
@@ -291,9 +394,25 @@ export async function bulkDeleteUsers(
     );
     revalidatePath("/dashboard/users");
     revalidatePath("/dashboard/users/trash");
+
+    await logActivity({
+      action: "bulk_delete_users",
+      entity_type: "user",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected users moved to trash." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_users",
+      entity_type: "user",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to delete selected users." };
   }
 }
@@ -318,9 +437,25 @@ export async function bulkRestoreUsers(
     );
     revalidatePath("/dashboard/users/trash");
     revalidatePath("/dashboard/users");
+
+    await logActivity({
+      action: "bulk_restore_users",
+      entity_type: "user",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected users restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_users",
+      entity_type: "user",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to restore selected users." };
   }
 }
@@ -330,7 +465,7 @@ export async function bulkPermanentlyDeleteUsers(
   selectAllScope: boolean = false,
   filterParams?: UserFilterParams,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/users");
+  const { user } = await assertPermission("delete", "/dashboard/users");
   const filterWhere =
     selectAllScope && filterParams
       ? getUserFilterWhere(filterParams, true)
@@ -339,9 +474,25 @@ export async function bulkPermanentlyDeleteUsers(
   try {
     await bulkPermanentlyDeleteUsersTransaction(ids, selectAllScope, filterWhere);
     revalidatePath("/dashboard/users/trash");
+
+    await logActivity({
+      action: "bulk_permanently_delete_users",
+      entity_type: "user",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected users permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_users",
+      entity_type: "user",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected users.",

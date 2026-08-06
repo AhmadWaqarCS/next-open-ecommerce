@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   ProductCreateInput,
@@ -50,7 +50,7 @@ export interface ProductVariantInput {
 export async function uploadProductImage(
   formData: FormData,
 ): Promise<ActionResponse<{ relativePath: string }>> {
-  await assertPermission("create", "/dashboard/products");
+  const { user } = await assertPermission("create", "/dashboard/products");
 
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {
@@ -89,6 +89,12 @@ export async function uploadProductImage(
     const destination = `products/${year}/${month}`;
 
     const uploadResult = await saveFileToUploads(buffer, fileName, destination);
+    await logActivity({
+      action: "upload_product_image",
+      entity_type: "product",
+      status: "SUCCESS",
+      details: { fileName: file.name, relativePath: uploadResult.relativePath },
+    });
     return {
       success: true,
       message: "Image uploaded successfully.",
@@ -96,6 +102,12 @@ export async function uploadProductImage(
     };
   } catch (error) {
     console.error("Failed to upload image file:", error);
+    await logActivity({
+      action: "upload_product_image",
+      entity_type: "product",
+      status: "FAILED",
+      details: { fileName: file.name, error: String(error) },
+    });
     return { success: false, message: "Failed to upload image file." };
   }
 }
@@ -184,9 +196,25 @@ export async function createProduct(
 
     revalidatePath("/dashboard/products");
 
+    await logActivity({
+      action: "create_product",
+      entity_type: "product",
+      entity_id: slug,
+      user,
+      status: "SUCCESS",
+      details: { name, slug, price },
+    });
+
     return { success: true, message: "Product created successfully." };
   } catch (error) {
     console.error("Error creating product:", error);
+    await logActivity({
+      action: "create_product",
+      entity_type: "product",
+      user,
+      status: "FAILED",
+      details: { name, slug, error: String(error) },
+    });
     return { success: false, message: "Failed to create product." };
   }
 }
@@ -307,9 +335,26 @@ export async function updateProduct(
 
     revalidatePath("/dashboard/products");
 
+    await logActivity({
+      action: "update_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name: updatedProduct.name, slug: updatedProduct.slug },
+    });
+
     return { success: true, message: "Product updated successfully." };
   } catch (error) {
     console.error("Error updating product:", error);
+    await logActivity({
+      action: "update_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update product." };
   }
 }
@@ -330,9 +375,27 @@ export async function deleteProduct(id: number): Promise<ActionResponse> {
 
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
+
+    await logActivity({
+      action: "delete_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing?.slug },
+    });
+
     return { success: true, message: "Product deleted successfully." };
   } catch (error) {
     console.error("Error deleting product:", error);
+    await logActivity({
+      action: "delete_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete product." };
   }
 }
@@ -353,9 +416,27 @@ export async function restoreProduct(id: number): Promise<ActionResponse> {
 
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
+
+    await logActivity({
+      action: "restore_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing?.slug },
+    });
+
     return { success: true, message: "Product restored successfully." };
   } catch (error) {
     console.error("Error restoring product:", error);
+    await logActivity({
+      action: "restore_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore product." };
   }
 }
@@ -363,7 +444,7 @@ export async function restoreProduct(id: number): Promise<ActionResponse> {
 export async function permanentlyDeleteProduct(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/products");
+  const { user } = await assertPermission("delete", "/dashboard/products");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -382,9 +463,27 @@ export async function permanentlyDeleteProduct(
       revalidateTag(`category-${existing.category.slug}`, "max");
 
     revalidatePath("/dashboard/products/trash");
+
+    await logActivity({
+      action: "permanently_delete_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing?.slug },
+    });
+
     return { success: true, message: "Product permanently deleted." };
   } catch (error) {
     console.error("Error permanently deleting product:", error);
+    await logActivity({
+      action: "permanently_delete_product",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete product." };
   }
 }
@@ -420,9 +519,24 @@ export async function bulkDeleteProducts(
     revalidatePath("/dashboard/products");
     revalidatePath("/dashboard/products/trash");
 
+    await logActivity({
+      action: "bulk_delete_products",
+      entity_type: "product",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected products moved to trash." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_products",
+      entity_type: "product",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to delete selected products." };
   }
 }
@@ -458,9 +572,24 @@ export async function bulkRestoreProducts(
     revalidatePath("/dashboard/products/trash");
     revalidatePath("/dashboard/products");
 
+    await logActivity({
+      action: "bulk_restore_products",
+      entity_type: "product",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected products restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_products",
+      entity_type: "product",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to restore selected products." };
   }
 }
@@ -470,7 +599,7 @@ export async function bulkPermanentlyDeleteProducts(
   selectAllScope: boolean = false,
   filterParams?: ProductFilterParams,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/products");
+  const { user } = await assertPermission("delete", "/dashboard/products");
   const filterWhere =
     selectAllScope && filterParams
       ? getProductFilterWhere(filterParams, true)
@@ -499,9 +628,24 @@ export async function bulkPermanentlyDeleteProducts(
 
     revalidatePath("/dashboard/products/trash");
 
+    await logActivity({
+      action: "bulk_permanently_delete_products",
+      entity_type: "product",
+      user,
+      status: "SUCCESS",
+      details: { ids, count: affected.length },
+    });
+
     return { success: true, message: "Selected products permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_products",
+      entity_type: "product",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected products.",

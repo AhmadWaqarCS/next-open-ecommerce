@@ -1,7 +1,7 @@
 "use server";
 
 import { assertPermission } from "@/lib/guards";
-import { formatZodErrors, ActionResponse } from "@/lib/action-utils";
+import { formatZodErrors, ActionResponse, logActivity } from "@/lib/action-utils";
 import {
   deleteMediaSchema,
   reconnectMediaSchema,
@@ -73,11 +73,27 @@ export async function deleteMediaAction(input: DeleteMediaInput): Promise<Action
     revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "delete_media",
+      entity_type: "media",
+      entity_id: validation.data.relativePath,
+      user,
+      status: "SUCCESS",
+      details: { relativePath: validation.data.relativePath },
+    });
+
     return {
       success: true,
       message: `File deleted successfully from storage and DB references cleared.`,
     };
   } catch (error: any) {
+    await logActivity({
+      action: "delete_media",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { relativePath: validation.data.relativePath, error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to delete media file.",
@@ -109,11 +125,26 @@ export async function reconnectMediaAction(input: ReconnectMediaInput): Promise<
     revalidateMediaTags(validation.data.targetType);
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "reconnect_media",
+      entity_type: "media",
+      user,
+      status: "SUCCESS",
+      details: { targetType: validation.data.targetType },
+    });
+
     return {
       success: true,
       message: "Media position successfully updated.",
     };
   } catch (error: any) {
+    await logActivity({
+      action: "reconnect_media",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to update image connection.",
@@ -145,11 +176,26 @@ export async function clearBrokenMediaAction(input: ClearBrokenMediaInput): Prom
     revalidateMediaTags(validation.data.targetType);
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "clear_broken_media",
+      entity_type: "media",
+      user,
+      status: "SUCCESS",
+      details: { targetType: validation.data.targetType },
+    });
+
     return {
       success: true,
       message: "Broken database image link removed.",
     };
   } catch (error: any) {
+    await logActivity({
+      action: "clear_broken_media",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to remove broken image link.",
@@ -178,6 +224,14 @@ export async function bulkDeleteMediaAction(input: BulkDeleteMediaInput): Promis
     revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "bulk_delete_media",
+      entity_type: "media",
+      user,
+      status: "SUCCESS",
+      details: { count: validation.data.relativePaths.length },
+    });
+
     if (result.failedCount > 0) {
       return {
         success: result.deletedCount > 0,
@@ -190,6 +244,13 @@ export async function bulkDeleteMediaAction(input: BulkDeleteMediaInput): Promis
       message: `Successfully bulk deleted ${result.deletedCount} file(s) in batches.`,
     };
   } catch (error: any) {
+    await logActivity({
+      action: "bulk_delete_media",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to execute bulk media deletion.",
@@ -204,7 +265,7 @@ export async function uploadMediaImage(
   formData: FormData,
   folder: string = "uploads"
 ): Promise<ActionResponse<{ relativePath: string; fileName: string; size: number }>> {
-  await assertPermission("create", "/dashboard/media");
+  const { user } = await assertPermission("create", "/dashboard/media");
 
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {
@@ -241,6 +302,14 @@ export async function uploadMediaImage(
 
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "upload_media_image",
+      entity_type: "media",
+      user,
+      status: "SUCCESS",
+      details: { relativePath: result.relativePath, fileName: result.fileName },
+    });
+
     return {
       success: true,
       message: "Image uploaded successfully.",
@@ -251,6 +320,13 @@ export async function uploadMediaImage(
       },
     };
   } catch (error: any) {
+    await logActivity({
+      action: "upload_media_image",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { fileName: file.name, error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to save image to disk.",
@@ -285,12 +361,27 @@ export async function replaceOptimizedMediaAction(
     revalidateMediaTags();
     revalidatePath("/dashboard/media");
 
+    await logActivity({
+      action: "replace_optimized_media",
+      entity_type: "media",
+      user,
+      status: "SUCCESS",
+      details: { oldRelativePath, newRelativePath: result.relativePath },
+    });
+
     return {
       success: true,
       message: "Media file optimized and replaced successfully.",
       data: result,
     };
   } catch (error: any) {
+    await logActivity({
+      action: "replace_optimized_media",
+      entity_type: "media",
+      user,
+      status: "FAILED",
+      details: { oldRelativePath, error: String(error) },
+    });
     return {
       success: false,
       message: error.message || "Failed to replace optimized media file.",

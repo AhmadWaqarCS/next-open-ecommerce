@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   OrderRefundCreateInput,
@@ -76,9 +76,27 @@ export async function updateOrder(
     );
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${id}`);
+
+    await logActivity({
+      action: "update_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, payment_status, fulfillment_status },
+    });
+
     return { success: true, message: "Order updated successfully." };
   } catch (error: any) {
     console.error(error);
+    await logActivity({
+      action: "update_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     if (error?.message === "ORDER_CANCELLED_CANNOT_BE_EDITED") {
       return { success: false, message: "Cancelled orders cannot be edited." };
     }
@@ -95,9 +113,27 @@ export async function deleteOrder(id: number): Promise<ActionResponse> {
     await deleteOrderTransaction(id, Number(user.id));
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/orders/trash");
+
+    await logActivity({
+      action: "delete_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Order deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete order." };
   }
 }
@@ -111,9 +147,27 @@ export async function restoreOrder(id: number): Promise<ActionResponse> {
     await restoreOrderTransaction(id, Number(user.id));
     revalidatePath("/dashboard/orders/trash");
     revalidatePath("/dashboard/orders");
+
+    await logActivity({
+      action: "restore_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Order restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore order." };
   }
 }
@@ -121,16 +175,34 @@ export async function restoreOrder(id: number): Promise<ActionResponse> {
 export async function permanentlyDeleteOrder(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/orders");
+  const { user } = await assertPermission("delete", "/dashboard/orders");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
     await permanentlyDeleteOrderTransaction(id);
     revalidatePath("/dashboard/orders/trash");
+
+    await logActivity({
+      action: "permanently_delete_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Order permanently deleted." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_order",
+      entity_type: "order",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to permanently delete order." };
   }
 }
@@ -168,9 +240,25 @@ export async function createOrderRefund(
     );
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${order_id}`);
+
+    await logActivity({
+      action: "create_order_refund",
+      entity_type: "order_refund",
+      user,
+      status: "SUCCESS",
+      details: { order_id, amount },
+    });
+
     return { success: true, message: "Refund created successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "create_order_refund",
+      entity_type: "order_refund",
+      user,
+      status: "FAILED",
+      details: { order_id, error: String(error) },
+    });
     return { success: false, message: "Failed to create refund." };
   }
 }
@@ -179,7 +267,7 @@ export async function updateOrderRefund(
   id: number,
   data: OrderRefundUpdateInput,
 ): Promise<ActionResponse> {
-  await assertPermission("update", "/dashboard/orders");
+  const { user } = await assertPermission("update", "/dashboard/orders");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -202,9 +290,27 @@ export async function updateOrderRefund(
       refunded_at: refunded_at ? new Date(refunded_at) : undefined,
     });
     revalidatePath("/dashboard/orders");
+
+    await logActivity({
+      action: "update_order_refund",
+      entity_type: "order_refund",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, status },
+    });
+
     return { success: true, message: "Refund updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_order_refund",
+      entity_type: "order_refund",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update refund." };
   }
 }

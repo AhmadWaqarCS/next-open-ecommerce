@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   PaymentMethodCreateInput,
@@ -111,9 +111,26 @@ export async function updatePaymentMethod(
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods");
 
+    await logActivity({
+      action: "update_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, name },
+    });
+
     return { success: true, message: "Payment method updated successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "update_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to update payment method." };
   }
 }
@@ -131,9 +148,26 @@ export async function deletePaymentMethod(id: number): Promise<ActionResponse> {
     revalidatePath("/dashboard/payment-methods");
     revalidatePath("/dashboard/payment-methods/trash");
 
+    await logActivity({
+      action: "delete_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Payment method deleted successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "delete_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete payment method." };
   }
 }
@@ -151,9 +185,26 @@ export async function restorePaymentMethod(id: number): Promise<ActionResponse> 
     revalidatePath("/dashboard/payment-methods/trash");
     revalidatePath("/dashboard/payment-methods");
 
+    await logActivity({
+      action: "restore_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Payment method restored successfully." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "restore_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore payment method." };
   }
 }
@@ -161,7 +212,7 @@ export async function restorePaymentMethod(id: number): Promise<ActionResponse> 
 export async function permanentlyDeletePaymentMethod(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/payment-methods");
+  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
@@ -172,12 +223,29 @@ export async function permanentlyDeletePaymentMethod(
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
+    await logActivity({
+      action: "permanently_delete_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return {
       success: true,
       message: "Payment method permanently deleted.",
     };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "permanently_delete_payment_method",
+      entity_type: "payment_method",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete payment method.",
@@ -209,12 +277,27 @@ export async function bulkDeletePaymentMethods(
     revalidatePath("/dashboard/payment-methods");
     revalidatePath("/dashboard/payment-methods/trash");
 
+    await logActivity({
+      action: "bulk_delete_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return {
       success: true,
       message: "Selected payment methods moved to trash.",
     };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_delete_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to delete selected payment methods.",
@@ -246,9 +329,24 @@ export async function bulkRestorePaymentMethods(
     revalidatePath("/dashboard/payment-methods/trash");
     revalidatePath("/dashboard/payment-methods");
 
+    await logActivity({
+      action: "bulk_restore_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected payment methods restored." };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_restore_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to restore selected payment methods.",
@@ -261,7 +359,7 @@ export async function bulkPermanentlyDeletePaymentMethods(
   selectAllScope: boolean = false,
   filterParams?: PaymentMethodFilterParams,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/payment-methods");
+  const { user } = await assertPermission("delete", "/dashboard/payment-methods");
   const filterWhere =
     selectAllScope && filterParams
       ? await getPaymentMethodFilterWhere(filterParams, true)
@@ -278,12 +376,27 @@ export async function bulkPermanentlyDeletePaymentMethods(
     revalidateTag("checkout", "max");
     revalidatePath("/dashboard/payment-methods/trash");
 
+    await logActivity({
+      action: "bulk_permanently_delete_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return {
       success: true,
       message: "Selected payment methods permanently deleted.",
     };
   } catch (error) {
     console.error(error);
+    await logActivity({
+      action: "bulk_permanently_delete_payment_methods",
+      entity_type: "payment_method",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
       success: false,
       message: "Failed to permanently delete selected payment methods.",

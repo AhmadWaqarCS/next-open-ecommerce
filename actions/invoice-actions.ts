@@ -1,6 +1,6 @@
 "use server";
 
-import { ActionResponse, formatZodErrors } from "@/lib/action-utils";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
   InvoiceCreateInput,
@@ -73,6 +73,16 @@ export async function createInvoice(
 
     revalidatePath("/dashboard/invoices");
     revalidatePath(`/dashboard/orders/${order_id}`);
+
+    await logActivity({
+      action: "create_invoice",
+      entity_type: "invoice",
+      entity_id: invoice.id,
+      user,
+      status: "SUCCESS",
+      details: { invoice_id: invoice.id, order_id, total: String(total) },
+    });
+
     return {
       success: true,
       message: "Invoice created successfully.",
@@ -80,6 +90,13 @@ export async function createInvoice(
     };
   } catch (error: any) {
     console.error("[createInvoice] Error:", error);
+    await logActivity({
+      action: "create_invoice",
+      entity_type: "invoice",
+      user,
+      status: "FAILED",
+      details: { order_id, error: String(error) },
+    });
     return {
       success: false,
       message: error?.message || "Failed to create invoice.",
@@ -141,10 +158,28 @@ export async function updateInvoice(
 
     revalidatePath("/dashboard/invoices");
     revalidatePath(`/dashboard/invoices/${id}`);
+
+    await logActivity({
+      action: "update_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, status },
+    });
+
     return { success: true, message: "Invoice updated successfully." };
   } catch (error) {
     console.error("[updateInvoice] Error:", error);
-    return { success: true, message: "Invoice updated successfully." };
+    await logActivity({
+      action: "update_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
+    return { success: false, message: "Failed to update invoice." };
   }
 }
 
@@ -157,9 +192,27 @@ export async function deleteInvoice(id: number): Promise<ActionResponse> {
     await deleteInvoiceTransaction(id, Number(user.id));
     revalidatePath("/dashboard/invoices");
     revalidatePath("/dashboard/invoices/trash");
+
+    await logActivity({
+      action: "delete_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Invoice moved to trash." };
   } catch (error) {
     console.error("[deleteInvoice] Error:", error);
+    await logActivity({
+      action: "delete_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to delete invoice." };
   }
 }
@@ -173,9 +226,27 @@ export async function restoreInvoice(id: number): Promise<ActionResponse> {
     await restoreInvoiceTransaction(id, Number(user.id));
     revalidatePath("/dashboard/invoices/trash");
     revalidatePath("/dashboard/invoices");
+
+    await logActivity({
+      action: "restore_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Invoice restored successfully." };
   } catch (error) {
     console.error("[restoreInvoice] Error:", error);
+    await logActivity({
+      action: "restore_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
     return { success: false, message: "Failed to restore invoice." };
   }
 }
@@ -183,17 +254,35 @@ export async function restoreInvoice(id: number): Promise<ActionResponse> {
 export async function permanentlyDeleteInvoice(
   id: number,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/invoices");
+  const { user } = await assertPermission("delete", "/dashboard/invoices");
 
   if (id < 1) return { success: false, message: "Invalid invoice ID." };
 
   try {
     await permanentlyDeleteInvoiceTransaction(id);
     revalidatePath("/dashboard/invoices/trash");
+
+    await logActivity({
+      action: "permanently_delete_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id },
+    });
+
     return { success: true, message: "Invoice permanently deleted." };
   } catch (error) {
     console.error("[permanentlyDeleteInvoice] Error:", error);
-    return { success: true, message: "Invoice deleted permanently." };
+    await logActivity({
+      action: "permanently_delete_invoice",
+      entity_type: "invoice",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
+    return { success: false, message: "Failed to permanently delete invoice." };
   }
 }
 
@@ -215,9 +304,25 @@ export async function bulkDeleteInvoices(
     );
     revalidatePath("/dashboard/invoices");
     revalidatePath("/dashboard/invoices/trash");
+
+    await logActivity({
+      action: "bulk_delete_invoices",
+      entity_type: "invoice",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected invoices moved to trash." };
   } catch (error) {
     console.error("[bulkDeleteInvoices] Error:", error);
+    await logActivity({
+      action: "bulk_delete_invoices",
+      entity_type: "invoice",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to delete selected invoices." };
   }
 }
@@ -240,9 +345,25 @@ export async function bulkRestoreInvoices(
     );
     revalidatePath("/dashboard/invoices/trash");
     revalidatePath("/dashboard/invoices");
+
+    await logActivity({
+      action: "bulk_restore_invoices",
+      entity_type: "invoice",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected invoices restored." };
   } catch (error) {
     console.error("[bulkRestoreInvoices] Error:", error);
+    await logActivity({
+      action: "bulk_restore_invoices",
+      entity_type: "invoice",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return { success: false, message: "Failed to restore selected invoices." };
   }
 }
@@ -252,17 +373,33 @@ export async function bulkPermanentlyDeleteInvoices(
   selectAllScope: boolean = false,
   filterWhere?: any,
 ): Promise<ActionResponse> {
-  await assertPermission("delete", "/dashboard/invoices");
+  const { user } = await assertPermission("delete", "/dashboard/invoices");
 
   try {
     await bulkPermanentlyDeleteInvoicesTransaction(ids, selectAllScope, filterWhere);
     revalidatePath("/dashboard/invoices/trash");
+
+    await logActivity({
+      action: "bulk_permanently_delete_invoices",
+      entity_type: "invoice",
+      user,
+      status: "SUCCESS",
+      details: { ids },
+    });
+
     return { success: true, message: "Selected invoices permanently deleted." };
   } catch (error) {
     console.error("[bulkPermanentlyDeleteInvoices] Error:", error);
+    await logActivity({
+      action: "bulk_permanently_delete_invoices",
+      entity_type: "invoice",
+      user,
+      status: "FAILED",
+      details: { ids, error: String(error) },
+    });
     return {
-      success: true,
-      message: `Bulk action complete. Successfully processed ${ids.length} invoices.`,
+      success: false,
+      message: "Failed to permanently delete selected invoices.",
     };
   }
 }
@@ -281,6 +418,15 @@ export async function generateAndSendInvoiceAction(
     revalidatePath(`/dashboard/orders/${orderId}`);
     revalidatePath("/dashboard/sent-emails");
 
+    await logActivity({
+      action: "generate_send_invoice",
+      entity_type: "invoice",
+      entity_id: result.invoice.id,
+      user,
+      status: "SUCCESS",
+      details: { orderId, invoiceId: result.invoice.id },
+    });
+
     if (result.customerResult.success) {
       return { success: true, message: "Invoice generated and sent to customer." };
     } else {
@@ -291,6 +437,13 @@ export async function generateAndSendInvoiceAction(
     }
   } catch (error: any) {
     console.error("[generateAndSendInvoiceAction] Error:", error);
+    await logActivity({
+      action: "generate_send_invoice",
+      entity_type: "invoice",
+      user,
+      status: "FAILED",
+      details: { orderId, error: String(error) },
+    });
     return {
       success: false,
       message: error?.message || "Failed to generate and send invoice.",

@@ -687,3 +687,24 @@ model order_otp_verification {
   @@index([expires_at])
   @@map("order_otp_verifications")
 }
+
+model activity_log {
+  id          Int      @id @default(autoincrement())
+  action      String
+  entity_type String
+  entity_id   String?
+  user_id     Int?
+  user_email  String?
+  user_role   String?
+  status      String   @default("SUCCESS")
+  details     Json?    @default("{}")
+  ip_address  String?
+  created_at  DateTime @default(now())
+
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("activity_logs")
+}
+

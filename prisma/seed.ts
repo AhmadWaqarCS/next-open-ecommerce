@@ -130,6 +130,7 @@ async function main() {
     { name: "Media", path: "/dashboard/media", enabled: true, is_super: false },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
+    { name: "Activity Logs", path: "/dashboard/activity-logs", enabled: true, is_super: true },
   ];
 
   const features = [];
