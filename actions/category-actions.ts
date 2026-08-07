@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -18,6 +19,7 @@ import {
   bulkRestoreCategoriesTransaction,
   bulkPermanentlyDeleteCategoriesTransaction,
 } from "@/services/category-services";
+import { deleteMediaFileFromStorage } from "@/services/media-services";
 import { saveMediaToStorage } from "@/services/storage-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -234,6 +236,21 @@ export async function updateCategory(
         },
         Number(user.id),
       );
+
+    if (existing.image_url && image_url !== undefined && image_url !== existing.image_url) {
+      const oldUrl = existing.image_url;
+      try {
+        after(async () => {
+          await deleteMediaFileFromStorage(oldUrl).catch((err) => {
+            console.warn(`[Category Image Cleanup] Failed to delete old image '${oldUrl}':`, err);
+          });
+        });
+      } catch {
+        deleteMediaFileFromStorage(oldUrl).catch((err) => {
+          console.warn(`[Category Image Cleanup Fallback] Failed to delete old image '${oldUrl}':`, err);
+        });
+      }
+    }
 
     const categoryListChanged =
       (name !== undefined && name !== existing.name) ||

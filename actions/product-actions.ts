@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -18,6 +19,7 @@ import {
   bulkRestoreProductsTransaction,
   bulkPermanentlyDeleteProductsTransaction,
 } from "@/services/product-services";
+import { deleteMediaFileFromStorage } from "@/services/media-services";
 import { saveMediaToStorage } from "@/services/storage-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -309,6 +311,21 @@ export async function updateProduct(
         },
         Number(user.id),
       );
+
+    if (existing?.feature_image_url && feature_image_url !== undefined && feature_image_url !== existing.feature_image_url) {
+      const oldUrl = existing.feature_image_url;
+      try {
+        after(async () => {
+          await deleteMediaFileFromStorage(oldUrl).catch((err) => {
+            console.warn(`[Product Image Cleanup] Failed to delete old image '${oldUrl}':`, err);
+          });
+        });
+      } catch {
+        deleteMediaFileFromStorage(oldUrl).catch((err) => {
+          console.warn(`[Product Image Cleanup Fallback] Failed to delete old image '${oldUrl}':`, err);
+        });
+      }
+    }
 
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (updatedProduct.slug && updatedProduct.slug !== existing?.slug) {

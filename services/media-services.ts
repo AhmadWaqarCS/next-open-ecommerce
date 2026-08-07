@@ -1,4 +1,5 @@
 import path from "node:path";
+import { after } from "next/server";
 import prisma from "@/lib/prisma";
 import { saveMediaToStorage, deleteMediaFromStorage, bulkDeleteMediaFromStorage } from "./storage-services";
 
@@ -90,10 +91,22 @@ export async function replaceOptimizedImageAndUpdateDB(
   }
 
   // Step 3: Delete old file from storage (only after DB commit succeeds)
-  // Fire-and-forget — do not fail the operation if old file delete fails
-  deleteMediaFromStorage(oldNorm).catch((err) => {
-    console.warn(`[Replace Optimized] Failed to delete old file '${oldNorm}':`, err);
-  });
+  if (oldNorm && oldNorm !== newUrl) {
+    const doDelete = async () => {
+      await deleteMediaFromStorage(oldNorm);
+    };
+    try {
+      after(async () => {
+        await doDelete().catch((err) => {
+          console.warn(`[Replace Optimized] Failed to delete old file '${oldNorm}':`, err);
+        });
+      });
+    } catch {
+      doDelete().catch((err) => {
+        console.warn(`[Replace Optimized Fallback] Failed to delete old file '${oldNorm}':`, err);
+      });
+    }
+  }
 
   return {
     newUrl,

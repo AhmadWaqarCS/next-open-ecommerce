@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { ZodError } from "zod";
 import prisma from "@/lib/prisma";
 import { cacheLife, cacheTag } from "next/cache";
@@ -31,37 +32,50 @@ export interface LogActivityOptions {
 }
 
 export async function logActivity(options: LogActivityOptions): Promise<void> {
+  let ip_address: string | null = null;
   try {
-    let ip_address: string | null = null;
-    try {
-      const reqHeaders = await headers();
-      ip_address =
-        reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        reqHeaders.get("x-real-ip") ||
-        null;
-    } catch {
-      // In case headers() is called outside request context
-    }
+    const reqHeaders = await headers();
+    ip_address =
+      reqHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      reqHeaders.get("x-real-ip") ||
+      null;
+  } catch {
+    // In case headers() is called outside request context
+  }
 
-    let userId: number | null = null;
-    if (options.user?.id != null) {
-      const parsedId = Number(options.user.id);
-      if (!isNaN(parsedId)) userId = parsedId;
-    }
+  let userId: number | null = null;
+  if (options.user?.id != null) {
+    const parsedId = Number(options.user.id);
+    if (!isNaN(parsedId)) userId = parsedId;
+  }
 
-    await createActivityLogInDB({
-      action: options.action,
-      entity_type: options.entity_type,
-      entity_id: options.entity_id,
-      user_id: userId,
-      user_email: options.user?.email ?? null,
-      user_role: options.user?.role ?? null,
-      status: options.status ?? "SUCCESS",
-      details: options.details,
-      ip_address,
+  const logPayload = {
+    action: options.action,
+    entity_type: options.entity_type,
+    entity_id: options.entity_id,
+    user_id: userId,
+    user_email: options.user?.email ?? null,
+    user_role: options.user?.role ?? null,
+    status: options.status ?? "SUCCESS",
+    details: options.details,
+    ip_address,
+  };
+
+  const executeLog = async () => {
+    await createActivityLogInDB(logPayload);
+  };
+
+  try {
+    after(async () => {
+      await executeLog().catch((err) => {
+        console.error("Failed to execute logActivity background task:", err);
+      });
     });
-  } catch (err) {
-    console.error("Failed to execute logActivity:", err);
+  } catch {
+    // Fallback if after() is called outside Next.js request lifecycle
+    executeLog().catch((err) => {
+      console.error("Failed to execute logActivity fallback:", err);
+    });
   }
 }
 
