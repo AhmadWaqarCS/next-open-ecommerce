@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "../../_components/toast-context";
-import { updateSiteConfig, generateSitemapAction } from "@/actions/site-actions";
+import { updateSiteConfig, revalidateSitemapAction } from "@/actions/site-actions";
 import { uploadMediaImage } from "@/actions/media-actions";
 import MetaInput from "@/app/(dashboard)/_components/meta-input";
 import {
@@ -41,31 +41,24 @@ export default function SiteConfigForm({
   const [pendingDarkLogo, setPendingDarkLogo] = useState<File | null>(null);
   const [pendingFavicon, setPendingFavicon] = useState<File | null>(null);
 
-  const [isGeneratingSitemap, setIsGeneratingSitemap] = useState(false);
-  const [sitemapStats, setSitemapStats] = useState({
-    lastGenerated: initialData.meta_info?.sitemap_last_generated || null,
-    urlCount: initialData.meta_info?.sitemap_url_count || null,
-  });
+  const [isRevalidatingSitemap, setIsRevalidatingSitemap] = useState(false);
+  const [lastRevalidatedAt, setLastRevalidatedAt] = useState<string | null>(null);
 
-  const handleGenerateSitemap = () => {
-    setIsGeneratingSitemap(true);
+  const handleRevalidateSitemap = () => {
+    setIsRevalidatingSitemap(true);
     startTransition(async () => {
       try {
-        const res = await generateSitemapAction();
+        const res = await revalidateSitemapAction();
         if (res.success) {
-          toast(res.message || "Sitemap generated successfully!", "success");
-          const countMatch = res.message?.match(/(\d+)\s+URLs/);
-          setSitemapStats({
-            lastGenerated: new Date().toISOString(),
-            urlCount: countMatch ? parseInt(countMatch[1]) : null,
-          });
+          toast(res.message || "Sitemap cache revalidated successfully!", "success");
+          setLastRevalidatedAt(new Date().toISOString());
         } else {
-          toast(res.message || "Failed to generate sitemap.", "error");
+          toast(res.message || "Failed to revalidate sitemap.", "error");
         }
       } catch (err) {
-        toast("An unexpected error occurred while generating sitemap.", "error");
+        toast("An unexpected error occurred while revalidating sitemap.", "error");
       } finally {
-        setIsGeneratingSitemap(false);
+        setIsRevalidatingSitemap(false);
       }
     });
   };
@@ -846,17 +839,17 @@ export default function SiteConfigForm({
                 />
               </div>
 
-              {/* Dynamic Sitemap & Saved Static Rendering */}
+              {/* Dynamic Sitemap & Static Cache */}
               <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-4">
                 <div>
                   <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <span>Dynamic Sitemap & Rapid Pre-rendering</span>
+                    <span>Dynamic Sitemap & Static Cache</span>
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      Quick Fetch Active
+                      Static Cache Active
                     </span>
                   </h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    Generate and save a pre-rendered <code className="text-indigo-600 dark:text-indigo-400 font-mono">sitemap.xml</code> file directly to public storage for instant response when web crawlers visit your shop.
+                    Sitemap is dynamically rendered and statically cached via <code className="text-indigo-600 dark:text-indigo-400 font-mono">app/sitemap.ts</code> using Next.js <code className="text-indigo-600 dark:text-indigo-400 font-mono">"use cache"</code>.
                   </p>
                 </div>
 
@@ -865,14 +858,12 @@ export default function SiteConfigForm({
                     <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                       Status:{" "}
                       <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                        {sitemapStats.lastGenerated
-                          ? `Saved on Disk (${sitemapStats.urlCount ?? "—"} URLs indexed)`
-                          : "Dynamic Fallback Active (Not manually saved to public disk)"}
+                        Cached via Next.js Dynamic IO
                       </span>
                     </p>
-                    {sitemapStats.lastGenerated && (
+                    {lastRevalidatedAt && (
                       <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Last rebuilt: {new Date(sitemapStats.lastGenerated).toLocaleString()}
+                        Last revalidated: {new Date(lastRevalidatedAt).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -888,20 +879,20 @@ export default function SiteConfigForm({
                     </a>
                     <button
                       type="button"
-                      disabled={!permissions.update || isGeneratingSitemap || isPending}
-                      onClick={handleGenerateSitemap}
-                      className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+                      disabled={!permissions.update || isRevalidatingSitemap || isPending}
+                      onClick={handleRevalidateSitemap}
+                      className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
-                      {isGeneratingSitemap ? (
+                      {isRevalidatingSitemap ? (
                         <>
                           <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Generating...
+                          Revalidating...
                         </>
                       ) : (
-                        "⚡ Generate / Rebuild Sitemap"
+                        "🔄 Revalidate Sitemap"
                       )}
                     </button>
                   </div>

@@ -1,7 +1,5 @@
 "use server";
 
-import fs from "node:fs/promises";
-import path from "node:path";
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -13,7 +11,6 @@ import {
 import {
   createSiteConfigTransaction,
   updateSiteConfigTransaction,
-  getSitemapDataTransaction,
 } from "@/services/site-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
@@ -267,141 +264,31 @@ export async function updateSiteConfig(
   }
 }
 
-// ─── SITEMAP GENERATION ───────────────────────────────────────────────────────
+// ─── SITEMAP REVALIDATION ─────────────────────────────────────────────────────
 
-export async function generateSitemapAction(): Promise<ActionResponse> {
+export async function revalidateSitemapAction(): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/settings");
 
   try {
-    const { siteConfig, categories, products, pages } =
-      await getSitemapDataTransaction();
-
-    const rawBaseUrl =
-      siteConfig?.site_url ||
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      "http://localhost:3000";
-    const baseUrl = rawBaseUrl.replace(/\/$/, "");
-
-    interface SitemapUrl {
-      loc: string;
-      lastmod: string;
-      changefreq: string;
-      priority: string;
-    }
-
-    const nowIso = new Date().toISOString();
-
-    const urls: SitemapUrl[] = [
-      {
-        loc: baseUrl,
-        lastmod: nowIso,
-        changefreq: "daily",
-        priority: "1.0",
-      },
-      {
-        loc: `${baseUrl}/about`,
-        lastmod: nowIso,
-        changefreq: "monthly",
-        priority: "0.5",
-      },
-      {
-        loc: `${baseUrl}/contact`,
-        lastmod: nowIso,
-        changefreq: "monthly",
-        priority: "0.5",
-      },
-      {
-        loc: `${baseUrl}/search`,
-        lastmod: nowIso,
-        changefreq: "weekly",
-        priority: "0.6",
-      },
-    ];
-
-    for (const cat of categories) {
-      urls.push({
-        loc: `${baseUrl}/category/${cat.slug}`,
-        lastmod: cat.updated_at.toISOString(),
-        changefreq: "weekly",
-        priority: "0.8",
-      });
-    }
-
-    for (const prod of products) {
-      urls.push({
-        loc: `${baseUrl}/product/${prod.slug}`,
-        lastmod: prod.updated_at.toISOString(),
-        changefreq: "daily",
-        priority: "0.9",
-      });
-    }
-
-    for (const page of pages) {
-      urls.push({
-        loc: `${baseUrl}/pages/${page.slug}`,
-        lastmod: page.updated_at.toISOString(),
-        changefreq: "monthly",
-        priority: "0.6",
-      });
-    }
-
-    const xmlLines = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...urls.map(
-        (u) =>
-          `  <url>\n    <loc>${u.loc}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`,
-      ),
-      "</urlset>",
-    ];
-
-    const xmlContent = xmlLines.join("\n");
-    const publicPath = path.join(process.cwd(), "public");
-    await fs.mkdir(publicPath, { recursive: true });
-    await fs.writeFile(
-      path.join(publicPath, "sitemap.xml"),
-      xmlContent,
-      "utf-8",
-    );
-
-    if (siteConfig) {
-      const currentMetaInfo = (siteConfig.meta_info ?? {}) as Record<
-        string,
-        any
-      >;
-      const updatedMetaInfo = {
-        ...currentMetaInfo,
-        sitemap_last_generated: nowIso,
-        sitemap_url_count: urls.length,
-      };
-
-      await updateSiteConfigTransaction(
-        siteConfig.id,
-        { meta_info: updatedMetaInfo },
-        Number(user.id),
-      );
-    }
-
-    revalidateTag("site-config", "max");
+    revalidateTag("sitemap", "max");
     revalidatePath("/sitemap.xml");
-    revalidatePath("/dashboard/settings");
 
     await logActivity({
-      action: "generate_sitemap",
+      action: "revalidate_sitemap",
       entity_type: "sitemap",
       user,
       status: "SUCCESS",
-      details: { urlCount: urls.length },
+      details: {},
     });
 
     return {
       success: true,
-      message: `Sitemap successfully generated and saved with ${urls.length} URLs.`,
+      message: "Sitemap cache revalidated successfully.",
     };
   } catch (error) {
-    console.error("Failed to generate sitemap:", error);
+    console.error("Failed to revalidate sitemap:", error);
     await logActivity({
-      action: "generate_sitemap",
+      action: "revalidate_sitemap",
       entity_type: "sitemap",
       user,
       status: "FAILED",
@@ -409,7 +296,10 @@ export async function generateSitemapAction(): Promise<ActionResponse> {
     });
     return {
       success: false,
-      message: "Failed to generate sitemap XML file.",
+      message: "Failed to revalidate sitemap cache.",
     };
   }
 }
+
+export const generateSitemapAction = revalidateSitemapAction;
+

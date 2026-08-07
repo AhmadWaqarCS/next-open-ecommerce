@@ -177,28 +177,6 @@ export async function updateSiteConfigTransaction(
   return result;
 }
 
-export async function getSitemapDataTransaction() {
-  return await prisma.$transaction(async (tx) => {
-    const siteConfig = await tx.site_config.findFirst({
-      where: { deleted_at: null },
-    });
-    const categories = await tx.category.findMany({
-      where: { deleted_at: null, is_active: true },
-      select: { slug: true, updated_at: true },
-    });
-    const products = await tx.product.findMany({
-      where: { deleted_at: null, is_active: true },
-      select: { slug: true, updated_at: true },
-    });
-    const pages = await tx.site_page.findMany({
-      where: { is_active: true },
-      select: { slug: true, updated_at: true },
-    });
-
-    return { siteConfig, categories, products, pages };
-  });
-}
-
 export async function getSiteConfigDashboardDataInDB() {
   return await prisma.site_config.findFirst({
     where: { deleted_at: null },
