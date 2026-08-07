@@ -8,54 +8,66 @@
 
 ## 🌟 About the Project
 
-**Next Open E-Commerce** is a modern, open-source storefront and management platform engineered for speed, simplicity, and complete hostability. Designed from the ground up for standard Linux Virtual Private Servers (VPS), it eliminates reliance on expensive cloud SaaS platforms, third-party media storage buckets, and vendor lock-in.
+**Next Open E-Commerce** is a modern, open-source storefront and management platform engineered for speed, simplicity, and complete hostability. Designed from the ground up for standard Linux Virtual Private Servers (VPS), it eliminates reliance on expensive cloud SaaS platforms, third-party headless CMSs, and vendor lock-in.
 
-Every element of the storefront—from site metadata, branding colors, hero taglines, product catalogs, and categories down to legal policies and footer links—is entirely dynamic and configurable through an intuitive, permission-controlled admin dashboard.
+Every element of the storefront—from site metadata, branding colors, hero taglines, product catalogs, and multi-level category hierarchies down to email templates, legal policies, and footer links—is entirely dynamic and configurable through an intuitive, permission-controlled admin dashboard.
 
 ---
 
 ## 🎯 Vision & Core Philosophy
 
-- **Simplicity & Hostability**: Designed to run seamlessly on a low-cost VPS with zero cloud dependencies. No external S3 storage, no third-party headless CMS, and no proprietary database services required.
-- **Login-less Storefront**: Frictionless purchasing experience for customers. Buyers can browse, build a cart, and place orders directly without forcing customer registration or mandatory user account creation.
-- **Cash on Delivery (COD)**: First-class Cash on Delivery support out of the box with flexible extra fee and instruction controls, alongside standard payment gateway structures.
-- **Local Asset Storage & Image Proxy**: All uploaded product photos, category banners, and media assets are stored directly on the local filesystem (`uploads/`) and served securely via a built-in Next.js proxy route (`app/uploads/[...path]/route.ts`) featuring path-traversal security guards.
-- **Aggressive Component Caching & Low Database Hits**: Leverages Next.js 16 page/component-level caching (`"use cache"`, `cacheLife("max")`, and `cacheComponents: true` in `next.config.ts`). Public storefront requests are served instantly from cache with near-zero database load, revalidating on-demand only when admin mutations occur.
-- **PostgreSQL & Prisma Integration**: Strictly built for PostgreSQL using Prisma ORM with `@prisma/adapter-pg` for type-safe database queries and automated schema migrations.
-- **Email & PDF Invoicing**: Integrated email settings supporting direct SMTP host configuration (via Nodemailer) with automated generation of PDF invoices (`jspdf` + `jspdf-autotable`) sent to customers and store administrators upon purchase.
+- **Simplicity & Hostability**: Designed to run seamlessly on a low-cost VPS with zero mandatory third-party cloud SaaS dependencies.
+- **Storage Abstraction Layer**: Unified storage engine powered by Flydrive (`@flydrive`) supporting flexible storage drivers (local disk, cloud bucket readiness) with dashboard management.
+- **Login-less Storefront & Self-Service Portal**: Frictionless purchasing experience for customers without forced account creation, complemented by secure OTP-based email verification for order tracking and self-service cancellations.
+- **Flexible Hybrid Payments**: Native Cash on Delivery (COD) support with optional email OTP verification alongside full Stripe Checkout integration and secure webhook processing.
+- **Non-Blocking Background Tasks**: Utilizes Next.js 16 `after()` API (`next/server`) to offload asynchronous tasks like physical media cleanup and audit activity logging outside of response delivery.
+- **Aggressive Component Caching & Granular Tag Revalidation**: Leverages Next.js 16 page/component-level caching (`"use cache"`, `cacheLife("max")`, and `cacheComponents: true`). Public storefront requests are served instantly from cache with near-zero database load, invalidating precisely via targeted revalidation tags (`products`, `categories`, `site-config`, `coupons`, `sitemap`).
+- **Dynamic Email Template Engine**: Full dynamic email template builder with visual editing and customizable variable injection for order receipts, OTP delivery, newsletter double opt-in, and invoice dispatches.
+- **PostgreSQL & Prisma Integration**: Strictly built for PostgreSQL using Prisma ORM with `@prisma/adapter-pg` for type-safe database queries, atomic transactions, and automated schema migrations.
 
 ---
 
 ## 🔥 Current Implemented Features
 
 ### 🛒 Customer Storefront (`/`)
+- **Dynamic Catch-All Routing (`[...slug]`)**: Dynamic product and hierarchical multi-level category navigation via clean catch-all route segments.
 - **Dynamic Homepage**: Managed hero banners, featured categories, promoted product grids, and customizable topbar notification messages.
-- **Dynamic Product Catalog**: Browse products with search, category filtering, price displays, stock status, and variant selectors (sizes, colors).
-- **Interactive Cart & Checkout**: Slide-over cart drawer and streamlined checkout form with instant shipping method selection and COD payment option.
-- **Dynamic Pages & Policies**: Custom CMS pages (Privacy Policy, Refund Policy, Terms of Service, FAQs, Shipping Policy) rendered dynamically from the database.
+- **Dynamic Product Catalog**: Browse products with instant search, multi-level category filtering, price displays, stock status alerts, and variant selectors (sizes, colors).
+- **Interactive Cart & Checkout**: Slide-over cart drawer and streamlined checkout form with instant shipping method selection, coupon code validation & discount application, COD option, and Stripe Checkout integration.
+- **Order Tracking & Self-Service Cancellation**: Dedicated tracking portal allowing buyers to trace order progress and request order cancellations validated securely via OTP email verification.
+- **Double Opt-In Newsletter System**: Newsletter subscription flow complete with token-based email confirmation validation to build verified mailing lists.
+- **CAPTCHA Anti-Bot Protection**: Server-verified CAPTCHA controls (Turnstile / reCAPTCHA / HCaptcha) safeguarding public forms against automated submission abuse.
+- **Dynamic Pages & Policies**: Custom CMS pages (Privacy Policy, Refund Policy, Terms of Service, FAQs, Shipping Policy) rendered dynamically from the database with simplified status toggling.
+- **Dynamic Sitemap**: Dynamically rendered, tag-revalidated sitemap (`app/sitemap.ts`) automatically updating on catalog changes.
 - **SEO & Metadata**: Dynamic meta titles, open graph descriptions, primary brand colors, light/dark logos, and favicons loaded live from site configuration.
 
 ### 🛡️ Admin Dashboard (`/dashboard`)
-- **Product & Category Management**: Hierarchical multi-level categories, product variants, inventory tracking, low-stock threshold alerts, and soft-delete capabilities (`deleted_at`).
-- **Orders & Invoice Engine**: Real-time order fulfillment pipeline (pending, processing, shipped, delivered, cancelled), tracking code assignment, and single-click automated PDF invoice generation & email dispatching.
+- **Storage Drivers & Migration UI (`/dashboard/storages`)**: Configure active storage drivers (Flydrive), manage local disk upload roots, inspect storage usage, and run automated asset migration tools.
+- **Email Template Manager (`/dashboard/email-templates`)**: Visual template builder to customize HTML email layouts, preview responsive email designs, and manage dynamic variable tags (`{order_id}`, `{customer_name}`, `{otp_code}`, etc.).
+- **Activity Logs & Audit Trail (`/dashboard/activity-logs`)**: Administrative action logger capturing user activities, entity mutations, and operational events across the dashboard.
+- **Order Management & Analytics (`/dashboard/orders`)**: Real-time order fulfillment pipeline (pending, processing, shipped, delivered, cancelled), revenue & order status visual analytics dashboard, tracking code assignment, and single-click automated PDF invoice generation & email dispatching. State guards prevent altering cancelled orders.
+- **Product & Category Management (`/dashboard/products`, `/dashboard/categories`)**: Hierarchical multi-level categories, product variants, inventory tracking, low-stock threshold alerts, and soft-delete capabilities (`deleted_at`).
+- **Media Library & Image Optimizer (`/dashboard/media`)**: Image optimization engine supporting batch compression/resizing, automatic calculation of file metadata (dimensions, mime type, byte size), and broken media scanner.
 - **Denormalized Order Snapshots**: Order line items, product names, unit prices, coupon codes, and shipping fees are snapshotted at checkout to guarantee immutable historical transaction records.
-- **Coupons & Discounts**: Percentage and fixed discount rules with expiration dates, usage limits, and minimum spend requirements.
-- **Shipping & Payment Settings**: Custom shipping methods with fee structures and free-shipping minimum thresholds.
-- **Media Library & Storage Scanner**: Integrated scanner that scans the physical `uploads/` folder, maps files to database records, and flags broken links or unlinked media.
-- **Email Configurations & Live Tester**: Configure custom SMTP servers, sender names, and recipient addresses directly from the dashboard with built-in live email connectivity testing.
-- **Dynamic RBAC & Role Management**: Multi-user administrative access backed by preseeded site features (`site_feature`), custom roles (`role`), and explicit CRUD permission matrices (`access_crud` JSON). Includes an immutable `superadmin` role protected against modification or deletion.
-- **Security Guards**: Comprehensive Server Action guards using `assertPermission()`, server-side Zod payload validation, and strict file path traversal guards.
+- **Coupons & Discounts (`/dashboard/coupons`)**: Percentage and fixed discount rules with expiration dates, usage limits, and minimum spend requirements validated dynamically during checkout.
+- **Shipping & Status-Based Site Components (`/dashboard/shipping`, `/dashboard/site-components`)**: Custom shipping methods with fee structures and status-based control toggles for storefront widgets and CMS pages.
+- **Email Configurations & Live Tester (`/dashboard/email-config`)**: Configure custom SMTP servers, sender names, and recipient addresses directly from the dashboard with built-in live email connectivity testing.
+- **Dynamic RBAC & Role Management (`/dashboard/roles`, `/dashboard/users`)**: Multi-user administrative access backed by preseeded site features (`site_feature`), custom roles (`role`), and explicit CRUD permission matrices (`access_crud` JSON). Includes an immutable `superadmin` role protected against modification or deletion.
+- **Security Guards**: Comprehensive Server Action guards using `assertPermission()`, server-side Zod payload validation, non-blocking background cleanup via `after()`, and strict file path traversal guards.
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Framework**: Next.js 16 (App Router, Turbopack, React 19)
+- **Framework**: Next.js 16 (App Router, Turbopack, React 19, `next/server` `after()` API)
 - **Database & ORM**: PostgreSQL & Prisma ORM 7 (`@prisma/client`, `@prisma/adapter-pg`)
+- **Storage Abstraction**: Flydrive (`@flydrive/local`, `@flydrive/source`)
+- **Payment Processing**: Stripe SDK (`stripe`) & Native Cash on Delivery (COD)
 - **Styling**: Tailwind CSS v4
 - **Forms & Validation**: React Hook Form with Zod (`@hookform/resolvers`)
+- **Media Processing**: Sharp (`sharp`) for server-side image compression & optimization
 - **PDF Generation**: JsPDF & AutoTable (`jspdf`, `jspdf-autotable`)
-- **Email Dispatch**: Nodemailer (`nodemailer`)
+- **Email Dispatch & Templates**: Nodemailer (`nodemailer`) & custom template engine
 - **Icons & UI**: Lucide React Icons & custom modular dialog components
 
 ---
@@ -106,6 +118,14 @@ AUTH_SECRET="your-generated-random-32-byte-hex-secret"
 # Host Trusting Configuration
 TRUST_HOST=true
 
+# Optional Stripe Payment Gateway Credentials
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_..."
+
+# Optional CAPTCHA Site Configuration
+CAPTCHA_SECRET_KEY="your-captcha-secret-key"
+
 # Optional Initial Seed Overrides
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="YourSecurePassword123!"
@@ -134,7 +154,7 @@ Execute the following sequence to generate the Prisma client, create database ta
    ```bash
    npx prisma db seed
    ```
-   *This populates default admin permissions, site features, initial store configuration, sample policies, shipping methods, Cash on Delivery options, and your default Superadmin user account.*
+   *This populates default admin permissions, site features, initial store configuration, email templates, default storage drivers, sample policies, shipping methods, Cash on Delivery options, and your default Superadmin user account.*
 
 ---
 
@@ -222,3 +242,4 @@ After running `npx prisma db seed`, you can sign in to the Admin Dashboard at `/
 ## 📄 License
 
 This project is open-source software licensed under the [MIT License](LICENSE).
+
