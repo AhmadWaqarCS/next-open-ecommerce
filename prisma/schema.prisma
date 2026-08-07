@@ -172,6 +172,8 @@ model site_component {
 model email_config {
   id Int @id @default(autoincrement())
 
+  purpose  String @default("marketing")
+  name     String @default("Email Config")
   provider String @default("smtp")
 
   from_name      String
@@ -184,16 +186,21 @@ model email_config {
   admin_notification_email String?
 
   include_pdf_invoice Boolean @default(false)
+  time_delay_ms       Int     @default(1000)
 
-  is_active Boolean @default(true)
+  is_active Boolean @default(false)
 
   created_at DateTime  @default(now())
-  created_by Int
+  created_by Int       @default(1)
   updated_at DateTime  @updatedAt
-  updated_by Int
+  updated_by Int       @default(1)
   deleted_at DateTime?
   deleted_by Int?
 
+  campaigns email_campaign[]
+
+  @@index([purpose])
+  @@index([is_active])
   @@map("email_config")
 }
 
@@ -208,6 +215,7 @@ model email_template {
   available_variables Json?
 
   is_active Boolean @default(false)
+  is_system Boolean @default(false)
 
   created_at DateTime  @default(now())
   created_by Int       @default(1)
@@ -216,8 +224,11 @@ model email_template {
   deleted_at DateTime?
   deleted_by Int?
 
+  campaigns email_campaign[]
+
   @@index([key])
   @@index([is_active])
+  @@index([is_system])
   @@index([deleted_at])
   @@map("email_templates")
 }
@@ -606,13 +617,123 @@ model product_variant {
   @@map("product_variants")
 }
 
-model newsletter_subscriber {
-  id    Int    @id @default(autoincrement())
-  email String @unique
+model customer_contact {
+  id Int @id @default(autoincrement())
+
+  email      String  @unique
+  first_name String?
+  last_name  String?
+  phone      String?
+
+  is_customer     Boolean   @default(false)
+  is_newsletter   Boolean   @default(false)
+  is_unsubscribed Boolean   @default(false)
+  unsubscribed_at DateTime?
+
+  total_spent       Decimal @default(0) @db.Decimal(10, 2)
+  total_orders      Int     @default(0)
+  total_quantity    Int     @default(0)
+  categories_bought Json    @default("[]")
+  locations         Json    @default("[]")
+  meta_info         Json    @default("{}")
 
   created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  @@map("newsletter_subscribers")
+  group_memberships   email_group_member[]
+  campaign_recipients email_campaign_recipient[]
+
+  @@index([email])
+  @@index([is_customer])
+  @@index([is_newsletter])
+  @@index([is_unsubscribed])
+  @@map("customer_contacts")
+}
+
+model email_group {
+  id           Int     @id @default(autoincrement())
+  name         String
+  description  String?
+  member_count Int     @default(0)
+
+  created_at DateTime @default(now())
+  created_by Int      @default(1)
+  updated_at DateTime @updatedAt
+  updated_by Int      @default(1)
+
+  members email_group_member[]
+
+  @@map("email_groups")
+}
+
+model email_group_member {
+  id                  Int              @id @default(autoincrement())
+  group_id            Int
+  group               email_group      @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  customer_contact_id Int
+  customer_contact    customer_contact @relation(fields: [customer_contact_id], references: [id], onDelete: Cascade)
+
+  added_at DateTime @default(now())
+
+  @@unique([group_id, customer_contact_id])
+  @@index([group_id])
+  @@index([customer_contact_id])
+  @@map("email_group_members")
+}
+
+model email_campaign {
+  id Int @id @default(autoincrement())
+
+  name      String
+  subject   String?
+  body_html String? @db.Text
+  strategy  String  @default("single") // "single" | "per_recipient"
+  status    String  @default("draft") // "draft" | "scheduled" | "sending" | "completed" | "failed" | "partially_failed"
+
+  email_config_id Int?
+  email_config    email_config? @relation(fields: [email_config_id], references: [id], onDelete: SetNull)
+
+  template_id Int?
+  template    email_template? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+
+  scheduled_at DateTime?
+  sent_at      DateTime?
+
+  total_recipients Int @default(0)
+  sent_count       Int @default(0)
+  failed_count     Int @default(0)
+
+  created_at DateTime @default(now())
+  created_by Int      @default(1)
+  updated_at DateTime @updatedAt
+  updated_by Int      @default(1)
+
+  recipients email_campaign_recipient[]
+
+  @@index([status])
+  @@index([scheduled_at])
+  @@map("email_campaigns")
+}
+
+model email_campaign_recipient {
+  id                  Int              @id @default(autoincrement())
+  campaign_id         Int
+  campaign            email_campaign   @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  customer_contact_id Int
+  customer_contact    customer_contact @relation(fields: [customer_contact_id], references: [id], onDelete: Cascade)
+
+  custom_subject   String?
+  custom_body_html String? @db.Text
+
+  status        String    @default("pending") // "pending" | "sent" | "failed"
+  sent_at       DateTime?
+  error_message String?   @db.Text
+
+  @@unique([campaign_id, customer_contact_id])
+  @@index([campaign_id])
+  @@index([customer_contact_id])
+  @@index([status])
+  @@map("email_campaign_recipients")
 }
 
 model invoice {

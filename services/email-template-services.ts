@@ -9,6 +9,7 @@ export interface CreateEmailTemplateData {
   body_html: string;
   available_variables?: any;
   is_active?: boolean;
+  is_system?: boolean;
   created_by?: number;
 }
 
@@ -24,10 +25,6 @@ export interface UpdateEmailTemplateData {
   deleted_by?: number | null;
 }
 
-/**
- * Creates a new email template in the database.
- * If is_active is true, deactivates all other active templates for the same use case (key).
- */
 export async function createEmailTemplateInDB(data: CreateEmailTemplateData) {
   const sanitizedHtml = sanitizeEmailHtml(data.body_html);
   const createdBy = data.created_by || 1;
@@ -49,6 +46,7 @@ export async function createEmailTemplateInDB(data: CreateEmailTemplateData) {
         body_html: sanitizedHtml,
         available_variables: data.available_variables || null,
         is_active: data.is_active || false,
+        is_system: data.is_system || false,
         created_by: createdBy,
         updated_by: createdBy,
       },
@@ -56,10 +54,6 @@ export async function createEmailTemplateInDB(data: CreateEmailTemplateData) {
   });
 }
 
-/**
- * Updates an email template record in DB. Supports field updates, activation, and soft-delete.
- * If is_active is true or setting is_active = true, deactivates all other templates for that key.
- */
 export async function updateEmailTemplateInDB(id: number, data: UpdateEmailTemplateData) {
   const existing = await prisma.email_template.findUnique({
     where: { id },
@@ -69,11 +63,21 @@ export async function updateEmailTemplateInDB(id: number, data: UpdateEmailTempl
     throw new Error(`Email template with ID ${id} not found.`);
   }
 
-  const sanitizedHtml = data.body_html !== undefined ? sanitizeEmailHtml(data.body_html) : undefined;
   const isBeingSoftDeleted = data.deleted_at !== undefined && data.deleted_at !== null;
 
+  // SYSTEM TEMPLATE IMMUTABILITY PROTECTION
+  if (existing.is_system) {
+    if (isBeingSoftDeleted) {
+      throw new Error("Protected Template: System email templates cannot be deleted.");
+    }
+    if (data.is_active === false) {
+      throw new Error("Protected Template: System email templates must remain active.");
+    }
+  }
+
+  const sanitizedHtml = data.body_html !== undefined ? sanitizeEmailHtml(data.body_html) : undefined;
+
   return await prisma.$transaction(async (tx) => {
-    // If activating this template, deactivate all other templates for this key
     if (data.is_active === true && !isBeingSoftDeleted) {
       await tx.email_template.updateMany({
         where: { key: existing.key, id: { not: id }, deleted_at: null },
@@ -81,8 +85,7 @@ export async function updateEmailTemplateInDB(id: number, data: UpdateEmailTempl
       });
     }
 
-    // If soft deleting this template and it was active, set is_active = false
-    const finalIsActive = isBeingSoftDeleted ? false : data.is_active;
+    const finalIsActive = isBeingSoftDeleted ? false : (existing.is_system ? true : data.is_active);
 
     return await tx.email_template.update({
       where: { id },
@@ -101,10 +104,15 @@ export async function updateEmailTemplateInDB(id: number, data: UpdateEmailTempl
   });
 }
 
-/**
- * Permanently deletes an email template record from the database.
- */
 export async function deleteEmailTemplatePermanentlyInDB(id: number) {
+  const existing = await prisma.email_template.findUnique({
+    where: { id },
+  });
+
+  if (existing?.is_system) {
+    throw new Error("Protected Template: System email templates cannot be deleted.");
+  }
+
   return await prisma.email_template.delete({
     where: { id },
   });

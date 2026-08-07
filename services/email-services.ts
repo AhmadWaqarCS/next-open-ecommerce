@@ -120,11 +120,10 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
     order_id: orderId || null,
   });
 
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-  const secure = process.env.SMTP_SECURE === "true";
-  const user = process.env.SMTP_USER || fromEmail;
-  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  const { getSmtpEnvVarsForPurpose } = await import("@/lib/email-smtp-config");
+  const { host, port, secure, user, pass, envKeys } = getSmtpEnvVarsForPurpose(
+    emailConfig?.purpose || "order_completion",
+  );
 
   if (!host) {
     console.warn(

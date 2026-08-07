@@ -286,6 +286,52 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
       });
     }
 
+    // Automatically upsert customer contact and update analytical totals
+    const normalizedEmail = input.customer_email.toLowerCase();
+    const existingContact = await tx.customer_contact.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    const itemQuantity = input.items.reduce((acc, i) => acc + i.quantity, 0);
+
+    if (existingContact) {
+      const locationString = `${input.shipping_city}, ${input.shipping_country}`;
+      const existingLocs = (existingContact.locations as string[]) || [];
+      const updatedLocations = Array.from(new Set([...existingLocs, locationString]));
+
+      await tx.customer_contact.update({
+        where: { id: existingContact.id },
+        data: {
+          first_name: input.customer_first_name || existingContact.first_name,
+          last_name: input.customer_last_name || existingContact.last_name,
+          phone: input.customer_phone ?? existingContact.phone,
+          is_customer: true,
+          is_unsubscribed: false,
+          unsubscribed_at: null,
+          total_spent: existingContact.total_spent.add(total),
+          total_orders: { increment: 1 },
+          total_quantity: existingContact.total_quantity + itemQuantity,
+          locations: updatedLocations,
+        },
+      });
+    } else {
+      await tx.customer_contact.create({
+        data: {
+          email: normalizedEmail,
+          first_name: input.customer_first_name,
+          last_name: input.customer_last_name,
+          phone: input.customer_phone ?? null,
+          is_customer: true,
+          is_newsletter: false,
+          is_unsubscribed: false,
+          total_spent: total,
+          total_orders: 1,
+          total_quantity: itemQuantity,
+          locations: [`${input.shipping_city}, ${input.shipping_country}`],
+        },
+      });
+    }
+
     return createdOrder;
   });
 }

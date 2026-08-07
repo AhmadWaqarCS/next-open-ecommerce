@@ -28,6 +28,11 @@ interface DataTableProps<T extends { id: number }> {
     selectedIds: number[],
     selectAllScope: boolean,
   ) => Promise<{ success: boolean; message?: string }>;
+  renderBulkActions?: (
+    selectedIds: number[],
+    selectAllScope: boolean,
+    clearSelection: () => void,
+  ) => React.ReactNode;
   emptyState?: {
     icon?: React.ReactNode;
     title: string;
@@ -49,6 +54,7 @@ export default function DataTable<T extends { id: number }>({
   renderActivity,
   renderActions,
   onBulkDelete,
+  renderBulkActions,
   emptyState,
 }: DataTableProps<T>) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -204,7 +210,12 @@ export default function DataTable<T extends { id: number }>({
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {renderBulkActions &&
+                  renderBulkActions(selectedIds, selectAllScope, () => {
+                    setSelectedIds([]);
+                    setSelectAllScope(false);
+                  })}
                 {permissions.delete && onBulkDelete && (
                   <button
                     onClick={() => setShowBulkDeleteModal(true)}

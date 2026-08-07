@@ -9,8 +9,10 @@ export interface NewsletterFilterParams {
 
 export function buildNewsletterWhereInput(
   params: NewsletterFilterParams
-): Prisma.newsletter_subscriberWhereInput {
-  const where: Prisma.newsletter_subscriberWhereInput = {};
+): Prisma.customer_contactWhereInput {
+  const where: Prisma.customer_contactWhereInput = {
+    is_newsletter: true,
+  };
 
   // ID search
   if (params.id && !isNaN(Number(params.id))) {
@@ -40,6 +42,6 @@ export function buildNewsletterWhereInput(
 
 export async function getNewsletterFilterWhere(
   params: NewsletterFilterParams
-): Promise<Prisma.newsletter_subscriberWhereInput> {
+): Promise<Prisma.customer_contactWhereInput> {
   return buildNewsletterWhereInput(params);
 }

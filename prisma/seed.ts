@@ -122,8 +122,20 @@ async function main() {
       is_super: false,
     },
     {
-      name: "Newsletter Subscribers",
-      path: "/dashboard/newsletter",
+      name: "Customers",
+      path: "/dashboard/customers",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Email Groups",
+      path: "/dashboard/email-groups",
+      enabled: true,
+      is_super: false,
+    },
+    {
+      name: "Email Campaigns",
+      path: "/dashboard/email-campaigns",
       enabled: true,
       is_super: false,
     },
@@ -522,30 +534,59 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   });
   console.log("  ✓ Payment Method: Credit / Debit Card (Stripe) checked");
 
-  // 9. Email Config
-  const existingEmail = await prisma.email_config.findFirst({
-    where: { id: 1 },
-  });
-  if (!existingEmail) {
-    await prisma.email_config.create({
-      data: {
-        id: 1,
-        provider: "smtp",
-        from_name: STORE_NAME,
-        from_email: "orders@example.com",
-        reply_to_email: "support@example.com",
-        send_order_confirmation: true,
-        send_shipping_update: true,
-        send_admin_new_order: true,
-        admin_notification_email: ADMIN_EMAIL,
-        include_pdf_invoice: false,
-        is_active: true,
-        created_by: 0,
-        updated_by: 0,
-      },
+  // 9. Multi-purpose Email Configurations (Seeded as Inactive)
+  const defaultEmailConfigs = [
+    {
+      purpose: "order_completion",
+      name: "Order Completion Emails",
+      from_name: STORE_NAME,
+      from_email: "orders@example.com",
+      is_active: false,
+      time_delay_ms: 1000,
+    },
+    {
+      purpose: "marketing",
+      name: "Marketing & Campaigns",
+      from_name: STORE_NAME,
+      from_email: "marketing@example.com",
+      is_active: false,
+      time_delay_ms: 1500,
+    },
+    {
+      purpose: "otp_verification",
+      name: "OTP Verification",
+      from_name: STORE_NAME,
+      from_email: "verify@example.com",
+      is_active: false,
+      time_delay_ms: 500,
+    },
+    {
+      purpose: "system",
+      name: "System Notifications",
+      from_name: STORE_NAME,
+      from_email: "system@example.com",
+      is_active: false,
+      time_delay_ms: 1000,
+    },
+  ];
+
+  for (const cfg of defaultEmailConfigs) {
+    const existing = await prisma.email_config.findFirst({
+      where: { purpose: cfg.purpose, deleted_at: null },
     });
+    if (!existing) {
+      await prisma.email_config.create({
+        data: {
+          ...cfg,
+          created_by: adminUser.id,
+          updated_by: adminUser.id,
+        },
+      });
+    }
   }
-  console.log("  ✓ Email Config created");
+  console.log(
+    `  ✓ Email Configurations (${defaultEmailConfigs.length} purposes) checked & seeded as inactive`,
+  );
 
   // 10. Sample Category & Product
   const categoryCount = await prisma.category.count();
@@ -629,7 +670,9 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     }
     console.log("  ✓ Sample Category & Product seeded");
   } else {
-    console.log("  ✓ Catalog already exists, skipping sample category/product seed");
+    console.log(
+      "  ✓ Catalog already exists, skipping sample category/product seed",
+    );
   }
 
   // 12. Default Email Templates
@@ -1057,7 +1100,12 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       driver: "s3",
       description: "Amazon Web Services Simple Storage Service (S3).",
       is_active: false,
-      env_keys: ["AWS_S3_KEY", "AWS_S3_SECRET", "AWS_S3_BUCKET", "AWS_S3_REGION"],
+      env_keys: [
+        "AWS_S3_KEY",
+        "AWS_S3_SECRET",
+        "AWS_S3_BUCKET",
+        "AWS_S3_REGION",
+      ],
     },
     {
       key: "cloudflare_r2",
@@ -1065,7 +1113,12 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       driver: "s3",
       description: "Zero egress cost object storage powered by Cloudflare.",
       is_active: false,
-      env_keys: ["CLOUDFLARE_R2_KEY", "CLOUDFLARE_R2_SECRET", "CLOUDFLARE_R2_BUCKET", "CLOUDFLARE_R2_ENDPOINT"],
+      env_keys: [
+        "CLOUDFLARE_R2_KEY",
+        "CLOUDFLARE_R2_SECRET",
+        "CLOUDFLARE_R2_BUCKET",
+        "CLOUDFLARE_R2_ENDPOINT",
+      ],
     },
     {
       key: "minio",
@@ -1096,7 +1149,112 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     }
   }
 
-  console.log(`  ✓ Storage Options (${defaultStorageOptions.length} providers) seeded`);
+  console.log(
+    `  ✓ Storage Options (${defaultStorageOptions.length} providers) seeded`,
+  );
+
+  // System Email Templates (is_system: true)
+  const systemTemplates = [
+    {
+      key: "order_confirmation",
+      name: "Order Confirmation",
+      description:
+        "Sent automatically when a customer successfully places an order.",
+      subject: "Order Confirmation - {{order_number}}",
+      body_html:
+        "<h2>Thank you for your order!</h2><p>Hi {{customer_name}},</p><p>We received your order <strong>#{{order_number}}</strong>. Total: <strong>{{currency}} {{total}}</strong>.</p>",
+      available_variables: [
+        "customer_name",
+        "order_number",
+        "total",
+        "currency",
+        "items_table",
+      ],
+      is_active: true,
+      is_system: true,
+    },
+    {
+      key: "otp_verification",
+      name: "OTP Verification",
+      description:
+        "One-time password for Cash on Delivery confirmation or order tracking.",
+      subject: "Your OTP Verification Code: {{otp_code}}",
+      body_html:
+        "<h2>Verification Code</h2><p>Your one-time security verification code is: <strong>{{otp_code}}</strong>. It will expire in {{expires_in_minutes}} minutes.</p>",
+      available_variables: ["otp_code", "expires_in_minutes"],
+      is_active: true,
+      is_system: true,
+    },
+    {
+      key: "invoice",
+      name: "Invoice & Receipt",
+      description: "Sent to customers with invoice breakdown.",
+      subject: "Invoice {{invoice_number}} for Order {{order_number}}",
+      body_html:
+        "<h2>Invoice {{invoice_number}}</h2><p>Hi {{customer_name}}, please find attached your invoice for order #{{order_number}}.</p>",
+      available_variables: [
+        "customer_name",
+        "invoice_number",
+        "order_number",
+        "total",
+        "currency",
+      ],
+      is_active: true,
+      is_system: true,
+    },
+    {
+      key: "shipping_update",
+      name: "Shipping Notification",
+      description: "Sent when order status changes to shipped.",
+      subject: "Your Order #{{order_number}} Has Shipped!",
+      body_html:
+        "<h2>Order Shipped</h2><p>Hi {{customer_name}}, your order #{{order_number}} is on its way!</p><p>Carrier: {{carrier_name}}<br>Tracking: {{tracking_number}}</p>",
+      available_variables: [
+        "customer_name",
+        "order_number",
+        "carrier_name",
+        "tracking_number",
+        "tracking_url",
+      ],
+      is_active: true,
+      is_system: true,
+    },
+    {
+      key: "newsletter_optin",
+      name: "Newsletter Double Opt-in Confirmation",
+      description: "Sent when a user requests to subscribe to the newsletter.",
+      subject: "Please confirm your newsletter subscription",
+      body_html:
+        "<h2>Welcome!</h2><p>Thank you for subscribing to our newsletter. Please confirm your subscription by clicking the link below.</p><p><a href='{{confirm_url}}'>Confirm Subscription</a></p>",
+      available_variables: ["confirm_url"],
+      is_active: true,
+      is_system: true,
+    },
+  ];
+
+  for (const tmpl of systemTemplates) {
+    const existing = await prisma.email_template.findFirst({
+      where: { key: tmpl.key, deleted_at: null },
+    });
+    if (!existing) {
+      await prisma.email_template.create({
+        data: {
+          ...tmpl,
+          created_by: adminUser.id,
+          updated_by: adminUser.id,
+        },
+      });
+    } else {
+      await prisma.email_template.update({
+        where: { id: existing.id },
+        data: { is_system: true },
+      });
+    }
+  }
+  console.log(
+    `  ✓ System Email Templates (${systemTemplates.length} templates) seeded & marked immutable`,
+  );
+
   console.log("\n✅ Minimal Database Seeding Complete!");
 }
 

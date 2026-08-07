@@ -1646,3 +1646,61 @@ export const confirmCancellationOtpSchema = z.object({
 export type ConfirmCancellationOtpInput = z.infer<
   typeof confirmCancellationOtpSchema
 >;
+
+// ============================================================
+// EMAIL MARKETING: CONTACTS, GROUPS & CAMPAIGNS
+// ============================================================
+
+export const customerContactUpdateSchema = z.object({
+  first_name: z.string().trim().max(100).optional().nullable(),
+  last_name: z.string().trim().max(100).optional().nullable(),
+  phone: phoneSchema.optional().nullable(),
+  is_customer: z.boolean().optional(),
+  is_newsletter: z.boolean().optional(),
+  is_unsubscribed: z.boolean().optional(),
+});
+export type CustomerContactUpdateInput = z.infer<typeof customerContactUpdateSchema>;
+
+export const emailGroupCreateSchema = z.object({
+  name: z.string().trim().min(1, "Group name is required").max(100, "Group name cannot exceed 100 characters"),
+  description: z.string().trim().max(500).optional().nullable(),
+});
+export type EmailGroupCreateInput = z.infer<typeof emailGroupCreateSchema>;
+
+export const addToGroupSchema = z.object({
+  group_id: z.number().int().positive().optional(),
+  new_group_name: z.string().trim().max(100).optional(),
+  contact_ids: z.array(z.number().int().positive()).min(1, "Select at least one customer contact"),
+});
+export type AddToGroupInput = z.infer<typeof addToGroupSchema>;
+
+export const emailCampaignCreateSchema = z.object({
+  name: z.string().trim().min(1, "Campaign name is required").max(150, "Campaign name cannot exceed 150 characters"),
+  strategy: z.enum(["single", "per_recipient"]).default("single"),
+  subject: z.string().trim().max(255).optional().nullable(),
+  body_html: z.string().max(500000).optional().nullable(),
+  email_config_id: z.number().int().positive().optional().nullable(),
+  template_id: z.number().int().positive().optional().nullable(),
+  contact_ids: z.array(z.number().int().positive()).optional(),
+  group_id: z.number().int().positive().optional(),
+  scheduled_at: z.string().optional().nullable(),
+});
+export type EmailCampaignCreateInput = z.infer<typeof emailCampaignCreateSchema>;
+
+export const emailCampaignUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(150).optional(),
+  strategy: z.enum(["single", "per_recipient"]).optional(),
+  subject: z.string().trim().max(255).optional().nullable(),
+  body_html: z.string().max(500000).optional().nullable(),
+  email_config_id: z.number().int().positive().optional().nullable(),
+  template_id: z.number().int().positive().optional().nullable(),
+  scheduled_at: z.string().optional().nullable(),
+});
+export type EmailCampaignUpdateInput = z.infer<typeof emailCampaignUpdateSchema>;
+
+export const recipientCustomContentSchema = z.object({
+  recipient_id: z.number().int().positive(),
+  custom_subject: z.string().trim().max(255).optional().nullable(),
+  custom_body_html: z.string().max(500000).optional().nullable(),
+});
+export type RecipientCustomContentInput = z.infer<typeof recipientCustomContentSchema>;

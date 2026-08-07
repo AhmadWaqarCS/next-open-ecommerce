@@ -162,21 +162,22 @@ export async function updateEmailConfig(
   }
 }
 
-// ─── VERIFY EMAIL CONFIG ACTION ────────────────────────────────────────────────
-
-export async function verifyEmailConfigAction(): Promise<ActionResponse> {
+export async function verifyAndActivateEmailConfigAction(id: number): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/email-config");
 
   try {
-    const { verifySmtpConnectionService } =
-      await import("@/services/email-services");
-    const result = await verifySmtpConnectionService();
+    const { verifyAndActivateEmailConfigTransaction } = await import("@/services/email-config-services");
+    const result = await verifyAndActivateEmailConfigTransaction(id, Number(user.id));
+
+    revalidatePath("/dashboard/email-config");
+
     await logActivity({
       action: "verify_email_config",
       entity_type: "email_config",
+      entity_id: id,
       user,
       status: result.success ? "SUCCESS" : "FAILED",
-      details: { message: result.message },
+      details: { id, message: result.message },
     });
 
     return {
@@ -184,17 +185,22 @@ export async function verifyEmailConfigAction(): Promise<ActionResponse> {
       message: result.message,
     };
   } catch (error: any) {
-    console.error("[verifyEmailConfigAction] Error:", error);
+    console.error("[verifyAndActivateEmailConfigAction] Error:", error);
     await logActivity({
       action: "verify_email_config",
       entity_type: "email_config",
+      entity_id: id,
       user,
       status: "FAILED",
-      details: { error: String(error) },
+      details: { id, error: String(error) },
     });
     return {
       success: false,
       message: error?.message || "Failed to verify SMTP server configuration.",
     };
   }
+}
+
+export async function verifyEmailConfigAction(id: number = 1): Promise<ActionResponse> {
+  return await verifyAndActivateEmailConfigAction(id);
 }

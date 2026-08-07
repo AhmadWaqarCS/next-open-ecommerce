@@ -24,6 +24,7 @@ export default async function EmailTemplatesPage() {
     subject: t.subject,
     body_html: t.body_html,
     is_active: t.is_active,
+    is_system: t.is_system,
     created_at: t.created_at.toISOString(),
     updated_at: t.updated_at.toISOString(),
     deleted_at: t.deleted_at ? t.deleted_at.toISOString() : null,

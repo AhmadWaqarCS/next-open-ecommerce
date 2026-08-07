@@ -259,7 +259,6 @@ export async function replaceOptimizedImageAction(
     revalidateTag("page-categories", "max");
     revalidateTag("page-products", "max");
     revalidateTag("site-config", "max");
-    revalidateTag("site-header", "max");
     revalidatePath("/dashboard/media");
 
     await logActivity({
@@ -491,7 +490,9 @@ export async function fetchDBImageUrlsAction(): Promise<
  */
 export async function fetchRemoteMediaFileAction(
   url: string,
-): Promise<ActionResponse<{ base64: string; mimeType: string; fileName: string }>> {
+): Promise<
+  ActionResponse<{ base64: string; mimeType: string; fileName: string }>
+> {
   await assertPermission("read", "/dashboard/media");
 
   if (!url || typeof url !== "string") {

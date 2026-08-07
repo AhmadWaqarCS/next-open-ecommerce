@@ -19,6 +19,7 @@ export interface EmailTemplateItem {
   subject: string;
   body_html: string;
   is_active: boolean;
+  is_system?: boolean;
   created_at: Date | string;
   updated_at: Date | string;
   deleted_at?: Date | string | null;
@@ -242,6 +243,11 @@ export function EmailTemplateClient({ templates, userPermissions }: EmailTemplat
                             {template.name}
                           </span>
 
+                          {template.is_system && (
+                            <span className="text-[10px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                              🔒 System Template
+                            </span>
+                          )}
                           {template.is_active ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wide uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -286,7 +292,7 @@ export function EmailTemplateClient({ templates, userPermissions }: EmailTemplat
                               </Link>
                             )}
 
-                            {userPermissions.delete && (
+                            {!template.is_system && userPermissions.delete && (
                               <button
                                 onClick={() => handleSoftDelete(template.id)}
                                 disabled={isPending}
