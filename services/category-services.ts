@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { saveMediaToStorage, deleteMediaFromStorage, bulkDeleteMediaFromStorage } from "@/services/storage-services";
 
 export async function createCategoryTransaction(
   data: {
@@ -19,10 +20,20 @@ export async function createCategoryTransaction(
   },
   userId: number,
 ) {
+  // Process image upload if new media payload
+  let finalImageUrl: string | null = null;
+  if (data.image_url) {
+    const now = new Date();
+    const destination = `categories/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const res = await saveMediaToStorage(data.image_url, undefined, destination);
+    finalImageUrl = res ? res.relativePath : data.image_url;
+  }
+
   return await prisma.$transaction(async (tx) => {
     const category = await tx.category.create({
       data: {
         ...data,
+        image_url: finalImageUrl,
         created_by: userId,
         updated_by: userId,
       },
@@ -60,26 +71,57 @@ export async function updateCategoryTransaction(
   },
   userId: number,
 ) {
-  return await prisma.$transaction(async (tx) => {
+  // Process image upload if new media payload
+  let processedImageUrl: string | null | undefined = undefined;
+  if (data.image_url !== undefined) {
+    if (data.image_url) {
+      const now = new Date();
+      const destination = `categories/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const res = await saveMediaToStorage(data.image_url, undefined, destination);
+      processedImageUrl = res ? res.relativePath : data.image_url;
+    } else {
+      processedImageUrl = null;
+    }
+  }
+
+  let oldImageUrl: string | null = null;
+
+  const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.category.findUnique({
       where: { id },
       include: { parent: { select: { slug: true } } },
     });
     if (!existing) throw new Error("Category not found.");
 
-    const removedMediaUrls: string[] = [];
-    if (
-      data.image_url !== undefined &&
-      data.image_url !== existing.image_url &&
-      existing.image_url
-    ) {
-      removedMediaUrls.push(existing.image_url);
+    const updatePayload: Record<string, any> = {};
+
+    // Compare fields and include ONLY changed values
+    if (data.name !== undefined && data.name !== existing.name) updatePayload.name = data.name;
+    if (data.slug !== undefined && data.slug !== existing.slug) updatePayload.slug = data.slug;
+    if (data.description !== undefined && data.description !== existing.description) updatePayload.description = data.description;
+    if (data.image_alt_text !== undefined && data.image_alt_text !== existing.image_alt_text) updatePayload.image_alt_text = data.image_alt_text;
+    if (data.bg_color !== undefined && data.bg_color !== existing.bg_color) updatePayload.bg_color = data.bg_color;
+    if (data.show_in_header !== undefined && data.show_in_header !== existing.show_in_header) updatePayload.show_in_header = data.show_in_header;
+    if (data.show_in_footer !== undefined && data.show_in_footer !== existing.show_in_footer) updatePayload.show_in_footer = data.show_in_footer;
+    if (data.show_in_home !== undefined && data.show_in_home !== existing.show_in_home) updatePayload.show_in_home = data.show_in_home;
+    if (data.parent_id !== undefined && data.parent_id !== existing.parent_id) updatePayload.parent_id = data.parent_id;
+    if (data.sort_order !== undefined && data.sort_order !== existing.sort_order) updatePayload.sort_order = data.sort_order;
+    if (data.is_active !== undefined && data.is_active !== existing.is_active) updatePayload.is_active = data.is_active;
+    if (data.meta_info !== undefined && JSON.stringify(data.meta_info) !== JSON.stringify(existing.meta_info)) updatePayload.meta_info = data.meta_info;
+
+    if (processedImageUrl !== undefined && processedImageUrl !== existing.image_url) {
+      updatePayload.image_url = processedImageUrl;
+      if (existing.image_url) oldImageUrl = existing.image_url;
     }
 
-    const updated = await tx.category.update({
-      where: { id },
-      data: { ...data, updated_by: userId },
-    });
+    let updated = existing as any;
+    if (Object.keys(updatePayload).length > 0) {
+      updatePayload.updated_by = userId;
+      updated = await tx.category.update({
+        where: { id },
+        data: updatePayload,
+      });
+    }
 
     let newParentSlug: string | null = null;
     if (data.parent_id && data.parent_id !== existing.parent_id) {
@@ -90,13 +132,17 @@ export async function updateCategoryTransaction(
       newParentSlug = parent?.slug || null;
     }
 
-    return {
-      existing,
-      updated,
-      newParentSlug,
-      removedMediaUrls: Array.from(new Set(removedMediaUrls.filter(Boolean))),
-    };
+    return { existing, updated, newParentSlug };
   });
+
+  // Delete old image AFTER DB commit — fire-and-forget
+  if (oldImageUrl) {
+    deleteMediaFromStorage(oldImageUrl).catch((err) =>
+      console.warn(`[Category Update] Failed to delete old image '${oldImageUrl}':`, err)
+    );
+  }
+
+  return result;
 }
 
 export async function deleteCategoryTransaction(id: number, userId: number) {
@@ -134,20 +180,26 @@ export async function restoreCategoryTransaction(id: number, userId: number) {
 }
 
 export async function permanentlyDeleteCategoryTransaction(id: number) {
-  return await prisma.$transaction(async (tx) => {
+  const { existing } = await prisma.$transaction(async (tx) => {
     const existing = await tx.category.findUnique({
       where: { id },
       include: { parent: { select: { slug: true } } },
     });
     if (!existing) throw new Error("Category not found.");
 
-    const removedMediaUrls: string[] = [];
-    if (existing.image_url) removedMediaUrls.push(existing.image_url);
-
     await tx.category.delete({ where: { id } });
 
-    return { existing, removedMediaUrls };
+    return { existing };
   });
+
+  // Delete associated media AFTER DB delete — fire-and-forget
+  if (existing.image_url) {
+    deleteMediaFromStorage(existing.image_url).catch((err) =>
+      console.warn(`[Category Delete] Failed to delete image '${existing.image_url}':`, err)
+    );
+  }
+
+  return { existing };
 }
 
 export async function bulkDeleteCategoriesTransaction(
@@ -221,7 +273,7 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
   selectAllScope: boolean = false,
   filterWhere?: Prisma.categoryWhereInput,
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const { affected } = await prisma.$transaction(async (tx) => {
     const whereCondition: Prisma.categoryWhereInput = selectAllScope
       ? (filterWhere ?? { NOT: { deleted_at: null } })
       : { id: { in: ids } };
@@ -240,14 +292,20 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
       },
     });
 
-    const removedMediaUrls = affected
-      .map((c) => c.image_url)
-      .filter(Boolean) as string[];
-
     await tx.category.deleteMany({ where: whereCondition });
 
-    return { affected, removedMediaUrls };
+    return { affected };
   });
+
+  // Delete all collected media URLs AFTER DB delete — fire-and-forget
+  const mediaUrls = affected.map((c) => c.image_url).filter(Boolean) as string[];
+  if (mediaUrls.length > 0) {
+    bulkDeleteMediaFromStorage(mediaUrls).catch((err) =>
+      console.warn(`[Category Bulk Delete] Failed to delete some media:`, err)
+    );
+  }
+
+  return { affected };
 }
 
 export async function getCategoriesDashboardDataInDB(

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { saveMediaToStorage, deleteMediaFromStorage, bulkDeleteMediaFromStorage } from "@/services/storage-services";
 
 export interface ProductGalleryImageServiceInput {
   id?: number;
@@ -49,20 +50,59 @@ export async function createProductTransaction(
   },
   userId: number,
 ) {
+  const now = new Date();
+  const dest = `products/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Process feature image if base64/binary payload
+  let processedFeatureImage: string | null = null;
+  if (data.feature_image_url) {
+    const res = await saveMediaToStorage(data.feature_image_url, undefined, dest);
+    processedFeatureImage = res ? res.relativePath : null;
+  }
+
+  // Process gallery images if base64/binary payloads
+  const processedGalleryImages: ProductGalleryImageServiceInput[] = [];
+  if (data.gallery_images && data.gallery_images.length > 0) {
+    for (const img of data.gallery_images) {
+      const res = await saveMediaToStorage(img.url, undefined, dest);
+      processedGalleryImages.push({
+        ...img,
+        url: res ? res.relativePath : img.url,
+      });
+    }
+  }
+
+  // Process variants if base64/binary payloads
+  const processedVariants: ProductVariantServiceInput[] = [];
+  if (data.variants && data.variants.length > 0) {
+    for (const v of data.variants) {
+      let variantImageUrl = v.image_url;
+      if (v.image_url) {
+        const res = await saveMediaToStorage(v.image_url, undefined, dest);
+        variantImageUrl = res ? res.relativePath : v.image_url;
+      }
+      processedVariants.push({
+        ...v,
+        image_url: variantImageUrl,
+      });
+    }
+  }
+
   return await prisma.$transaction(async (tx) => {
     const { gallery_images, variants, ...productFields } = data;
 
     const newProduct = await tx.product.create({
       data: {
         ...productFields,
+        feature_image_url: processedFeatureImage,
         created_by: userId,
         updated_by: userId,
       } as Prisma.productUncheckedCreateInput,
     });
 
-    if (gallery_images && gallery_images.length > 0) {
+    if (processedGalleryImages.length > 0) {
       await tx.product_image.createMany({
-        data: gallery_images.map((img, idx) => ({
+        data: processedGalleryImages.map((img, idx) => ({
           product_id: newProduct.id,
           url: img.url,
           alt_text: img.alt_text || null,
@@ -73,9 +113,9 @@ export async function createProductTransaction(
       });
     }
 
-    if (variants && variants.length > 0) {
+    if (processedVariants.length > 0) {
       await tx.product_variant.createMany({
-        data: variants.map((v, idx) => ({
+        data: processedVariants.map((v, idx) => ({
           product_id: newProduct.id,
           name: v.name,
           sku: v.sku || null,
@@ -137,7 +177,23 @@ export async function updateProductTransaction(
   },
   userId: number,
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const now = new Date();
+  const dest = `products/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  // Process feature_image_url if provided
+  let processedFeatureImage: string | null | undefined = undefined;
+  if (data.feature_image_url !== undefined) {
+    if (data.feature_image_url) {
+      const res = await saveMediaToStorage(data.feature_image_url, undefined, dest);
+      processedFeatureImage = res ? res.relativePath : null;
+    } else {
+      processedFeatureImage = null;
+    }
+  }
+
+  const removedMediaUrls: string[] = [];
+
+  const result = await prisma.$transaction(async (tx) => {
     const existing = await tx.product.findUnique({
       where: { id },
       include: {
@@ -151,25 +207,45 @@ export async function updateProductTransaction(
       throw new Error("Product not found.");
     }
 
-    const removedMediaUrls: string[] = [];
+    const { gallery_images, variants, ...productFields } = data;
+    const updatePayload: Record<string, any> = {};
 
-    if (
-      data.feature_image_url !== undefined &&
-      data.feature_image_url !== existing.feature_image_url &&
-      existing.feature_image_url
-    ) {
-      removedMediaUrls.push(existing.feature_image_url);
+    // Diff scalar fields against existing record
+    const keysToCheck = [
+      "name", "slug", "description", "short_description", "feature_image_alt_text",
+      "price", "compare_at_price", "cost_price", "sku", "stock_quantity",
+      "low_stock_threshold", "track_inventory", "weight", "category_id",
+      "is_featured", "is_active", "sort_order"
+    ];
+
+    for (const k of keysToCheck) {
+      if ((productFields as any)[k] !== undefined && (productFields as any)[k] !== (existing as any)[k]) {
+        updatePayload[k] = (productFields as any)[k];
+      }
     }
 
-    const { gallery_images, variants, ...productFields } = data;
+    if (productFields.dimensions !== undefined && JSON.stringify(productFields.dimensions) !== JSON.stringify(existing.dimensions)) {
+      updatePayload.dimensions = productFields.dimensions;
+    }
+    if (productFields.meta_info !== undefined && JSON.stringify(productFields.meta_info) !== JSON.stringify(existing.meta_info)) {
+      updatePayload.meta_info = productFields.meta_info;
+    }
 
-    const updatedProduct = await tx.product.update({
-      where: { id },
-      data: {
-        ...productFields,
-        updated_by: userId,
-      } as Prisma.productUncheckedUpdateInput,
-    });
+    if (processedFeatureImage !== undefined && processedFeatureImage !== existing.feature_image_url) {
+      updatePayload.feature_image_url = processedFeatureImage;
+      if (existing.feature_image_url) {
+        removedMediaUrls.push(existing.feature_image_url);
+      }
+    }
+
+    let updatedProduct = existing as any;
+    if (Object.keys(updatePayload).length > 0) {
+      updatePayload.updated_by = userId;
+      updatedProduct = await tx.product.update({
+        where: { id },
+        data: updatePayload as Prisma.productUncheckedUpdateInput,
+      });
+    }
 
     if (gallery_images !== undefined) {
       const incomingIds = gallery_images
@@ -192,11 +268,19 @@ export async function updateProductTransaction(
 
       for (let idx = 0; idx < gallery_images.length; idx++) {
         const img = gallery_images[idx];
+        const res = await saveMediaToStorage(img.url, undefined, dest);
+        const finalUrl = res ? res.relativePath : img.url;
+
         if (img.id) {
+          const oldGalleryImg = existing.images.find((e) => e.id === img.id);
+          if (oldGalleryImg && oldGalleryImg.url && finalUrl !== oldGalleryImg.url) {
+            removedMediaUrls.push(oldGalleryImg.url);
+          }
+
           await tx.product_image.update({
             where: { id: img.id },
             data: {
-              url: img.url,
+              url: finalUrl,
               alt_text: img.alt_text || null,
               sort_order: img.sort_order ?? idx,
               updated_by: userId,
@@ -206,7 +290,7 @@ export async function updateProductTransaction(
           await tx.product_image.create({
             data: {
               product_id: id,
-              url: img.url,
+              url: finalUrl,
               alt_text: img.alt_text || null,
               sort_order: img.sort_order ?? idx,
               created_by: userId,
@@ -238,6 +322,12 @@ export async function updateProductTransaction(
 
       for (let idx = 0; idx < variants.length; idx++) {
         const v = variants[idx];
+        let variantImageUrl = v.image_url || null;
+        if (v.image_url) {
+          const res = await saveMediaToStorage(v.image_url, undefined, dest);
+          variantImageUrl = res ? res.relativePath : v.image_url;
+        }
+
         const formattedPrice =
           v.price != null && v.price !== "" ? Number(v.price) : null;
         const formattedCompare =
@@ -249,8 +339,8 @@ export async function updateProductTransaction(
           const oldVariant = existing.variants.find((ev) => ev.id === v.id);
           if (
             oldVariant &&
-            v.image_url !== undefined &&
-            v.image_url !== oldVariant.image_url &&
+            variantImageUrl !== undefined &&
+            variantImageUrl !== oldVariant.image_url &&
             oldVariant.image_url
           ) {
             removedMediaUrls.push(oldVariant.image_url);
@@ -265,7 +355,7 @@ export async function updateProductTransaction(
               compare_at_price: formattedCompare,
               stock_quantity: v.stock_quantity ?? 0,
               options: (v.options as any) ?? {},
-              image_url: v.image_url || null,
+              image_url: variantImageUrl,
               image_url_alt_text: v.image_url_alt_text || null,
               is_active: v.is_active ?? true,
               sort_order: v.sort_order ?? idx,
@@ -282,7 +372,7 @@ export async function updateProductTransaction(
               compare_at_price: formattedCompare,
               stock_quantity: v.stock_quantity ?? 0,
               options: (v.options as any) ?? {},
-              image_url: v.image_url || null,
+              image_url: variantImageUrl,
               image_url_alt_text: v.image_url_alt_text || null,
               is_active: v.is_active ?? true,
               sort_order: v.sort_order ?? idx,
@@ -303,13 +393,17 @@ export async function updateProductTransaction(
       newCategorySlug = cat?.slug || null;
     }
 
-    return {
-      existing,
-      updatedProduct,
-      newCategorySlug,
-      removedMediaUrls: Array.from(new Set(removedMediaUrls.filter(Boolean))),
-    };
+    return { existing, updatedProduct, newCategorySlug };
   });
+
+  // Delete removed media AFTER DB commit — fire-and-forget
+  if (removedMediaUrls.length > 0) {
+    bulkDeleteMediaFromStorage(Array.from(new Set(removedMediaUrls.filter(Boolean)))).catch(
+      (err) => console.warn(`[Product Update] Failed to delete some removed media:`, err)
+    );
+  }
+
+  return result;
 }
 
 export async function deleteProductTransaction(id: number, userId: number) {
@@ -367,7 +461,7 @@ export async function restoreProductTransaction(id: number, userId: number) {
 }
 
 export async function permanentlyDeleteProductTransaction(id: number) {
-  return await prisma.$transaction(async (tx) => {
+  const { existing } = await prisma.$transaction(async (tx) => {
     const existing = await tx.product.findUnique({
       where: { id },
       include: {
@@ -379,24 +473,26 @@ export async function permanentlyDeleteProductTransaction(id: number) {
 
     if (!existing) throw new Error("Product not found.");
 
-    const removedMediaUrls: string[] = [];
-    if (existing.feature_image_url) removedMediaUrls.push(existing.feature_image_url);
-    for (const img of existing.images) {
-      if (img.url) removedMediaUrls.push(img.url);
-    }
-    for (const v of existing.variants) {
-      if (v.image_url) removedMediaUrls.push(v.image_url);
-    }
-
     await tx.product_variant.deleteMany({ where: { product_id: id } });
     await tx.product_image.deleteMany({ where: { product_id: id } });
     await tx.product.delete({ where: { id } });
 
-    return {
-      existing,
-      removedMediaUrls: Array.from(new Set(removedMediaUrls.filter(Boolean))),
-    };
+    return { existing };
   });
+
+  // Delete all associated media AFTER DB delete — fire-and-forget
+  const mediaUrls: string[] = [];
+  if (existing.feature_image_url) mediaUrls.push(existing.feature_image_url);
+  for (const img of existing.images) if (img.url) mediaUrls.push(img.url);
+  for (const v of existing.variants) if (v.image_url) mediaUrls.push(v.image_url);
+
+  if (mediaUrls.length > 0) {
+    bulkDeleteMediaFromStorage(Array.from(new Set(mediaUrls))).catch((err) =>
+      console.warn(`[Product Permanent Delete] Failed to delete some media:`, err)
+    );
+  }
+
+  return { existing };
 }
 
 export async function bulkDeleteProductsTransaction(
@@ -472,7 +568,7 @@ export async function bulkPermanentlyDeleteProductsTransaction(
   selectAllScope: boolean = false,
   filterWhere?: Prisma.productWhereInput,
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const { affected } = await prisma.$transaction(async (tx) => {
     const whereCondition: Prisma.productWhereInput = selectAllScope
       ? (filterWhere ?? { NOT: { deleted_at: null } })
       : { id: { in: ids } };
@@ -487,17 +583,6 @@ export async function bulkPermanentlyDeleteProductsTransaction(
     });
 
     const affectedIds = affected.map((p) => p.id);
-    const removedMediaUrls: string[] = [];
-
-    for (const p of affected) {
-      if (p.feature_image_url) removedMediaUrls.push(p.feature_image_url);
-      for (const img of p.images) {
-        if (img.url) removedMediaUrls.push(img.url);
-      }
-      for (const v of p.variants) {
-        if (v.image_url) removedMediaUrls.push(v.image_url);
-      }
-    }
 
     if (affectedIds.length > 0) {
       await tx.product_variant.deleteMany({
@@ -511,11 +596,24 @@ export async function bulkPermanentlyDeleteProductsTransaction(
       });
     }
 
-    return {
-      affected,
-      removedMediaUrls: Array.from(new Set(removedMediaUrls.filter(Boolean))),
-    };
+    return { affected };
   });
+
+  // Delete all collected media URLs AFTER DB delete — fire-and-forget
+  const mediaUrls: string[] = [];
+  for (const p of affected) {
+    if (p.feature_image_url) mediaUrls.push(p.feature_image_url);
+    for (const img of p.images) if (img.url) mediaUrls.push(img.url);
+    for (const v of p.variants) if (v.image_url) mediaUrls.push(v.image_url);
+  }
+
+  if (mediaUrls.length > 0) {
+    bulkDeleteMediaFromStorage(Array.from(new Set(mediaUrls.filter(Boolean)))).catch(
+      (err) => console.warn(`[Product Bulk Permanent Delete] Failed to delete some media:`, err)
+    );
+  }
+
+  return { affected };
 }
 
 export async function getProductsDashboardDataInDB(

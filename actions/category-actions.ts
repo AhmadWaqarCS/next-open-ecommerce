@@ -18,8 +18,7 @@ import {
   bulkRestoreCategoriesTransaction,
   bulkPermanentlyDeleteCategoriesTransaction,
 } from "@/services/category-services";
-import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
-import { saveFileToUploads } from "@/services/upload-services";
+import { saveMediaToStorage } from "@/services/storage-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
   CategoryFilterParams,
@@ -29,7 +28,7 @@ import {
 export async function uploadCategoryImage(
   formData: FormData,
 ): Promise<ActionResponse<{ relativePath: string }>> {
-  await assertPermission("create", "/dashboard/categories");
+  const { user } = await assertPermission("create", "/dashboard/categories");
 
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {
@@ -70,11 +69,15 @@ export async function uploadCategoryImage(
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const destination = `categories/${year}/${month}`;
 
-    const uploadResult = await saveFileToUploads(buffer, fileName, destination);
+    const uploadResult = await saveMediaToStorage(buffer, fileName, destination);
+    if (!uploadResult) {
+      return { success: false, message: "Failed to save uploaded image." };
+    }
 
     await logActivity({
       action: "upload_category_image",
       entity_type: "category",
+      user,
       details: { fileName: file.name, relativePath: uploadResult.relativePath },
     });
 
@@ -210,7 +213,7 @@ export async function updateCategory(
   } = validatedFields.data;
 
   try {
-    const { existing, updated, newParentSlug, removedMediaUrls } =
+    const { existing, updated, newParentSlug } =
       await updateCategoryTransaction(
         id,
         {
@@ -231,10 +234,6 @@ export async function updateCategory(
         },
         Number(user.id),
       );
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     const categoryListChanged =
       (name !== undefined && name !== existing.name) ||
@@ -421,12 +420,8 @@ export async function permanentlyDeleteCategory(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const { existing, removedMediaUrls } =
+    const { existing } =
       await permanentlyDeleteCategoryTransaction(id);
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     revalidateTag("page-categories", "max");
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
@@ -579,16 +574,12 @@ export async function bulkPermanentlyDeleteCategories(
       : undefined;
 
   try {
-    const { affected, removedMediaUrls } =
+    const { affected } =
       await bulkPermanentlyDeleteCategoriesTransaction(
         ids,
         selectAllScope,
         filterWhere,
       );
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     revalidateTag("page-categories", "max");
     for (const cat of affected) {

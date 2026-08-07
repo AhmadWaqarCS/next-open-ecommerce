@@ -728,3 +728,21 @@ model activity_log {
   @@map("activity_logs")
 }
 
+model storage_option {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  name        String
+  driver      String
+  description String?
+  is_active   Boolean  @default(false)
+  env_keys    Json     @default("[]")
+  cdn_url     String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([key])
+  @@index([is_active])
+  @@map("storage_options")
+}
+
+

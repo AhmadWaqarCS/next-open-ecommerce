@@ -18,8 +18,7 @@ import {
   bulkRestoreProductsTransaction,
   bulkPermanentlyDeleteProductsTransaction,
 } from "@/services/product-services";
-import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
-import { saveFileToUploads } from "@/services/upload-services";
+import { saveMediaToStorage } from "@/services/storage-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
   ProductFilterParams,
@@ -88,7 +87,10 @@ export async function uploadProductImage(
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const destination = `products/${year}/${month}`;
 
-    const uploadResult = await saveFileToUploads(buffer, fileName, destination);
+    const uploadResult = await saveMediaToStorage(buffer, fileName, destination);
+    if (!uploadResult) {
+      return { success: false, message: "Failed to upload image file." };
+    }
     await logActivity({
       action: "upload_product_image",
       entity_type: "product",
@@ -271,7 +273,7 @@ export async function updateProduct(
   } = validatedFields.data;
 
   try {
-    const { existing, updatedProduct, newCategorySlug, removedMediaUrls } =
+    const { existing, updatedProduct, newCategorySlug } =
       await updateProductTransaction(
         id,
         {
@@ -307,10 +309,6 @@ export async function updateProduct(
         },
         Number(user.id),
       );
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (updatedProduct.slug && updatedProduct.slug !== existing?.slug) {
@@ -449,12 +447,8 @@ export async function permanentlyDeleteProduct(
   if (id < 1) return { success: false, message: "An Error Occurred" };
 
   try {
-    const { existing, removedMediaUrls } =
+    const { existing } =
       await permanentlyDeleteProductTransaction(id);
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     revalidateTag("page-products", "max");
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
@@ -606,16 +600,12 @@ export async function bulkPermanentlyDeleteProducts(
       : undefined;
 
   try {
-    const { affected, removedMediaUrls } =
+    const { affected } =
       await bulkPermanentlyDeleteProductsTransaction(
         ids,
         selectAllScope,
         filterWhere,
       );
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     revalidateTag("page-products", "max");
     for (const prod of affected) {

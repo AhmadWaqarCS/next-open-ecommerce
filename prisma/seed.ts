@@ -139,6 +139,12 @@ async function main() {
       enabled: true,
       is_super: false,
     },
+    {
+      name: "Storage Options",
+      path: "/dashboard/storages",
+      enabled: true,
+      is_super: false,
+    },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
     {
@@ -1034,6 +1040,63 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   console.log(
     "  ✓ 1 Category, 1 Sample Product & Sample Coupon WELCOME10 seeded",
   );
+
+  // Seed Storage Options
+  const defaultStorageOptions = [
+    {
+      key: "local",
+      name: "Local Server Storage",
+      driver: "fs",
+      description: "Default local uploads folder on VPS/Server disk storage.",
+      is_active: true,
+      env_keys: ["LOCAL_UPLOADS_DIR"],
+    },
+    {
+      key: "aws_s3",
+      name: "AWS S3 Storage",
+      driver: "s3",
+      description: "Amazon Web Services Simple Storage Service (S3).",
+      is_active: false,
+      env_keys: ["AWS_S3_KEY", "AWS_S3_SECRET", "AWS_S3_BUCKET", "AWS_S3_REGION"],
+    },
+    {
+      key: "cloudflare_r2",
+      name: "Cloudflare R2",
+      driver: "s3",
+      description: "Zero egress cost object storage powered by Cloudflare.",
+      is_active: false,
+      env_keys: ["CLOUDFLARE_R2_KEY", "CLOUDFLARE_R2_SECRET", "CLOUDFLARE_R2_BUCKET", "CLOUDFLARE_R2_ENDPOINT"],
+    },
+    {
+      key: "minio",
+      name: "MinIO Object Storage",
+      driver: "s3",
+      description: "Self-hosted S3 compatible high performance object storage.",
+      is_active: false,
+      env_keys: ["MINIO_KEY", "MINIO_SECRET", "MINIO_BUCKET", "MINIO_ENDPOINT"],
+    },
+    {
+      key: "google_cloud",
+      name: "Google Cloud Storage",
+      driver: "gcs",
+      description: "Google Cloud Platform unified object storage service.",
+      is_active: false,
+      env_keys: ["GCS_KEY_FILE", "GCS_BUCKET"],
+    },
+  ];
+
+  for (const opt of defaultStorageOptions) {
+    const existing = await prisma.storage_option.findUnique({
+      where: { key: opt.key },
+    });
+    if (!existing) {
+      await prisma.storage_option.create({
+        data: opt,
+      });
+    }
+  }
+
+  console.log(`  ✓ Storage Options (${defaultStorageOptions.length} providers) seeded`);
   console.log("\n✅ Minimal Database Seeding Complete!");
 }
 

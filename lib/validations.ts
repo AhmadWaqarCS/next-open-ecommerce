@@ -1473,65 +1473,27 @@ export const deleteMediaSchema = z.object({
 });
 export type DeleteMediaInput = z.infer<typeof deleteMediaSchema>;
 
-export const mediaTargetTypes = [
-  "category",
-  "product_feature",
-  "product_gallery",
-  "product_variant",
-  "site_logo_light",
-  "site_logo_dark",
-  "site_favicon",
-] as const;
-
-export const reconnectMediaSchema = z.object({
-  relativePath: relativePathSchema,
-  targetType: z.enum(mediaTargetTypes, {
-    error: () => ({ message: "Please select a valid target type" }),
-  }),
-  targetId: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(2147483647)
-    .optional()
-    .nullable(),
-  altText: z
-    .string()
-    .trim()
-    .max(255, "Alt text cannot exceed 255 characters")
-    .optional()
-    .nullable(),
-});
-export type ReconnectMediaInput = z.infer<typeof reconnectMediaSchema>;
-
-export const clearBrokenMediaSchema = z.object({
-  targetType: z.enum(mediaTargetTypes, {
-    error: () => ({ message: "Please select a valid target type" }),
-  }),
-  targetId: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(2147483647)
-    .optional()
-    .nullable(),
-  galleryImageId: z.coerce
-    .number()
-    .int()
-    .positive()
-    .max(2147483647)
-    .optional()
-    .nullable(),
-});
-export type ClearBrokenMediaInput = z.infer<typeof clearBrokenMediaSchema>;
-
 export const bulkDeleteMediaSchema = z.object({
   relativePaths: z
     .array(relativePathSchema)
     .min(1, "Please select at least one file to delete")
-    .max(100, "Cannot delete more than 100 files at once"),
+    .max(500, "Cannot delete more than 500 files at once"),
 });
 export type BulkDeleteMediaInput = z.infer<typeof bulkDeleteMediaSchema>;
+
+export const fetchStorageFilesSchema = z.object({
+  storageKey: z
+    .string()
+    .trim()
+    .min(1, "Storage key is required")
+    .max(50, "Storage key is too long"),
+});
+export type FetchStorageFilesInput = z.infer<typeof fetchStorageFilesSchema>;
+
+export const replaceOptimizedImageSchema = z.object({
+  oldUrl: relativePathSchema,
+});
+export type ReplaceOptimizedImageInput = z.infer<typeof replaceOptimizedImageSchema>;
 
 // ============================================================
 // INVOICES

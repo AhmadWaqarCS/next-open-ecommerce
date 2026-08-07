@@ -1,7 +1,7 @@
 "use server";
 
-import fs from "fs/promises";
-import path from "path";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -15,7 +15,6 @@ import {
   updateSiteConfigTransaction,
   getSitemapDataTransaction,
 } from "@/services/site-services";
-import { bulkDeleteMediaFilesFromStorage } from "@/services/media-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 // ─── SITE CONFIG ──────────────────────────────────────────────────────────────
@@ -165,7 +164,8 @@ export async function updateSiteConfig(
   } = validatedFields.data;
 
   try {
-    const { removedMediaUrls } = await updateSiteConfigTransaction(
+    const { existing, updated } =
+      await updateSiteConfigTransaction(
       id,
       {
         name,
@@ -199,10 +199,6 @@ export async function updateSiteConfig(
       },
       Number(user.id),
     );
-
-    if (removedMediaUrls.length > 0) {
-      await bulkDeleteMediaFilesFromStorage(removedMediaUrls);
-    }
 
     revalidateTag("site-config", "max");
 

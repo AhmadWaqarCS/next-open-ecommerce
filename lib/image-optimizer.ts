@@ -1,4 +1,5 @@
 import imageCompression from "browser-image-compression";
+import { fetchRemoteMediaFileAction } from "@/actions/media-actions";
 
 export type ImageFormat =
   | "original"
@@ -52,37 +53,203 @@ export function getImageDimensions(
 }
 
 /**
+ * Converts an existing HTMLImageElement from the DOM directly into a File object via Canvas drawing.
+ * Reads the rendered pixels straight from the DOM img element.
+ */
+export function domImgToFile(
+  imgEl: HTMLImageElement | null,
+  fileName = "image.png"
+): Promise<File | null> {
+  return new Promise((resolve) => {
+    if (!imgEl || !imgEl.complete || !imgEl.naturalWidth) {
+      resolve(null);
+      return;
+    }
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = imgEl.naturalWidth || imgEl.width || 300;
+      canvas.height = imgEl.naturalHeight || imgEl.height || 300;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+
+      ctx.drawImage(imgEl, 0, 0);
+
+      const ext = fileName.split(".").pop()?.toLowerCase() || "png";
+      let mimeType = "image/png";
+      if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+      else if (ext === "webp") mimeType = "image/webp";
+      else if (ext === "avif") mimeType = "image/avif";
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(new File([blob], fileName, { type: blob.type || mimeType }));
+          } else {
+            resolve(null);
+          }
+        },
+        mimeType,
+        0.95
+      );
+    } catch (err) {
+      console.warn("[domImgToFile] DOM image canvas export failed:", err);
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Loads an image URL into an HTML Image element and converts it to a File object via Canvas drawing.
+ * Loads directly from browser cache / DOM img without triggering cross-origin network fetch errors.
+ */
+export function imageElementToFile(
+  imgUrl: string,
+  fileName = "image.png"
+): Promise<File | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width || 300;
+        canvas.height = img.naturalHeight || img.height || 300;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+
+        const ext = fileName.split(".").pop()?.toLowerCase() || "png";
+        let mimeType = "image/png";
+        if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+        else if (ext === "webp") mimeType = "image/webp";
+        else if (ext === "avif") mimeType = "image/avif";
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], fileName, { type: blob.type || mimeType }));
+            } else {
+              resolve(null);
+            }
+          },
+          mimeType,
+          0.95
+        );
+      } catch {
+        resolve(null);
+      }
+    };
+
+    img.onerror = () => {
+      // Retry without crossOrigin if CORS failed
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = fallbackImg.naturalWidth || fallbackImg.width || 300;
+          canvas.height = fallbackImg.naturalHeight || fallbackImg.height || 300;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { resolve(null); return; }
+          ctx.drawImage(fallbackImg, 0, 0);
+          const ext = fileName.split(".").pop()?.toLowerCase() || "png";
+          let mimeType = "image/png";
+          if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+          else if (ext === "webp") mimeType = "image/webp";
+          canvas.toBlob((blob) => {
+            if (blob) resolve(new File([blob], fileName, { type: blob.type || mimeType }));
+            else resolve(null);
+          }, mimeType, 0.95);
+        } catch {
+          resolve(null);
+        }
+      };
+      fallbackImg.onerror = () => resolve(null);
+      fallbackImg.src = imgUrl;
+    };
+
+    img.src = imgUrl;
+  });
+}
+
+/**
  * Fetch an image URL and convert it into a File object for optimization
  */
 export async function urlToFile(
   url: string,
   defaultName = "image.png",
+  domImgElement?: HTMLImageElement | null,
 ): Promise<File | null> {
   if (!url || url.startsWith("blob:")) return null;
+
+  let filename = defaultName;
   try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    const contentType = blob.type || "image/png";
-
-    // Extract filename from URL if possible
-    let filename = defaultName;
-    try {
-      const parsed = new URL(url, window.location.href);
-      const pathname = parsed.pathname;
-      const segment = pathname.split("/").pop();
-      if (segment && segment.includes(".")) {
-        filename = segment;
-      }
-    } catch {
-      // fallback to defaultName
+    const parsed = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const segment = parsed.pathname.split("/").pop();
+    if (segment && segment.includes(".")) {
+      filename = segment;
     }
-
-    return new File([blob], filename, { type: contentType });
-  } catch (err) {
-    console.error("Failed to convert URL to File:", err);
-    return null;
+  } catch {
+    // fallback
   }
+
+  // 1. Try DOM img element directly if passed
+  if (domImgElement) {
+    try {
+      const fileFromDom = await domImgToFile(domImgElement, filename);
+      if (fileFromDom) return fileFromDom;
+    } catch {
+      // fallback
+    }
+  }
+
+  // 2. Try Image canvas drawing from URL
+  try {
+    const fileFromCanvas = await imageElementToFile(url, filename);
+    if (fileFromCanvas) return fileFromCanvas;
+  } catch {
+    // fallback
+  }
+
+  // 3. Try direct browser fetch
+  try {
+    const fetchUrl =
+      typeof window !== "undefined" && url.startsWith("/")
+        ? `${window.location.origin}${url}`
+        : url;
+
+    const response = await fetch(fetchUrl);
+    if (response.ok) {
+      const blob = await response.blob();
+      const contentType = blob.type || "image/png";
+      return new File([blob], filename, { type: contentType });
+    }
+  } catch {
+    // fallback
+  }
+
+  // 4. Server proxy fallback for remote CORS-restricted bucket images
+  try {
+    const res = await fetchRemoteMediaFileAction(url);
+    if (res.success && res.data?.base64) {
+      const base64Res = await fetch(res.data.base64);
+      const blob = await base64Res.blob();
+      const finalFileName = res.data.fileName || filename;
+      const contentType = res.data.mimeType || blob.type || "image/png";
+      return new File([blob], finalFileName, { type: contentType });
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
 /**

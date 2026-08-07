@@ -111,6 +111,7 @@ export default function SiteConfigForm({
       tax_label: initialData.tax_label || "Tax",
       require_phone: initialData.require_phone ?? false,
       allow_order_notes: initialData.allow_order_notes ?? true,
+      captcha_provider: initialData.captcha_provider || "none",
       meta_info: {
         title: initialData.meta_info?.title || "",
         description: initialData.meta_info?.description || "",
