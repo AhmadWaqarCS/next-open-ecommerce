@@ -1,9 +1,5 @@
 export async function register() {
-  if (
-    process.env.ENABLE_EMAIL_CRON === "true" &&
-    process.env.NEXT_RUNTIME === "nodejs" &&
-    process.env.NEXT_PHASE !== "phase-production-build"
-  ) {
+  if (process.env.ENABLE_EMAIL_CRON === "true") {
     const globalForWorker = global as unknown as {
       __emailCampaignInterval?: NodeJS.Timeout;
     };
