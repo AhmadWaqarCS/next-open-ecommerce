@@ -20,6 +20,12 @@ export default function CategoryCarouselClient({
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
 
+  // Mouse drag tracking refs
+  const isMouseDown = useRef(false);
+  const startX = useRef(0);
+  const startScrollLeft = useRef(0);
+  const isMoved = useRef(false);
+
   const checkScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -48,7 +54,6 @@ export default function CategoryCarouselClient({
     const amount = clientWidth * 0.85;
 
     if (direction === "right") {
-      // Loop back to start if reached the end
       if (scrollLeft >= scrollWidth - clientWidth - 10) {
         el.scrollTo({ left: 0, behavior: "smooth" });
       } else {
@@ -68,13 +73,68 @@ export default function CategoryCarouselClient({
     if (!autoScrollInterval || isHovered) return;
 
     const timer = setInterval(() => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && !isMouseDown.current) {
         scrollBy("right");
       }
     }, autoScrollInterval);
 
     return () => clearInterval(timer);
   }, [autoScrollInterval, isHovered, scrollBy]);
+
+  // ── Mouse Drag Handlers (Smooth 60fps 1:1 Scroll) ──────────────────────
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    isMouseDown.current = true;
+    isMoved.current = false;
+    startX.current = e.clientX;
+    startScrollLeft.current = el.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const deltaX = e.clientX - startX.current;
+
+    // Threshold check before considering it a drag
+    if (!isMoved.current && Math.abs(deltaX) > 6) {
+      isMoved.current = true;
+      el.style.scrollBehavior = "auto";
+      el.style.scrollSnapType = "none";
+    }
+
+    if (isMoved.current) {
+      el.scrollLeft = startScrollLeft.current - deltaX;
+    }
+  };
+
+  const handleMouseUpOrLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown.current) return;
+    isMouseDown.current = false;
+
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.style.scrollBehavior = "";
+      el.style.scrollSnapType = "";
+    }
+
+    if (isMoved.current) {
+      // Intercept trailing click event ONLY if user actually dragged
+      const preventClick = (clickEvent: Event) => {
+        clickEvent.stopPropagation();
+        clickEvent.preventDefault();
+      };
+      (e.currentTarget as HTMLElement).addEventListener("click", preventClick, {
+        capture: true,
+        once: true,
+      });
+      isMoved.current = false;
+    }
+  };
 
   return (
     <div
@@ -161,8 +221,20 @@ export default function CategoryCarouselClient({
       <div
         ref={scrollContainerRef}
         onScroll={checkScroll}
-        className="flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none py-1 -mx-4 px-4 sm:mx-0 sm:px-0"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        onTouchStart={() => setIsHovered(true)}
+        onTouchEnd={() => setIsHovered(false)}
+        onDragStart={(e) => e.preventDefault()}
+        className="flex gap-5 overflow-x-auto select-none snap-x snap-mandatory scroll-smooth scrollbar-none py-1 -mx-4 px-4 sm:mx-0 sm:px-0 touch-pan-x cursor-grab active:cursor-grabbing"
+        style={{
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch",
+          WebkitUserSelect: "none",
+        }}
       >
         {children}
       </div>
@@ -181,4 +253,3 @@ export default function CategoryCarouselClient({
     </div>
   );
 }
-
