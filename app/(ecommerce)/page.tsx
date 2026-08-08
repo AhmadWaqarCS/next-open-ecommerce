@@ -5,6 +5,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { getPageData } from "@/lib/storefront";
 import HeroBanner from "./_components/HeroBanner";
 import FeaturedProducts from "./_components/FeaturedProducts";
+import CategoryCarousel from "./_components/CategoryCarousel";
 
 export async function generateMetadata(): Promise<Metadata> {
   const pageRes = await getPageData("/");
@@ -27,6 +28,9 @@ export default async function EcommerceHomePage() {
 
       {/* ── Featured Products Section ─────────────────────────────────── */}
       <FeaturedProducts />
+
+      {/* ── Category Carousel Section ─────────────────────────────────── */}
+      <CategoryCarousel />
     </div>
   );
 }

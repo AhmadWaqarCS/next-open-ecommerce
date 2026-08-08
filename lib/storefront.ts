@@ -2,6 +2,7 @@
 // Clean, minimal storefront API layer.
 // Exclusively exports types, getSiteConfig (cached), and 14 page/component data functions.
 
+import { cache } from "react";
 import { cacheLife, cacheTag } from "next/cache";
 import prisma from "./prisma";
 import { isStripeConfigured } from "./stripe";
@@ -270,7 +271,7 @@ export interface CheckoutPageData {
 
 // ─── Central Site Config Fetcher (Cached) ────────────────────────────────────
 
-export async function getSiteConfig(): Promise<StorefrontConfig | null> {
+export const getSiteConfig = cache(async function getSiteConfig(): Promise<StorefrontConfig | null> {
   "use cache";
   cacheTag("site-config");
   cacheLife("max");
@@ -321,13 +322,13 @@ export async function getSiteConfig(): Promise<StorefrontConfig | null> {
     turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
     recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
   };
-}
+});
 
 // ─── 1. Header Data ───────────────────────────────────────────────────────────
 
-export async function getHeaderData(): Promise<HeaderData> {
-  const [config, navCategories, sitePages] = await Promise.all([
-    getSiteConfig(),
+export const getHeaderData = cache(async function getHeaderData(): Promise<HeaderData> {
+  const config = await getSiteConfig();
+  const [navCategories, sitePages] = await prisma.$transaction([
     prisma.category.findMany({
       where: {
         is_active: true,
@@ -362,14 +363,14 @@ export async function getHeaderData(): Promise<HeaderData> {
     categories: navCategories || [],
     sitePages: sitePages || [],
   };
-}
+});
 
 // ─── 2. Footer Data ───────────────────────────────────────────────────────────
 
-export async function getFooterData(): Promise<FooterData> {
-  const [config, categories, sitePages, shippingMethods, paymentMethods] =
-    await Promise.all([
-      getSiteConfig(),
+export const getFooterData = cache(async function getFooterData(): Promise<FooterData> {
+  const config = await getSiteConfig();
+  const [categories, sitePages, shippingMethods, paymentMethods] =
+    await prisma.$transaction([
       prisma.category.findMany({
         where: {
           is_active: true,
@@ -448,17 +449,17 @@ export async function getFooterData(): Promise<FooterData> {
     })),
     socialLinks: (config?.social_links ?? {}) as Record<string, string | null>,
   };
-}
+});
 
 // ─── 4. Home Page Data ────────────────────────────────────────────────────────
 
-export async function getHomePageData(): Promise<{}> {
+export const getHomePageData = cache(async function getHomePageData(): Promise<{}> {
   return {};
-}
+});
 
 // ─── 5. Featured Products ─────────────────────────────────────────────────────
 
-export async function getFeaturedProducts(
+export const getFeaturedProducts = cache(async function getFeaturedProducts(
   limit = 4,
 ): Promise<{ products: ProductCard[] }> {
   const rows = await prisma.product.findMany({
@@ -486,13 +487,13 @@ export async function getFeaturedProducts(
         r.compare_at_price !== null ? String(r.compare_at_price) : null,
     })),
   };
-}
+});
 
 // ─── 6. Category Page Data ────────────────────────────────────────────────────
 
 const CATEGORY_PAGE_SIZE = 24;
 
-export async function getCategoryPageData(
+export const getCategoryPageData = cache(async function getCategoryPageData(
   slug: string,
   page = 1,
 ): Promise<CategoryPageData> {
@@ -531,7 +532,7 @@ export async function getCategoryPageData(
 
   const skip = (page - 1) * CATEGORY_PAGE_SIZE;
 
-  const [products, total] = await Promise.all([
+  const [products, total] = await prisma.$transaction([
     prisma.product.findMany({
       where: {
         is_active: true,
@@ -582,22 +583,22 @@ export async function getCategoryPageData(
     pageSize: CATEGORY_PAGE_SIZE,
     pageCount: Math.ceil(total / CATEGORY_PAGE_SIZE),
   };
-}
+});
 
 // ─── 7. Category Slugs ────────────────────────────────────────────────────────
 
-export async function getCategorySlugs(limit = 1): Promise<string[]> {
+export const getCategorySlugs = cache(async function getCategorySlugs(limit = 1): Promise<string[]> {
   const rows = await prisma.category.findMany({
     where: { is_active: true, deleted_at: null },
     select: { slug: true },
     take: limit,
   });
   return rows.map((r) => r.slug);
-}
+});
 
 // ─── 8. Product Page Data ─────────────────────────────────────────────────────
 
-export async function getProductPageData(
+export const getProductPageData = cache(async function getProductPageData(
   slug: string,
 ): Promise<{ product: ProductFull | null }> {
   const row = await prisma.product.findUnique({
@@ -661,22 +662,22 @@ export async function getProductPageData(
       })),
     },
   };
-}
+});
 
 // ─── 9. Product Page Slugs ────────────────────────────────────────────────────
 
-export async function getProductPageSlugs(limit = 1): Promise<string[]> {
+export const getProductPageSlugs = cache(async function getProductPageSlugs(limit = 1): Promise<string[]> {
   const rows = await prisma.product.findMany({
     where: { is_active: true, deleted_at: null },
     select: { slug: true },
     take: limit,
   });
   return rows.map((r) => r.slug);
-}
+});
 
 // ─── 10. Search Page Products ─────────────────────────────────────────────────
 
-export async function getSearchPageProducts(
+export const getSearchPageProducts = cache(async function getSearchPageProducts(
   query: string,
   page = 1,
   pageSize = 24,
@@ -701,7 +702,7 @@ export async function getSearchPageProducts(
 
   const skip = (page - 1) * pageSize;
 
-  const [rows, total] = await Promise.all([
+  const [rows, total] = await prisma.$transaction([
     prisma.product.findMany({
       where,
       select: {
@@ -732,11 +733,11 @@ export async function getSearchPageProducts(
     total,
     pageCount: Math.ceil(total / pageSize),
   };
-}
+});
 
 // ─── 11. Page Data ────────────────────────────────────────────────────────────
 
-export async function getPageData(
+export const getPageData = cache(async function getPageData(
   slug: string,
 ): Promise<{ page: SitePage | null }> {
   const row = await prisma.site_page.findUnique({
@@ -767,13 +768,13 @@ export async function getPageData(
       }[],
     },
   };
-}
+});
 
 // ─── 12. Hero Banner Data ─────────────────────────────────────────────────────
 
-export async function getHeroBannerData(): Promise<HeroBannerData> {
-  const [config, categoryRows] = await Promise.all([
-    getSiteConfig(),
+export const getHeroBannerData = cache(async function getHeroBannerData(): Promise<HeroBannerData> {
+  const [config, categoryRows] = await prisma.$transaction([
+    prisma.site_config.findFirst({ where: { deleted_at: null } }),
     prisma.category.findMany({
       where: { is_active: true, show_in_home: true, deleted_at: null },
       select: {
@@ -809,11 +810,11 @@ export async function getHeroBannerData(): Promise<HeroBannerData> {
       product_count: r._count.products,
     })),
   };
-}
+});
 
 // ─── 12b. All Categories Page Data ───────────────────────────────────────────
 
-export async function getAllCategoriesPageData(): Promise<{
+export const getAllCategoriesPageData = cache(async function getAllCategoriesPageData(): Promise<{
   categories: ShopCategory[];
 }> {
   const categoryRows = await prisma.category.findMany({
@@ -846,7 +847,7 @@ export async function getAllCategoriesPageData(): Promise<{
       product_count: r._count.products,
     })),
   };
-}
+});
 
 export function maskEmail(email: string): string {
   if (!email || !email.includes("@")) return "***";
@@ -863,10 +864,10 @@ export function maskEmail(email: string): string {
 
 // ─── 14. Checkout Page Data ───────────────────────────────────────────────────
 
-export async function getCheckoutPageData(): Promise<CheckoutPageData> {
+export const getCheckoutPageData = cache(async function getCheckoutPageData(): Promise<CheckoutPageData> {
   const stripeActive = isStripeConfigured();
 
-  const [shippingMethods, paymentMethods, config] = await Promise.all([
+  const [shippingMethods, paymentMethods, config] = await prisma.$transaction([
     prisma.shipping_method.findMany({
       where: { is_active: true, deleted_at: null },
       select: {
@@ -892,7 +893,7 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
       },
       orderBy: { sort_order: "asc" },
     }),
-    getSiteConfig(),
+    prisma.site_config.findFirst({ where: { deleted_at: null } }),
   ]);
 
   const activePaymentMethods = (paymentMethods || []).filter((m) => {
@@ -912,7 +913,7 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
       estimated_days_min: m.estimated_days_min,
       estimated_days_max: m.estimated_days_max,
     })),
-    paymentMethods: (paymentMethods || []).map((m) => ({
+    paymentMethods: activePaymentMethods.map((m) => ({
       id: m.id,
       name: m.name,
       description: m.description,
@@ -926,13 +927,112 @@ export async function getCheckoutPageData(): Promise<CheckoutPageData> {
           currency_symbol: config.currency_symbol,
           require_phone: config.require_phone,
           allow_order_notes: config.allow_order_notes,
-          tax_rate: config.tax_rate,
+          tax_rate: config.tax_rate !== null ? Number(config.tax_rate) : null,
           tax_inclusive: config.tax_inclusive,
           tax_label: config.tax_label,
-          captcha_provider: config.captcha_provider,
-          turnstile_site_key: config.turnstile_site_key,
-          recaptcha_site_key: config.recaptcha_site_key,
+          captcha_provider: config.captcha_provider ?? "none",
+          turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
+          recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
         }
       : null,
   };
+});
+
+// ─── 15. Category Carousel Data ────────────────────────────────────────────────
+
+export interface CategoryCarouselItem {
+  category: {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+  };
+  products: ProductCard[];
 }
+
+export const getHomeCategoryCarousels = cache(
+  async function getHomeCategoryCarousels(
+    limitPerCategory = 10,
+  ): Promise<CategoryCarouselItem[]> {
+    return await prisma.$transaction(async (tx) => {
+      const categoryRows = await tx.category.findMany({
+        where: { is_active: true, show_in_home: true, deleted_at: null },
+        orderBy: { sort_order: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          children: {
+            where: { is_active: true, deleted_at: null },
+            select: {
+              id: true,
+              children: {
+                where: { is_active: true, deleted_at: null },
+                select: { id: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (categoryRows.length === 0) {
+        return [];
+      }
+
+      const carouselItems: CategoryCarouselItem[] = [];
+
+      for (const cat of categoryRows) {
+        const categoryIds = [
+          cat.id,
+          ...cat.children.flatMap((child) => [
+            child.id,
+            ...child.children.map((subChild) => subChild.id),
+          ]),
+        ];
+
+        const products = await tx.product.findMany({
+          where: {
+            is_active: true,
+            deleted_at: null,
+            category_id: { in: categoryIds },
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            feature_image_url: true,
+            feature_image_alt_text: true,
+            price: true,
+            compare_at_price: true,
+            category_name: true,
+            is_featured: true,
+          },
+          orderBy: [{ sort_order: "asc" }, { id: "desc" }],
+          take: limitPerCategory,
+        });
+
+        if (products.length > 0) {
+          carouselItems.push({
+            category: {
+              id: cat.id,
+              name: cat.name,
+              slug: cat.slug,
+              description: cat.description,
+            },
+            products: products.map((r) => ({
+              ...r,
+              price: String(r.price),
+              compare_at_price:
+                r.compare_at_price !== null ? String(r.compare_at_price) : null,
+            })),
+          });
+        }
+      }
+
+      return carouselItems;
+    });
+  },
+);
+
+
