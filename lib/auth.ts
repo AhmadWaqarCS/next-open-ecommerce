@@ -6,7 +6,7 @@ import prisma from "./prisma";
 const TOKEN_EXPIRY_SECONDS = 60 * 60 * 24 * 30; // 1 hour
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET || "default_fallback_secret_for_build_only",
   session: {
     strategy: "jwt",
     maxAge: Number(process.env.TOKEN_EXPIRY_SECONDS) || TOKEN_EXPIRY_SECONDS,

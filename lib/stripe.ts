@@ -15,8 +15,41 @@ export function isStripeTestMode(): boolean {
   return secretKey.startsWith("sk_test_");
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: getStripeApiVersion() as any,
+let stripeInstance: Stripe | null = null;
+
+/**
+ * Lazily instantiates and returns the active Stripe client instance.
+ * Throws a clear runtime error if STRIPE_SECRET_KEY is missing when an operation is executed.
+ */
+export function getStripe(): Stripe {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey || secretKey.trim() === "") {
+    throw new Error(
+      "Stripe is not configured. Missing STRIPE_SECRET_KEY in environment variables."
+    );
+  }
+  if (!stripeInstance) {
+    stripeInstance = new Stripe(secretKey.trim(), {
+      apiVersion: getStripeApiVersion() as any,
+    });
+  }
+  return stripeInstance;
+}
+
+/**
+ * Exported stripe Proxy object for backward compatibility.
+ * Defers instantiation of Stripe until a property or method is accessed at runtime,
+ * preventing build-time errors when STRIPE_SECRET_KEY is missing.
+ */
+export const stripe: Stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    const instance = getStripe();
+    const value = Reflect.get(instance, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(instance);
+    }
+    return value;
+  },
 });
 
 /**

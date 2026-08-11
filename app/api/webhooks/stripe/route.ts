@@ -1,11 +1,19 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { stripe, isStripeConfigured } from "@/lib/stripe";
 import prisma from "@/lib/prisma";
 import { sendInvoiceAndOrderEmailsForOrder } from "@/services/email-services";
 import Stripe from "stripe";
 
 export async function POST(req: Request) {
+  if (!isStripeConfigured()) {
+    console.error("[Stripe Webhook] Stripe environment variables are not configured.");
+    return NextResponse.json(
+      { error: "Stripe is not configured on this server." },
+      { status: 400 }
+    );
+  }
+
   const body = await req.text();
   const reqHeaders = await headers();
   const signature = reqHeaders.get("stripe-signature");
