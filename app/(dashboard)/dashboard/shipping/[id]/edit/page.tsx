@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { serializeShippingMethod } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
@@ -12,11 +14,21 @@ export const metadata: Metadata = {
   description: "Edit shipping method settings and rate tiers",
 };
 
-export default async function EditShippingPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditShippingPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditShippingPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditShippingPageContent({
+  params,
+}: PageProps) {
   await assertPermission("update", "/dashboard/shipping");
   const { id } = await params;
   const methodId = Number(id);

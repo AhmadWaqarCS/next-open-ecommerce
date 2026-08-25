@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import RoleTable from "./role-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Manage dashboard roles and their permissions",
 };
 
-export default async function DashboardRolesPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardRolesPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardRolesPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardRolesPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/roles");
   const params = await searchParams;
 

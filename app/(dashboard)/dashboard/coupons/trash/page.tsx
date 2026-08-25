@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import CouponTrashTable from "./coupon-trash-table";
 import { resolveUserNames, serializeCoupons } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Deleted coupons",
 };
 
-export default async function DashboardCouponsTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardCouponsTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardCouponsTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardCouponsTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/coupons");
   const params = (await searchParams) || {};
 

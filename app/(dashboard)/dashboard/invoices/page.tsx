@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import InvoiceTable from "./invoice-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -11,11 +13,21 @@ export const metadata: Metadata = {
   description: "Manage customer order invoices and track billing",
 };
 
-export default async function DashboardInvoicesPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardInvoicesPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardInvoicesPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardInvoicesPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/invoices");
   const params = await searchParams;
 

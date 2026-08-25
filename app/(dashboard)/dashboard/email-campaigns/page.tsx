@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import EmailCampaignTable from "./email-campaign-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -13,13 +15,23 @@ export const metadata: Metadata = {
   description: "Create, schedule, and execute targeted email marketing campaigns",
 };
 
-export default async function EmailCampaignsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function EmailCampaignsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EmailCampaignsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EmailCampaignsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/email-campaigns");
   const params = await searchParams;
 

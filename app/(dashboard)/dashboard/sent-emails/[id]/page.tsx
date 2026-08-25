@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
@@ -15,11 +17,21 @@ export async function generateMetadata({
   };
 }
 
-export default async function SentEmailDetailPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function SentEmailDetailPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <SentEmailDetailPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function SentEmailDetailPageContent({
+  params,
+}: PageProps) {
   await assertPermission("read", "/dashboard/sent-emails");
   const { id } = await params;
 

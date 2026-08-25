@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import CouponTable from "./coupon-table";
 import { resolveUserNames, serializeCoupons } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Manage discount coupons and promotional offers",
 };
 
-export default async function DashboardCouponsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardCouponsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardCouponsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardCouponsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/coupons");
   const params = (await searchParams) || {};
 

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import { EmailTemplateEditor } from "../_components/email-template-editor";
 
@@ -9,7 +11,15 @@ interface PageProps {
   searchParams: Promise<{ key?: string }>;
 }
 
-export default async function NewEmailTemplatePage({ searchParams }: PageProps) {
+export default function NewEmailTemplatePage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <NewEmailTemplatePageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function NewEmailTemplatePageContent({ searchParams }: PageProps) {
   await assertPermission("create", "/dashboard/email-templates");
 
   const resolvedParams = await searchParams;

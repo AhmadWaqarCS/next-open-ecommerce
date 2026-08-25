@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import CustomerTable from "./customer-table";
@@ -14,13 +16,23 @@ export const metadata: Metadata = {
   description: "Unified customer directory of buyers and newsletter subscribers",
 };
 
-export default async function DashboardCustomersPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardCustomersPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardCustomersPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardCustomersPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/customers");
   const params = await searchParams;
 

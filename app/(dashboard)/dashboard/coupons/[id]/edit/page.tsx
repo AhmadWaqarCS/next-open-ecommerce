@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { serializeCoupon } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
@@ -12,11 +14,21 @@ export const metadata: Metadata = {
   description: "Edit discount coupon settings",
 };
 
-export default async function EditCouponPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditCouponPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditCouponPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditCouponPageContent({
+  params,
+}: PageProps) {
   await assertPermission("update", "/dashboard/coupons");
   const { id } = await params;
   const couponId = Number(id);

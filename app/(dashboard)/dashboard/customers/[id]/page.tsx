@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import { notFound } from "next/navigation";
@@ -10,7 +12,15 @@ interface PageProps {
   }>;
 }
 
-export default async function CustomerDetailPage({ params }: PageProps) {
+export default function CustomerDetailPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CustomerDetailPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function CustomerDetailPageContent({ params }: PageProps) {
   await assertPermission("read", "/dashboard/customers");
   const { id } = await params;
   const contactId = Number(id);

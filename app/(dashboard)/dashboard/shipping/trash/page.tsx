@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeShippingMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Deleted shipping methods",
 };
 
-export default async function DashboardShippingTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardShippingTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardShippingTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardShippingTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/shipping");
   const params = (await searchParams) || {};
 

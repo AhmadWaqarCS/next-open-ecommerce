@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
 import CouponForm from "../_components/coupon-form";
@@ -9,7 +11,15 @@ export const metadata: Metadata = {
   description: "Create a new discount coupon",
 };
 
-export default async function CreateCouponPage() {
+export default function CreateCouponPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreateCouponPageContent />
+    </Suspense>
+  );
+}
+
+async function CreateCouponPageContent() {
   await assertPermission("create", "/dashboard/coupons");
 
   return (

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
@@ -15,11 +17,21 @@ export async function generateMetadata({
   };
 }
 
-export default async function EditInvoicePage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditInvoicePage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditInvoicePageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditInvoicePageContent({
+  params,
+}: PageProps) {
   await assertPermission("update", "/dashboard/invoices");
   const { id } = await params;
 

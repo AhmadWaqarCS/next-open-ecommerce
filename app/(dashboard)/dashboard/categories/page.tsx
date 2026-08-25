@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import CategoryTable from "./category-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -15,13 +17,23 @@ export const metadata: Metadata = {
   description: "Manage product categories",
 };
 
-export default async function DashboardCategoriesPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardCategoriesPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardCategoriesPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardCategoriesPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission(
     "read",
     "/dashboard/categories",

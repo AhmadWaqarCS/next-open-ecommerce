@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeShippingMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Manage store delivery methods, pricing tiers, and delivery estimates.",
 };
 
-export default async function DashboardShippingPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardShippingPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardShippingPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardShippingPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/shipping");
   const params = (await searchParams) ?? {};
 

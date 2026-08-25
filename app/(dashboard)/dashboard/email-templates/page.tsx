@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import prisma from "@/lib/prisma";
 import { EmailTemplateClient } from "./email-template-client";
@@ -6,7 +8,15 @@ export const metadata = {
   title: "Email Templates | Dashboard",
 };
 
-export default async function EmailTemplatesPage() {
+export default function EmailTemplatesPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EmailTemplatesPageContent />
+    </Suspense>
+  );
+}
+
+async function EmailTemplatesPageContent() {
   const { permissions } = await assertPermission(
     "read",
     "/dashboard/email-templates",

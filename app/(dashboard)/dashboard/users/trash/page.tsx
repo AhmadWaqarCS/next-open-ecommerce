@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import UserTrashTable from "./user-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -11,13 +13,23 @@ export const metadata: Metadata = {
   description: "Deleted users",
 };
 
-export default async function DashboardUsersTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardUsersTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardUsersTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardUsersTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/users");
   const params = await searchParams;
 

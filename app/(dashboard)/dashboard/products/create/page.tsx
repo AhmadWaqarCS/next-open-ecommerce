@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
 import ProductForm from "../_components/product-form";
@@ -10,7 +12,15 @@ export const metadata: Metadata = {
   description: "Add a new product to your storefront",
 };
 
-export default async function CreateProductPage() {
+export default function CreateProductPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreateProductPageContent />
+    </Suspense>
+  );
+}
+
+async function CreateProductPageContent() {
   await assertPermission("create", "/dashboard/products");
 
   const categories = await getCategoriesForProductSelectInDB();

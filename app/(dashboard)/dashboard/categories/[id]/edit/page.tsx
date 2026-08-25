@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,11 +13,21 @@ export const metadata: Metadata = {
   description: "Edit product category details",
 };
 
-export default async function EditCategoryPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditCategoryPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditCategoryPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditCategoryPageContent({
+  params,
+}: PageProps) {
   await assertPermission("update", "/dashboard/categories");
   const { id } = await params;
   const categoryId = Number(id);

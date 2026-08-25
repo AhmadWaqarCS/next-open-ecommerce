@@ -13,12 +13,12 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "password123";
 const STORE_NAME = process.env.STORE_NAME || "Next Open E-Commerce";
 
 async function main() {
-  console.log("🌱 Seeding database for next-open-ecommerce…");
+  console.log("🩺 [Doctor] Starting database diagnostic check & system initialization…\n");
 
   // 1. Superadmin Role
   const superadminRole = await prisma.role.upsert({
     where: { name: "superadmin" },
-    update: {},
+    update: { is_active: true },
     create: {
       name: "superadmin",
       is_active: true,
@@ -26,152 +26,72 @@ async function main() {
       updated_by: 0,
     },
   });
+  console.log(`  ✓ [Role] superadmin verified`);
 
-  // 2. Admin User
-  const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
-  const adminUser = await prisma.dashboard_user.upsert({
+  // 2. Superadmin Account
+  const existingAdmin = await prisma.dashboard_user.findUnique({
     where: { email: ADMIN_EMAIL },
-    update: {},
-    create: {
-      email: ADMIN_EMAIL,
-      password: hashedPassword,
-      role_id: superadminRole.id,
-      role_name: "superadmin",
-      is_active: true,
-      name: "Administrator",
-      created_by: 0,
-      updated_by: 0,
-    },
   });
-  console.log(`  ✓ Superadmin Account: ${adminUser.email}`);
+
+  let adminUser;
+  if (!existingAdmin) {
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    adminUser = await prisma.dashboard_user.create({
+      data: {
+        email: ADMIN_EMAIL,
+        password: hashedPassword,
+        role_id: superadminRole.id,
+        role_name: "superadmin",
+        is_active: true,
+        name: "Administrator",
+        created_by: 0,
+        updated_by: 0,
+      },
+    });
+    console.log(`  + [User] Superadmin account created (${adminUser.email})`);
+  } else {
+    adminUser = await prisma.dashboard_user.update({
+      where: { email: ADMIN_EMAIL },
+      data: {
+        role_id: superadminRole.id,
+        role_name: "superadmin",
+        is_active: true,
+      },
+    });
+    console.log(`  ✓ [User] Superadmin account verified (${adminUser.email})`);
+  }
 
   // 3. Dashboard Features & Permissions
-
   const featuresData = [
     { name: "Dashboard", path: "/dashboard", enabled: true, is_super: false },
-    {
-      name: "Orders",
-      path: "/dashboard/orders",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Products",
-      path: "/dashboard/products",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Categories",
-      path: "/dashboard/categories",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Coupons",
-      path: "/dashboard/coupons",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Shipping",
-      path: "/dashboard/shipping",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Payment Methods",
-      path: "/dashboard/payment-methods",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Site Pages",
-      path: "/dashboard/pages",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Themes",
-      path: "/dashboard/themes",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Invoices",
-      path: "/dashboard/invoices",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Sent Emails",
-      path: "/dashboard/sent-emails",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Email Config",
-      path: "/dashboard/email-config",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Email Templates",
-      path: "/dashboard/email-templates",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Customers",
-      path: "/dashboard/customers",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Email Groups",
-      path: "/dashboard/email-groups",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Email Campaigns",
-      path: "/dashboard/email-campaigns",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Site Settings",
-      path: "/dashboard/settings",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Media Gallery",
-      path: "/dashboard/media",
-      enabled: true,
-      is_super: false,
-    },
-    {
-      name: "Storage Options",
-      path: "/dashboard/storages",
-      enabled: true,
-      is_super: false,
-    },
+    { name: "Orders", path: "/dashboard/orders", enabled: true, is_super: false },
+    { name: "Products", path: "/dashboard/products", enabled: true, is_super: false },
+    { name: "Categories", path: "/dashboard/categories", enabled: true, is_super: false },
+    { name: "Coupons", path: "/dashboard/coupons", enabled: true, is_super: false },
+    { name: "Shipping", path: "/dashboard/shipping", enabled: true, is_super: false },
+    { name: "Payment Methods", path: "/dashboard/payment-methods", enabled: true, is_super: false },
+    { name: "Site Pages", path: "/dashboard/pages", enabled: true, is_super: false },
+    { name: "Themes", path: "/dashboard/themes", enabled: true, is_super: false },
+    { name: "Invoices", path: "/dashboard/invoices", enabled: true, is_super: false },
+    { name: "Sent Emails", path: "/dashboard/sent-emails", enabled: true, is_super: false },
+    { name: "Email Config", path: "/dashboard/email-config", enabled: true, is_super: false },
+    { name: "Email Templates", path: "/dashboard/email-templates", enabled: true, is_super: false },
+    { name: "Customers", path: "/dashboard/customers", enabled: true, is_super: false },
+    { name: "Email Groups", path: "/dashboard/email-groups", enabled: true, is_super: false },
+    { name: "Email Campaigns", path: "/dashboard/email-campaigns", enabled: true, is_super: false },
+    { name: "Site Settings", path: "/dashboard/settings", enabled: true, is_super: false },
+    { name: "Media Gallery", path: "/dashboard/media", enabled: true, is_super: false },
+    { name: "Storage Options", path: "/dashboard/storages", enabled: true, is_super: false },
     { name: "Roles", path: "/dashboard/roles", enabled: true, is_super: true },
     { name: "Users", path: "/dashboard/users", enabled: true, is_super: true },
-    {
-      name: "Activity Logs",
-      path: "/dashboard/activity-logs",
-      enabled: true,
-      is_super: true,
-    },
+    { name: "Activity Logs", path: "/dashboard/activity-logs", enabled: true, is_super: true },
   ];
 
   const features = [];
   for (const f of featuresData) {
     const feature = await prisma.site_feature.upsert({
       where: { path: f.path },
-      update: {},
+      update: { name: f.name, enabled: f.enabled, is_super: f.is_super },
       create: f,
     });
     features.push(feature);
@@ -186,7 +106,9 @@ async function main() {
           role_id: superadminRole.id,
         },
       },
-      update: {},
+      update: {
+        access_crud: fullCrud,
+      },
       create: {
         site_feature_id: feature.id,
         role_id: superadminRole.id,
@@ -194,9 +116,7 @@ async function main() {
       },
     });
   }
-  console.log(
-    `  ✓ Dashboard Features (${features.length}) & Permissions linked`,
-  );
+  console.log(`  ✓ [Features] ${features.length} dashboard features and superadmin permissions linked`);
 
   // 4. Singleton Site Config
   await prisma.site_config.upsert({
@@ -207,8 +127,7 @@ async function main() {
       name: STORE_NAME,
       tagline: "Simple open-source e-commerce.",
       site_url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-      description:
-        "Dynamic open-source e-commerce platform built with Next.js.",
+      description: "Dynamic open-source e-commerce platform built with Next.js.",
       topbar_message: "Welcome to our store!",
       theme_config: {
         bg_color: "#09090b",
@@ -242,285 +161,105 @@ async function main() {
       updated_by: 0,
     },
   });
-  console.log("  ✓ Minimal Site Config created");
+  console.log(`  ✓ [Config] Singleton site configuration verified`);
 
-  // 5. System Registered Themes & Components
-  const dreamTheme = await prisma.theme.upsert({
-    where: { slug: "Dream" },
-    update: { name: "Dream", is_active: true },
-    create: {
-      name: "Dream",
-      slug: "Dream",
-      description: "Modern minimalist theme with dark mode aesthetics and glassmorphism.",
-      is_active: true,
-      created_by: 0,
-      updated_by: 0,
-    },
-  });
-
-  const themeComponents = [
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream Header (header-1)",
-      component_type: "header",
-      file_path: "_components/headers/header-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-        hover_color: "#38bdf8",
-      },
-    },
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream Footer (footer-1)",
-      component_type: "footer",
-      file_path: "_components/footers/footer-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-      },
-    },
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream Home (home-1)",
-      component_type: "home",
-      file_path: "pages/homes/home-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-      },
-    },
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream Product Detail (product-1)",
-      component_type: "product",
-      file_path: "pages/products/product-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-      },
-    },
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream Category Detail (category-1)",
-      component_type: "category",
-      file_path: "pages/categories/category-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-      },
-    },
-    {
-      theme_id: dreamTheme.id,
-      name: "Dream CMS Page (page-1)",
-      component_type: "page",
-      file_path: "pages/pages/page-1.tsx",
-      theme_config: {
-        bg_color: "#09090b",
-        fg_color: "#18181b",
-        text_color: "#ffffff",
-        accent_color: "#f59e0b",
-      },
-    },
-  ];
-
-  for (const tc of themeComponents) {
-    await prisma.theme_component.upsert({
-      where: {
-        theme_id_component_type_file_path: {
-          theme_id: tc.theme_id,
-          component_type: tc.component_type,
-          file_path: tc.file_path,
-        },
-      },
-      update: {},
-      create: {
-        ...tc,
-        is_active: true,
-        created_by: 0,
-        updated_by: 0,
-      },
-    });
-  }
-  console.log(`  ✓ Dream Theme & Components (${themeComponents.length}) seeded`);
-
-  // 6. Active Storefront Pages (Matching existing app/(ecommerce) routes)
+  // 5. Storefront CMS & Legal Pages
   const pages = [
-    {
-      slug: "/",
-      title: "Home",
-      content: null,
-      show_in_header: false,
-      show_in_footer: false,
-      sort_order: 0,
-      theme_config: {},
-    },
-    {
-      slug: "product",
-      title: "All Products",
-      show_in_header: false,
-      show_in_footer: false,
-      sort_order: 1,
-      content: null,
-      theme_config: {},
-    },
-    {
-      slug: "product/[slug]",
-      title: "Product Details",
-      show_in_header: false,
-      show_in_footer: false,
-      sort_order: 2,
-      content: null,
-      theme_config: {},
-    },
-    {
-      slug: "category",
-      title: "All Categories",
-      show_in_header: false,
-      show_in_footer: false,
-      sort_order: 3,
-      content: null,
-      theme_config: {},
-    },
-    {
-      slug: "category/[slug]",
-      title: "Category Products",
-      show_in_header: false,
-      show_in_footer: false,
-      sort_order: 4,
-      content: null,
-      theme_config: {},
-    },
     {
       slug: "about",
       title: "About Us",
       show_in_header: true,
       show_in_footer: true,
-      sort_order: 5,
-      content: `<h2>Our Story</h2>
-<p>Welcome to <strong>${STORE_NAME}</strong>! We are dedicated to providing high quality products, exceptional customer experience, and seamless delivery.</p>`,
-      theme_config: {},
+      sort_order: 1,
+      content: `<h2>Our Story</h2>\n<p>Welcome to <strong>${STORE_NAME}</strong>! We are dedicated to providing high quality products, exceptional customer experience, and seamless delivery.</p>`,
     },
     {
       slug: "contact",
       title: "Contact Us",
       show_in_header: true,
       show_in_footer: true,
-      sort_order: 6,
+      sort_order: 2,
       content: `<p>Have questions or feedback? We would love to hear from you. Reach out to our customer support team at any time!</p>`,
-      theme_config: {},
     },
     {
       slug: "privacy-policy",
       title: "Privacy Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 10,
-      content: `<h2>1. Information We Collect</h2>
-<p>We collect essential order details including your name, email, delivery address, and contact number solely for order fulfillment and customer communication.</p>
-
-<h2>2. How We Protect Your Data</h2>
-<p>Your privacy is strictly guarded. We never sell, rent, or trade customer personal information to third parties.</p>`,
-      theme_config: {},
+      sort_order: 3,
+      content: `<h2>1. Information We Collect</h2>\n<p>We collect essential order details including your name, email, delivery address, and contact number solely for order fulfillment and customer communication.</p>\n\n<h2>2. How We Protect Your Data</h2>\n<p>Your privacy is strictly guarded. We never sell, rent, or trade customer personal information to third parties.</p>`,
     },
     {
       slug: "terms-and-conditions",
       title: "Terms and Conditions",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 11,
-      content: `<h2>1. Introduction</h2>
-<p>By accessing and placing an order with <strong>${STORE_NAME}</strong>, you confirm that you are in agreement with and bound by the terms of service outlined below.</p>
-
-<h2>2. Product Orders & Pricing</h2>
-<p>We reserve the right to adjust prices, modify product descriptions, or discontinue items at any time without notice.</p>`,
-      theme_config: {},
+      sort_order: 4,
+      content: `<h2>1. Introduction</h2>\n<p>By accessing and placing an order with <strong>${STORE_NAME}</strong>, you confirm that you are in agreement with and bound by the terms of service outlined below.</p>\n\n<h2>2. Product Orders & Pricing</h2>\n<p>We reserve the right to adjust prices, modify product descriptions, or discontinue items at any time without notice.</p>`,
     },
     {
       slug: "shipping-policy",
       title: "Shipping Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 12,
-      content: `<h2>1. Order Processing Times</h2>
-<p>All orders are processed within 1 to 2 business days. You will receive an automated email confirmation once your order has dispatched.</p>`,
-      theme_config: {},
+      sort_order: 5,
+      content: `<h2>1. Order Processing Times</h2>\n<p>All orders are processed within 1 to 2 business days. You will receive an automated email confirmation once your order has dispatched.</p>`,
     },
     {
       slug: "return-and-refund-policy",
       title: "Return & Refund Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 13,
-      content: `<h2>1. 14-Day Return Guarantee</h2>
-<p>We accept returns on eligible products within 14 days of delivery. Items must be unworn, unused, in original packaging, and with all tags attached.</p>`,
-      theme_config: {},
+      sort_order: 6,
+      content: `<h2>1. 14-Day Return Guarantee</h2>\n<p>We accept returns on eligible products within 14 days of delivery. Items must be unworn, unused, in original packaging, and with all tags attached.</p>`,
     },
     {
       slug: "payment-policy",
       title: "Payment Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 14,
-      content: `<h2>1. Accepted Payment Methods</h2>
-<p>We accept Cash on Delivery (COD) and major credit/debit card options for storefront purchases.</p>`,
-      theme_config: {},
+      sort_order: 7,
+      content: `<h2>1. Accepted Payment Methods</h2>\n<p>We accept Cash on Delivery (COD) and major credit/debit card options for storefront purchases.</p>`,
     },
     {
       slug: "legal-disclaimer",
       title: "Legal Disclaimer",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 15,
-      content: `<h2>1. General Information & Scope</h2>
-<p>The information provided by <strong>${STORE_NAME}</strong> on this website is for general informational and shopping purposes only.</p>`,
-      theme_config: {},
+      sort_order: 8,
+      content: `<h2>1. General Information & Scope</h2>\n<p>The information provided by <strong>${STORE_NAME}</strong> on this website is for general informational and shopping purposes only.</p>`,
     },
     {
       slug: "order-cancellation-policy",
       title: "Order Cancellation Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 16,
-      content: `<h2>1. Customer Order Cancellation</h2>
-<p>You may cancel your order free of charge at any time prior to item dispatch by contacting our support team.</p>`,
-      theme_config: {},
+      sort_order: 9,
+      content: `<h2>1. Customer Order Cancellation</h2>\n<p>You may cancel your order free of charge at any time prior to item dispatch by contacting our support team.</p>`,
     },
     {
       slug: "cookie-policy",
       title: "Cookie Policy",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 17,
-      content: `<h2>1. What Are Cookies?</h2>
-<p>Cookies are small text files stored on your device when you visit our website to remember preferences and cart items.</p>`,
-      theme_config: {},
+      sort_order: 10,
+      content: `<h2>1. What Are Cookies?</h2>\n<p>Cookies are small text files stored on your device when you visit our website to remember preferences and cart items.</p>`,
     },
     {
       slug: "faq",
       title: "Frequently Asked Questions",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 18,
-      content: `<h2>General Questions</h2>
-<p><strong>Q: How do I place an order?</strong><br/>
-A: Browse our catalog, select your items, add them to your cart, and proceed to checkout.</p>`,
-      theme_config: {},
+      sort_order: 11,
+      content: `<h2>General Questions</h2>\n<p><strong>Q: How do I place an order?</strong><br/>\nA: Browse our catalog, select your items, add them to your cart, and proceed to checkout.</p>`,
     },
     {
       slug: "copyright-notice",
       title: "Copyright Notice",
       show_in_header: false,
       show_in_footer: true,
-      sort_order: 19,
-      content: `<h2>1. Intellectual Property Ownership</h2>
-<p>All content on this website is the property of <strong>${STORE_NAME}</strong> and is protected by international copyright laws.</p>`,
-      theme_config: {},
+      sort_order: 12,
+      content: `<h2>1. Intellectual Property Ownership</h2>\n<p>All content on this website is the property of <strong>${STORE_NAME}</strong> and is protected by international copyright laws.</p>`,
     },
   ];
 
@@ -537,16 +276,16 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         sort_order: page.sort_order,
         is_active: true,
         meta_info: { title: page.title },
-        theme_config: page.theme_config || {},
+        theme_config: {},
         custom_css: null,
         created_by: 0,
         updated_by: 0,
       },
     });
   }
-  console.log(`  ✓ Active Storefront Pages (${pages.length}) seeded`);
+  console.log(`  ✓ [Pages] ${pages.length} storefront CMS & legal pages verified`);
 
-  // 7. Shipping Method
+  // 6. Baseline Shipping Method
   const shippingCount = await prisma.shipping_method.count();
   if (shippingCount === 0) {
     await prisma.shipping_method.create({
@@ -563,12 +302,12 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         updated_by: 0,
       },
     });
-    console.log("  ✓ Minimal Shipping Method created");
+    console.log("  + [Shipping] Baseline Standard Shipping created");
   } else {
-    console.log("  ✓ Shipping Methods exist, skipping initial seed");
+    console.log(`  ✓ [Shipping] Shipping methods verified (${shippingCount} registered)`);
   }
 
-  // 8. Payment Method
+  // 7. Payment Methods
   await prisma.payment_method.upsert({
     where: { id: 1 },
     update: {},
@@ -579,13 +318,12 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       provider: "cash_on_delivery",
       extra_charge: null,
       instructions: "Please prepare exact payment upon delivery.",
-      is_active: false,
+      is_active: true,
       sort_order: 1,
       created_by: 0,
       updated_by: 0,
     },
   });
-  console.log("  ✓ Payment Method: Cash on Delivery checked");
 
   await prisma.payment_method.upsert({
     where: { id: 2 },
@@ -593,8 +331,7 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     create: {
       id: 2,
       name: "Credit / Debit Card (Stripe)",
-      description:
-        "Pay securely with Credit/Debit card or digital wallets via Stripe.",
+      description: "Pay securely with Credit/Debit card or digital wallets via Stripe.",
       provider: "stripe",
       extra_charge: null,
       instructions: null,
@@ -604,9 +341,9 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       updated_by: 0,
     },
   });
-  console.log("  ✓ Payment Method: Credit / Debit Card (Stripe) checked");
+  console.log("  ✓ [Payments] Payment gateways verified (Cash on Delivery, Stripe)");
 
-  // 9. Multi-purpose Email Configurations (Seeded as Inactive)
+  // 8. Multi-purpose Email Configurations (Default Inactive)
   const defaultEmailConfigs = [
     {
       purpose: "order_completion",
@@ -656,98 +393,75 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       });
     }
   }
-  console.log(
-    `  ✓ Email Configurations (${defaultEmailConfigs.length} purposes) checked & seeded as inactive`,
-  );
+  console.log(`  ✓ [Email Config] ${defaultEmailConfigs.length} multi-purpose email configurations verified`);
 
-  // 10. Sample Category & Product
-  const categoryCount = await prisma.category.count();
-  const productCount = await prisma.product.count();
+  // 9. Storage Options
+  const defaultStorageOptions = [
+    {
+      key: "local",
+      name: "Local Server Storage",
+      driver: "fs",
+      description: "Default local uploads folder on VPS/Server disk storage.",
+      is_active: true,
+      env_keys: ["LOCAL_UPLOADS_DIR"],
+    },
+    {
+      key: "aws_s3",
+      name: "AWS S3 Storage",
+      driver: "s3",
+      description: "Amazon Web Services Simple Storage Service (S3).",
+      is_active: false,
+      env_keys: [
+        "AWS_S3_KEY",
+        "AWS_S3_SECRET",
+        "AWS_S3_BUCKET",
+        "AWS_S3_REGION",
+      ],
+    },
+    {
+      key: "cloudflare_r2",
+      name: "Cloudflare R2",
+      driver: "s3",
+      description: "Zero egress cost object storage powered by Cloudflare.",
+      is_active: false,
+      env_keys: [
+        "CLOUDFLARE_R2_KEY",
+        "CLOUDFLARE_R2_SECRET",
+        "CLOUDFLARE_R2_BUCKET",
+        "CLOUDFLARE_R2_ENDPOINT",
+      ],
+    },
+    {
+      key: "minio",
+      name: "MinIO Object Storage",
+      driver: "s3",
+      description: "Self-hosted S3 compatible high performance object storage.",
+      is_active: false,
+      env_keys: ["MINIO_KEY", "MINIO_SECRET", "MINIO_BUCKET", "MINIO_ENDPOINT"],
+    },
+    {
+      key: "google_cloud",
+      name: "Google Cloud Storage",
+      driver: "gcs",
+      description: "Google Cloud Platform unified object storage service.",
+      is_active: false,
+      env_keys: ["GCS_KEY_FILE", "GCS_BUCKET"],
+    },
+  ];
 
-  if (categoryCount === 0 && productCount === 0) {
-    const category = await prisma.category.upsert({
-      where: { slug: "general" },
-      update: {},
-      create: {
-        name: "General",
-        slug: "general",
-        description: "Default product category.",
-        image_url:
-          "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-        bg_color: "from-zinc-800 to-zinc-950",
-        show_in_header: true,
-        show_in_footer: true,
-        show_in_home: true,
-        product_count: 1,
-        sort_order: 1,
-        is_active: true,
-        created_by: 0,
-        updated_by: 0,
-      },
+  for (const opt of defaultStorageOptions) {
+    const existing = await prisma.storage_option.findUnique({
+      where: { key: opt.key },
     });
-
-    const productSlug = "sample-product";
-    const existingProduct = await prisma.product.findUnique({
-      where: { slug: productSlug },
-    });
-    if (!existingProduct) {
-      await prisma.product.create({
-        data: {
-          name: "Sample Product",
-          slug: productSlug,
-          short_description: "A simple sample product to get started.",
-          description: "This is a sample product seeded during initial setup.",
-          price: 29.99,
-          stock_quantity: 50,
-          category_id: category.id,
-          category_name: category.name,
-          feature_image_url:
-            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-          feature_image_alt_text: "Sample Product",
-          is_featured: true,
-          is_active: true,
-          sort_order: 1,
-          meta_info: {
-            title: "Sample Product",
-            description: "A simple sample product.",
-          },
-          created_by: 0,
-          updated_by: 0,
-          images: {
-            create: [
-              {
-                url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80",
-                alt_text: "Sample Product Front",
-                sort_order: 0,
-                created_by: 0,
-                updated_by: 0,
-              },
-            ],
-          },
-          variants: {
-            create: [
-              {
-                name: "Standard",
-                price: 29.99,
-                stock_quantity: 50,
-                options: { size: "Standard" },
-                sort_order: 0,
-                created_by: 0,
-                updated_by: 0,
-              },
-            ],
-          },
-        },
+    if (!existing) {
+      await prisma.storage_option.create({
+        data: opt,
       });
     }
-    console.log("  ✓ Sample Category & Product seeded");
-  } else {
-    console.log(
-      "  ✓ Catalog already exists, skipping sample category/product seed",
-    );
   }
+  console.log(`  ✓ [Storage] ${defaultStorageOptions.length} storage options verified`);
 
-  // 12. Default Email Templates
+  // 10. Transactional Email Templates (6 Standard Use Cases)
   const defaultTemplates = [
     {
       key: "invoice",
@@ -849,6 +563,31 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "store_email", description: "Store contact email" },
+        { name: "store_phone", description: "Store contact phone" },
+        { name: "store_address", description: "Store business address" },
+        { name: "logo_url", description: "URL of your store logo" },
+        { name: "storefront_url", description: "Base URL of your storefront website" },
+        { name: "invoice_number", description: "Unique invoice reference number" },
+        { name: "order_number", description: "Unique order reference number" },
+        { name: "customer_name", description: "Full name of customer" },
+        { name: "customer_email", description: "Email address of customer" },
+        { name: "issued_date", description: "Formatted invoice date" },
+        { name: "payment_method", description: "Selected payment method name" },
+        { name: "status_badge_text", description: "Status text (e.g. PAID or PENDING PAYMENT)" },
+        { name: "status_badge_color", description: "Badge CSS color (#16a34a or #ca8a04)" },
+        { name: "items_table", description: "HTML table rows of purchased items" },
+        { name: "subtotal", description: "Formatted subtotal amount with currency" },
+        { name: "discount_row", description: "Formatted HTML discount row (if applicable)" },
+        { name: "tax_row", description: "Formatted HTML tax row (if applicable)" },
+        { name: "shipping_cost", description: "Formatted shipping cost amount with currency" },
+        { name: "total", description: "Formatted total order price with currency" },
+        { name: "currency_symbol", description: "Currency symbol (e.g. $)" },
+        { name: "notes_section", description: "HTML section displaying customer order notes" },
+        { name: "year", description: "Current year" },
+      ],
     },
     {
       key: "order_notification",
@@ -939,6 +678,28 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "store_email", description: "Store contact email" },
+        { name: "store_phone", description: "Store contact phone" },
+        { name: "store_address", description: "Store business address" },
+        { name: "logo_url", description: "URL of your store logo" },
+        { name: "invoice_number", description: "Unique invoice reference number" },
+        { name: "order_number", description: "Unique order reference number" },
+        { name: "customer_name", description: "Full name of customer" },
+        { name: "customer_email", description: "Email address of customer" },
+        { name: "issued_date", description: "Formatted invoice date" },
+        { name: "payment_method", description: "Selected payment method name" },
+        { name: "items_table", description: "HTML table rows of purchased items" },
+        { name: "subtotal", description: "Formatted subtotal amount with currency" },
+        { name: "discount_row", description: "Formatted HTML discount row (if applicable)" },
+        { name: "tax_row", description: "Formatted HTML tax row (if applicable)" },
+        { name: "shipping_cost", description: "Formatted shipping cost amount with currency" },
+        { name: "total", description: "Formatted total order price with currency" },
+        { name: "currency_symbol", description: "Currency symbol (e.g. $)" },
+        { name: "notes_section", description: "HTML section displaying customer order notes" },
+        { name: "year", description: "Current year" },
+      ],
     },
     {
       key: "cod_otp",
@@ -990,6 +751,13 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "customer_name", description: "Customer name or 'there'" },
+        { name: "otp_code", description: "6-digit OTP verification code" },
+        { name: "expires_minutes", description: "OTP expiration time in minutes" },
+        { name: "year", description: "Current year" },
+      ],
     },
     {
       key: "order_cancellation_otp",
@@ -1042,6 +810,14 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "customer_name", description: "Customer name" },
+        { name: "order_number", description: "Order number being cancelled" },
+        { name: "otp_code", description: "6-digit cancellation OTP code" },
+        { name: "expires_minutes", description: "OTP expiration time in minutes" },
+        { name: "year", description: "Current year" },
+      ],
     },
     {
       key: "order_cancelled_confirmation",
@@ -1085,6 +861,13 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "customer_name", description: "Customer name" },
+        { name: "order_number", description: "Order number that was cancelled" },
+        { name: "order_details_url", description: "URL link for customer to view order details" },
+        { name: "year", description: "Current year" },
+      ],
     },
     {
       key: "newsletter_confirmation",
@@ -1126,12 +909,18 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
   </div>
 </body>
 </html>`,
+      available_variables: [
+        { name: "store_name", description: "Name of your store" },
+        { name: "to_email", description: "Recipient's subscriber email address" },
+        { name: "confirmation_url", description: "Signed double opt-in confirmation URL button link" },
+        { name: "year", description: "Current year" },
+      ],
     },
   ];
 
   for (const tmpl of defaultTemplates) {
     const existing = await prisma.email_template.findFirst({
-      where: { key: tmpl.key },
+      where: { key: tmpl.key, deleted_at: null },
     });
     if (!existing) {
       await prisma.email_template.create({
@@ -1141,177 +930,9 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
           description: tmpl.description,
           subject: tmpl.subject,
           body_html: tmpl.body_html,
+          available_variables: tmpl.available_variables,
           is_active: true,
-          created_by: 0,
-          updated_by: 0,
-        },
-      });
-    }
-  }
-
-  console.log(
-    `  ✓ Default Email Templates (${defaultTemplates.length} use cases) seeded`,
-  );
-  console.log(
-    "  ✓ 1 Category, 1 Sample Product & Sample Coupon WELCOME10 seeded",
-  );
-
-  // Seed Storage Options
-  const defaultStorageOptions = [
-    {
-      key: "local",
-      name: "Local Server Storage",
-      driver: "fs",
-      description: "Default local uploads folder on VPS/Server disk storage.",
-      is_active: true,
-      env_keys: ["LOCAL_UPLOADS_DIR"],
-    },
-    {
-      key: "aws_s3",
-      name: "AWS S3 Storage",
-      driver: "s3",
-      description: "Amazon Web Services Simple Storage Service (S3).",
-      is_active: false,
-      env_keys: [
-        "AWS_S3_KEY",
-        "AWS_S3_SECRET",
-        "AWS_S3_BUCKET",
-        "AWS_S3_REGION",
-      ],
-    },
-    {
-      key: "cloudflare_r2",
-      name: "Cloudflare R2",
-      driver: "s3",
-      description: "Zero egress cost object storage powered by Cloudflare.",
-      is_active: false,
-      env_keys: [
-        "CLOUDFLARE_R2_KEY",
-        "CLOUDFLARE_R2_SECRET",
-        "CLOUDFLARE_R2_BUCKET",
-        "CLOUDFLARE_R2_ENDPOINT",
-      ],
-    },
-    {
-      key: "minio",
-      name: "MinIO Object Storage",
-      driver: "s3",
-      description: "Self-hosted S3 compatible high performance object storage.",
-      is_active: false,
-      env_keys: ["MINIO_KEY", "MINIO_SECRET", "MINIO_BUCKET", "MINIO_ENDPOINT"],
-    },
-    {
-      key: "google_cloud",
-      name: "Google Cloud Storage",
-      driver: "gcs",
-      description: "Google Cloud Platform unified object storage service.",
-      is_active: false,
-      env_keys: ["GCS_KEY_FILE", "GCS_BUCKET"],
-    },
-  ];
-
-  for (const opt of defaultStorageOptions) {
-    const existing = await prisma.storage_option.findUnique({
-      where: { key: opt.key },
-    });
-    if (!existing) {
-      await prisma.storage_option.create({
-        data: opt,
-      });
-    }
-  }
-
-  console.log(
-    `  ✓ Storage Options (${defaultStorageOptions.length} providers) seeded`,
-  );
-
-  // System Email Templates (is_system: true)
-  const systemTemplates = [
-    {
-      key: "order_confirmation",
-      name: "Order Confirmation",
-      description:
-        "Sent automatically when a customer successfully places an order.",
-      subject: "Order Confirmation - {{order_number}}",
-      body_html:
-        "<h2>Thank you for your order!</h2><p>Hi {{customer_name}},</p><p>We received your order <strong>#{{order_number}}</strong>. Total: <strong>{{currency}} {{total}}</strong>.</p>",
-      available_variables: [
-        "customer_name",
-        "order_number",
-        "total",
-        "currency",
-        "items_table",
-      ],
-      is_active: true,
-      is_system: true,
-    },
-    {
-      key: "otp_verification",
-      name: "OTP Verification",
-      description:
-        "One-time password for Cash on Delivery confirmation or order tracking.",
-      subject: "Your OTP Verification Code: {{otp_code}}",
-      body_html:
-        "<h2>Verification Code</h2><p>Your one-time security verification code is: <strong>{{otp_code}}</strong>. It will expire in {{expires_in_minutes}} minutes.</p>",
-      available_variables: ["otp_code", "expires_in_minutes"],
-      is_active: true,
-      is_system: true,
-    },
-    {
-      key: "invoice",
-      name: "Invoice & Receipt",
-      description: "Sent to customers with invoice breakdown.",
-      subject: "Invoice {{invoice_number}} for Order {{order_number}}",
-      body_html:
-        "<h2>Invoice {{invoice_number}}</h2><p>Hi {{customer_name}}, please find attached your invoice for order #{{order_number}}.</p>",
-      available_variables: [
-        "customer_name",
-        "invoice_number",
-        "order_number",
-        "total",
-        "currency",
-      ],
-      is_active: true,
-      is_system: true,
-    },
-    {
-      key: "shipping_update",
-      name: "Shipping Notification",
-      description: "Sent when order status changes to shipped.",
-      subject: "Your Order #{{order_number}} Has Shipped!",
-      body_html:
-        "<h2>Order Shipped</h2><p>Hi {{customer_name}}, your order #{{order_number}} is on its way!</p><p>Carrier: {{carrier_name}}<br>Tracking: {{tracking_number}}</p>",
-      available_variables: [
-        "customer_name",
-        "order_number",
-        "carrier_name",
-        "tracking_number",
-        "tracking_url",
-      ],
-      is_active: true,
-      is_system: true,
-    },
-    {
-      key: "newsletter_optin",
-      name: "Newsletter Double Opt-in Confirmation",
-      description: "Sent when a user requests to subscribe to the newsletter.",
-      subject: "Please confirm your newsletter subscription",
-      body_html:
-        "<h2>Welcome!</h2><p>Thank you for subscribing to our newsletter. Please confirm your subscription by clicking the link below.</p><p><a href='{{confirm_url}}'>Confirm Subscription</a></p>",
-      available_variables: ["confirm_url"],
-      is_active: true,
-      is_system: true,
-    },
-  ];
-
-  for (const tmpl of systemTemplates) {
-    const existing = await prisma.email_template.findFirst({
-      where: { key: tmpl.key, deleted_at: null },
-    });
-    if (!existing) {
-      await prisma.email_template.create({
-        data: {
-          ...tmpl,
+          is_system: true,
           created_by: adminUser.id,
           updated_by: adminUser.id,
         },
@@ -1319,20 +940,21 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
     } else {
       await prisma.email_template.update({
         where: { id: existing.id },
-        data: { is_system: true },
+        data: {
+          is_system: true,
+          available_variables: tmpl.available_variables,
+        },
       });
     }
   }
-  console.log(
-    `  ✓ System Email Templates (${systemTemplates.length} templates) seeded & marked immutable`,
-  );
+  console.log(`  ✓ [Templates] ${defaultTemplates.length} transactional email templates verified`);
 
-  console.log("\n✅ Minimal Database Seeding Complete!");
+  console.log("\n🩺 [Doctor] Database health check & system synchronization complete: All systems healthy!\n");
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed execution failed:", e);
+    console.error("❌ Doctor seed execution failed:", e);
     process.exit(1);
   })
   .finally(async () => {

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -8,7 +10,15 @@ export const metadata: Metadata = {
   title: "Create Page",
 };
 
-export default async function CreatePageDashboardPage() {
+export default function CreatePageDashboardPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreatePageDashboardPageContent />
+    </Suspense>
+  );
+}
+
+async function CreatePageDashboardPageContent() {
   const { permissions } = await assertPermission("create", "/dashboard/pages");
   const activeThemes = await getActiveThemesWithComponentsInDB();
 

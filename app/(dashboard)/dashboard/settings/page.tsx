@@ -4,6 +4,7 @@ import { getSiteConfigDashboardDataInDB } from "@/services/site-services";
 import { getActiveThemesWithComponentsInDB } from "@/services/theme-services";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -11,9 +12,9 @@ export const metadata: Metadata = {
     "Manage site configuration, branding, theme components, and checkout settings",
 };
 
-export default async function SettingsPage() {
+export default function SettingsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<DashboardLoading />}>
       <SettingsPageContent />
     </Suspense>
   );

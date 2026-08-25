@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
 import CategoryForm from "../_components/category-form";
@@ -10,7 +12,15 @@ export const metadata: Metadata = {
   description: "Create a new product category",
 };
 
-export default async function CreateCategoryPage() {
+export default function CreateCategoryPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreateCategoryPageContent />
+    </Suspense>
+  );
+}
+
+async function CreateCategoryPageContent() {
   await assertPermission("create", "/dashboard/categories");
 
   const parentCategories = await getParentCategoriesInDB();

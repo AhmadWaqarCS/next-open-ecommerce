@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import InvoiceTrashTable from "./invoice-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -24,11 +26,21 @@ interface TrashedInvoice {
   deleted_by: number;
 }
 
-export default async function DashboardInvoicesTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardInvoicesTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardInvoicesTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardInvoicesTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/invoices");
   const params = await searchParams;
 

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { notFound } from "next/navigation";
 import { assertPermission } from "@/lib/guards";
 import prisma from "@/lib/prisma";
@@ -11,7 +13,15 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function EditEmailTemplatePage({ params }: PageProps) {
+export default function EditEmailTemplatePage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditEmailTemplatePageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditEmailTemplatePageContent({ params }: PageProps) {
   await assertPermission("update", "/dashboard/email-templates");
 
   const resolvedParams = await params;

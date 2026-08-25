@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import ProductTable from "./product-table";
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
@@ -15,13 +17,23 @@ export const metadata: Metadata = {
   description: "Manage storefront products catalog",
 };
 
-export default async function DashboardProductsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardProductsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardProductsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardProductsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/products");
   const params = await searchParams;
 

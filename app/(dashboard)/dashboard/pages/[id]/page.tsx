@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
@@ -10,11 +12,21 @@ export const metadata: Metadata = {
   title: "Edit Page Configuration",
 };
 
-export default async function EditPageConfigPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditPageConfigPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditPageConfigPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditPageConfigPageContent({
+  params,
+}: PageProps) {
   const { permissions } = await assertPermission("update", "/dashboard/pages");
   const { id: idStr } = await params;
   const id = Number(idStr);

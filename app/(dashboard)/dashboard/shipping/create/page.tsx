@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
 import ShippingForm from "../_components/shipping-form";
@@ -9,7 +11,15 @@ export const metadata: Metadata = {
   description: "Create a new store shipping method",
 };
 
-export default async function CreateShippingMethodPage() {
+export default function CreateShippingMethodPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreateShippingMethodPageContent />
+    </Suspense>
+  );
+}
+
+async function CreateShippingMethodPageContent() {
   await assertPermission("create", "/dashboard/shipping");
 
   return (

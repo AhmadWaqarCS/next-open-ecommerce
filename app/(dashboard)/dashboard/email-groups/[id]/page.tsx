@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import { notFound } from "next/navigation";
@@ -9,7 +11,15 @@ interface PageProps {
   }>;
 }
 
-export default async function EmailGroupDetailPage({ params }: PageProps) {
+export default function EmailGroupDetailPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EmailGroupDetailPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EmailGroupDetailPageContent({ params }: PageProps) {
   await assertPermission("read", "/dashboard/email-groups");
   const { id } = await params;
   const groupId = Number(id);

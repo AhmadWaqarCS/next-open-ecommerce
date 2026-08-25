@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializePages } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -15,11 +17,21 @@ export const metadata: Metadata = {
   description: "Manage static pages and content for your storefront.",
 };
 
-export default async function DashboardPagesPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardPagesPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardPagesPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardPagesPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/pages");
   const params = await searchParams;
 

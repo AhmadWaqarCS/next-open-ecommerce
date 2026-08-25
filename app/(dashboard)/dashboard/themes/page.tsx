@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -15,13 +17,23 @@ export const metadata: Metadata = {
   description: "Manage developer theme registries and custom storefront components.",
 };
 
-export default async function DashboardThemesPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardThemesPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardThemesPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardThemesPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/themes");
   const params = (await searchParams) || {};
 

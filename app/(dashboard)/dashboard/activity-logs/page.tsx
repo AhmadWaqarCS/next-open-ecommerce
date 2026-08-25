@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import prisma from "@/lib/prisma";
 import ActivityLogTable from "./activity-log-table";
@@ -14,11 +16,21 @@ export const metadata: Metadata = {
   description: "Audit trail of admin operations, system actions, and user activity events",
 };
 
-export default async function DashboardActivityLogsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardActivityLogsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardActivityLogsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardActivityLogsPageContent({
+  searchParams,
+}: PageProps) {
   await assertPermission("read", "/dashboard/activity-logs");
   const params = await searchParams;
 

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import Link from "next/link";
 import { assertPermission } from "@/lib/guards";
 import InvoiceForm from "../_components/invoice-form";
@@ -9,7 +11,15 @@ export const metadata: Metadata = {
   description: "Create a new order invoice",
 };
 
-export default async function CreateInvoicePage() {
+export default function CreateInvoicePage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <CreateInvoicePageContent />
+    </Suspense>
+  );
+}
+
+async function CreateInvoicePageContent() {
   await assertPermission("create", "/dashboard/invoices");
 
   const ordersRaw = await getInvoiceCreateDataInDB();

@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import { notFound } from "next/navigation";
@@ -9,7 +11,15 @@ interface PageProps {
   }>;
 }
 
-export default async function EditCampaignPage({ params }: PageProps) {
+export default function EditCampaignPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditCampaignPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditCampaignPageContent({ params }: PageProps) {
   await assertPermission("read", "/dashboard/email-campaigns");
   const { id } = await params;
   const campaignId = Number(id);

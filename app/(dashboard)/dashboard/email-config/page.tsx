@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import EmailConfigManagerClient from "./email-config-manager-client";
@@ -9,7 +11,15 @@ export const metadata: Metadata = {
     "Configure email sender identity, SMTP environment integration by purpose, and rate-limited dispatch rules",
 };
 
-export default async function EmailConfigPage() {
+export default function EmailConfigPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EmailConfigPageContent />
+    </Suspense>
+  );
+}
+
+async function EmailConfigPageContent() {
   const { permissions } = await assertPermission(
     "update",
     "/dashboard/email-config",

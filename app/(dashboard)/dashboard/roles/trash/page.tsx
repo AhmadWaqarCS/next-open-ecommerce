@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import RoleTrashTable from "./role-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Deleted roles",
 };
 
-export default async function DashboardRolesTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardRolesTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardRolesTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardRolesTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/roles");
   const params = await searchParams;
 

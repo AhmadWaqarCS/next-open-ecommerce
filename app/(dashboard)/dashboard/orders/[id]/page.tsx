@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -20,11 +22,21 @@ export async function generateMetadata({
   };
 }
 
-export default async function OrderDetailPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function OrderDetailPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <OrderDetailPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function OrderDetailPageContent({
+  params,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/orders");
   const { id } = await params;
 

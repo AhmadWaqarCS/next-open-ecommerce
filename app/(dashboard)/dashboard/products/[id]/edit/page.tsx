@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { serializeProduct } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Link from "next/link";
@@ -12,11 +14,21 @@ export const metadata: Metadata = {
   description: "Edit product details and gallery images",
 };
 
-export default async function EditProductPage({
-  params,
-}: {
+interface PageProps {
   params: Promise<{ id: string }>;
-}) {
+}
+
+export default function EditProductPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EditProductPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EditProductPageContent({
+  params,
+}: PageProps) {
   await assertPermission("update", "/dashboard/products");
   const { id } = await params;
   const productId = Number(id);

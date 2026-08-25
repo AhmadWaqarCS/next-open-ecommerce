@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import ProductTrashTable from "./product-trash-table";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Deleted products",
 };
 
-export default async function DashboardProductsTrashPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardProductsTrashPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardProductsTrashPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardProductsTrashPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("delete", "/dashboard/products");
   const params = await searchParams;
 

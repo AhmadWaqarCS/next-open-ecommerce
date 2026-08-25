@@ -5,8 +5,7 @@ import { ToastProvider } from "../_components/toast-context";
 import { ToastContainer } from "../_components/toast-container";
 import ThemeToggle from "../_components/theme-toggle";
 
-import { Suspense } from "react";
-import DashboardLoading from "./loading";
+
 
 export const instant = false;
 

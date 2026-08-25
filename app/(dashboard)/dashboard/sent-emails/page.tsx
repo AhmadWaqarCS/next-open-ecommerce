@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import SentEmailTable from "./sent-email-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -11,11 +13,21 @@ export const metadata: Metadata = {
     "Track and audit outgoing email dispatches and delivery statuses",
 };
 
-export default async function DashboardSentEmailsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardSentEmailsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardSentEmailsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardSentEmailsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission(
     "read",
     "/dashboard/sent-emails",

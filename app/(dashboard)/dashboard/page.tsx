@@ -4,18 +4,31 @@ import OrderAnalyticsChart from "./_components/order-analytics-chart";
 import Link from "next/link";
 import { Metadata } from "next";
 
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
+
 export const metadata: Metadata = {
   title: "Dashboard - Order Analysis",
   description: "Next OpenSource Ecommerce Dashboard & Order Analytics",
 };
 
-export default async function DashboardHomePage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     range?: string;
   }>;
-}) {
+}
+
+export default function DashboardHomePage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardHomePageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardHomePageContent({
+  searchParams,
+}: PageProps) {
   await assertPermission("read", "/dashboard");
 
   const params = await searchParams;

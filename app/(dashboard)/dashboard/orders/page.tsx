@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import OrderTable from "./order-table";
 import { resolveUserNames, serializeOrders } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "View and track customer orders and transactions",
 };
 
-export default async function DashboardOrdersPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardOrdersPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardOrdersPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardOrdersPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/orders");
   const params = await searchParams;
 

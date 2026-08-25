@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import EmailGroupTable from "./email-group-table";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -13,13 +15,23 @@ export const metadata: Metadata = {
   description: "Organize customer contact IDs into targeted subscriber segments",
 };
 
-export default async function EmailGroupsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function EmailGroupsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <EmailGroupsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function EmailGroupsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/email-groups");
   const params = await searchParams;
 

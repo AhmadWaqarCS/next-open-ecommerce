@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import UserTable from "./user-table";
 import { resolveUserNames } from "@/lib/action-utils";
@@ -12,13 +14,23 @@ export const metadata: Metadata = {
   description: "Users list",
 };
 
-export default async function DashboardUsersPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{
     [key: string]: string | string[] | undefined;
   }>;
-}) {
+}
+
+export default function DashboardUsersPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardUsersPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardUsersPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions, user } = await assertPermission(
     "read",
     "/dashboard/users",

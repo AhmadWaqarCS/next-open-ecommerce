@@ -1,8 +1,18 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import prisma from "@/lib/prisma";
 import { assertPermission } from "@/lib/guards";
 import CampaignFormClient from "../campaign-form-client";
 
-export default async function NewCampaignPage() {
+export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <NewCampaignPageContent />
+    </Suspense>
+  );
+}
+
+async function NewCampaignPageContent() {
   await assertPermission("create", "/dashboard/email-campaigns");
 
   const [configs, templates, groups] = await Promise.all([

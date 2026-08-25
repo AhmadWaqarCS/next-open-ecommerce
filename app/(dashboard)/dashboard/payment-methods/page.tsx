@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializePaymentMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import Pagination from "@/app/(dashboard)/_components/pagination";
@@ -15,11 +17,21 @@ export const metadata: Metadata = {
   description: "Manage store payment options including Cash on Delivery, Stripe, PayPal, and more.",
 };
 
-export default async function DashboardPaymentMethodsPage({
-  searchParams,
-}: {
+interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}
+
+export default function DashboardPaymentMethodsPage(props: PageProps) {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <DashboardPaymentMethodsPageContent {...props} />
+    </Suspense>
+  );
+}
+
+async function DashboardPaymentMethodsPageContent({
+  searchParams,
+}: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/payment-methods");
   const params = await searchParams;
 
