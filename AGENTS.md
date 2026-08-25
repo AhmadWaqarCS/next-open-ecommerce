@@ -34,7 +34,7 @@ Handles client requests, validation, permission assertions, cache revalidation, 
 - E.g., [actions/product-actions.ts](./actions/product-actions.ts), [actions/site-actions.ts](./actions/site-actions.ts), [actions/checkout-action.ts](./actions/checkout-action.ts), [actions/storage-actions.ts](./actions/storage-actions.ts), [actions/email-template-actions.ts](./actions/email-template-actions.ts)
 
 ### 3. Routes (`/app`)
-- **Admin Dashboard**: Located in `app/(dashboard)/dashboard/` (e.g. products, categories, orders, shipping, users, roles, coupons, storages, email-templates, activity-logs, site-components, newsletter, sent-emails).
+- **Admin Dashboard**: Located in `app/(dashboard)/dashboard/` (e.g. products, categories, orders, shipping, users, roles, coupons, storages, email-templates, activity-logs, themes, newsletter, sent-emails).
 - **Storefront (E-commerce)**: Located in `app/(ecommerce)/` with catch-all routing (`[...slug]`), dynamic cart drawer, checkout, order tracking, and newsletter confirmation.
 - **System Routes**: Dynamic sitemap (`app/sitemap.ts`), uploads proxy (`app/uploads/[...path]/route.ts`), and Stripe webhook handler (`app/api/webhooks/stripe/route.ts`).
 

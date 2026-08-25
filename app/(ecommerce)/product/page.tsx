@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getFeaturedProducts, getPageData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import { cacheLife, cacheTag } from "next/cache";
 import ProductCard from "../_components/ProductCard";
 
@@ -23,6 +24,28 @@ export default async function ProductsPage() {
     getFeaturedProducts(24),
     getPageData("product"),
   ]);
+
+  const pageThemeCfg = (page?.theme_config ?? {}) as Record<string, any>;
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomProductsPage = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomProductsPage) {
+      return (
+        <>
+          {page?.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+          )}
+          <CustomProductsPage
+            content={{ page, products }}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
   const currencySymbol = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "$";
 
   const title = page?.title ?? "All Products";
@@ -31,6 +54,9 @@ export default async function ProductsPage() {
 
   return (
     <div className="page-enter">
+      {page?.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+      )}
       {/* Dark banner so the transparent header text stays visible */}
       <div className="bg-zinc-950 relative overflow-hidden border-b border-zinc-800/40">
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-900/30 to-zinc-950" />

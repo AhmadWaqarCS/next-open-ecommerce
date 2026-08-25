@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getHeaderData, type HeaderData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import SearchButton from "./SearchButton";
 import MobileMenuToggle from "./MobileMenuToggle";
 import CartButton from "./CartButton";
@@ -112,6 +113,24 @@ export default async function SiteHeader() {
   cacheLife("max");
 
   const content = await getHeaderData();
+  const headerConfig = (content?.headerConfig ?? {}) as Record<string, any>;
+
+  // Check if custom theme header component is active
+  if (headerConfig.theme_name && headerConfig.component_path) {
+    const CustomHeader = await loadThemeComponent(
+      headerConfig.theme_name,
+      headerConfig.component_path,
+    );
+    if (CustomHeader) {
+      return (
+        <CustomHeader
+          content={content}
+          themeConfig={headerConfig.theme_config || content?.themeConfig}
+        />
+      );
+    }
+  }
+
   const siteName = content?.siteName || "Store";
   const logoUrl = content?.lightLogoUrl;
   const topbarMessage = content?.topbarMessage;

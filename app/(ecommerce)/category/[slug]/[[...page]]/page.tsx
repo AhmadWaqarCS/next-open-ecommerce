@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { cacheLife, cacheTag } from "next/cache";
-import { getCategoryPageData, getCategorySlugs } from "@/lib/storefront";
+import { getCategoryPageData, getCategorySlugs, getPageThemeConfig } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import CategoryPageMain from "../CategoryPageMain";
 
 interface PaginatedCategoryPageProps {
@@ -34,7 +35,33 @@ export default async function PaginatedCategoryPage({
   cacheTag(`category-${slug}`);
   cacheLife("max");
 
-  const data = await getCategoryPageData(slug, page);
+  const [data, pageThemeCfg] = await Promise.all([
+    getCategoryPageData(slug, page),
+    getPageThemeConfig(["category/[slug]", "category"]),
+  ]);
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomCategory = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomCategory) {
+      return (
+        <>
+          {pageThemeCfg.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+          )}
+          <CustomCategory data={data} themeConfig={pageThemeCfg.theme_config} />
+        </>
+      );
+    }
+  }
 
-  return <CategoryPageMain data={data} />;
+  return (
+    <>
+      {pageThemeCfg.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+      )}
+      <CategoryPageMain data={data} />
+    </>
+  );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getFooterData, type FooterData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import NewsletterForm from "./NewsletterForm";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -81,6 +82,24 @@ export default async function SiteFooter() {
   cacheLife("max");
 
   const content = await getFooterData();
+  const footerConfig = (content?.footerConfig ?? {}) as Record<string, any>;
+
+  // Check if custom theme footer component is active
+  if (footerConfig.theme_name && footerConfig.component_path) {
+    const CustomFooter = await loadThemeComponent(
+      footerConfig.theme_name,
+      footerConfig.component_path,
+    );
+    if (CustomFooter) {
+      return (
+        <CustomFooter
+          content={content}
+          themeConfig={footerConfig.theme_config || content?.themeConfig}
+        />
+      );
+    }
+  }
+
   const siteName = content?.siteConfig?.name || "Store";
   const description =
     content?.siteConfig?.description ||

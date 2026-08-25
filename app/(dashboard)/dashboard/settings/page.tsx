@@ -1,21 +1,34 @@
 import { assertPermission } from "@/lib/guards";
 import SiteConfigForm from "./site-config-form";
 import { getSiteConfigDashboardDataInDB } from "@/services/site-services";
+import { getActiveThemesWithComponentsInDB } from "@/services/theme-services";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Settings",
   description:
-    "Manage site configuration, branding, localization, and checkout settings",
+    "Manage site configuration, branding, theme components, and checkout settings",
 };
 
 export default async function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+async function SettingsPageContent() {
   const { permissions } = await assertPermission(
     "update",
     "/dashboard/settings",
   );
 
-  const siteConfig = await getSiteConfigDashboardDataInDB();
+  const [siteConfig, activeThemes] = await Promise.all([
+    getSiteConfigDashboardDataInDB(),
+    getActiveThemesWithComponentsInDB(),
+  ]);
 
   return (
     <div className="space-y-6 flex-1 flex flex-col pb-12">
@@ -24,8 +37,7 @@ export default async function SettingsPage() {
           Site Settings
         </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Configure global store parameters, branding, localization, and
-          checkout options.
+          Configure global store parameters, theme components, branding, and checkout options.
         </p>
       </div>
 
@@ -35,8 +47,7 @@ export default async function SettingsPage() {
             Site Configuration Not Found
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-            Please run the database seed script to initialize the default site
-            configuration.
+            Please run the database seed script to initialize the default site configuration.
           </p>
         </div>
       ) : (
@@ -52,7 +63,11 @@ export default async function SettingsPage() {
               string | null
             >,
             meta_info: (siteConfig.meta_info ?? {}) as Record<string, string>,
+            theme_config: (siteConfig.theme_config ?? {}) as Record<string, any>,
+            header_config: (siteConfig.header_config ?? {}) as Record<string, any>,
+            footer_config: (siteConfig.footer_config ?? {}) as Record<string, any>,
           }}
+          activeThemes={activeThemes as any}
           permissions={permissions}
         />
       )}

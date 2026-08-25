@@ -284,3 +284,69 @@ export type newsletter_subscriber = {
   email: string;
   created_at: Date;
 };
+
+// ─── THEMES & THEME COMPONENTS ───────────────────────────────────────────────
+
+export type ThemeComponentType =
+  | "header"
+  | "footer"
+  | "home"
+  | "product"
+  | "category"
+  | "page";
+
+export interface ThemeColorsConfig {
+  bg_color?: string;
+  fg_color?: string;
+  text_color?: string;
+  link_color?: string;
+  hover_color?: string;
+  accent_color?: string;
+  [key: string]: unknown;
+}
+
+export interface CustomComponentSelection {
+  theme_id?: number | null;
+  component_id?: number | null;
+  theme_name?: string | null;
+  component_path?: string | null;
+  theme_config?: ThemeColorsConfig;
+}
+
+export type theme = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: Date | string;
+  created_by: number;
+  updated_at: Date | string;
+  updated_by: number;
+  components?: theme_component[];
+};
+
+export type theme_component = {
+  id: number;
+  theme_id: number;
+  theme?: theme;
+  name: string;
+  component_type: ThemeComponentType | string;
+  file_path: string;
+  theme_config: ThemeColorsConfig | Record<string, unknown>;
+  is_active: boolean;
+  created_at: Date | string;
+  created_by: number;
+  updated_at: Date | string;
+  updated_by: number;
+};
+
+export type { site_page } from "./generated/prisma/client";
+
+export const PROTECTED_SYSTEM_SLUGS = [
+  "/",
+  "product",
+  "category",
+  "product/[slug]",
+  "category/[slug]",
+];

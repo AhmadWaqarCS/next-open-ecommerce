@@ -27,9 +27,7 @@ export default function DashboardRootLayout({
         />
         <link rel="shortcut icon" href="/icon" />
       </head>
-      <body className="min-h-full flex flex-col font-sans">
-        <Suspense>{children}</Suspense>
-      </body>
+      <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );
 }

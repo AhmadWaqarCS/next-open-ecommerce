@@ -83,8 +83,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     for (const page of pages) {
+      if (
+        page.slug === "/" ||
+        page.slug.includes("[slug]") ||
+        page.slug === "about" ||
+        page.slug === "contact" ||
+        page.slug === "search"
+      ) {
+        continue;
+      }
       routes.push({
-        url: `${baseUrl}/pages/${page.slug}`,
+        url: `${baseUrl}/${page.slug}`,
         lastModified: page.updated_at,
         changeFrequency: "monthly",
         priority: 0.6,

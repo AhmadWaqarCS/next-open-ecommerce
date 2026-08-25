@@ -305,9 +305,19 @@ export const siteConfigCreateSchema = z.object({
   light_logo_url: urlSchema.optional().or(z.literal("")),
   dark_logo_url: urlSchema.optional().or(z.literal("")),
   favicon_url: urlSchema.optional().or(z.literal("")),
-  primary_color: colorHexSchema.default("#18181b"),
-  secondary_color: colorHexSchema.default("#27272a"),
-  accent_color: colorHexSchema.default("#f59e0b"),
+
+  // Typography & Custom Styling
+  font_family: z
+    .string()
+    .trim()
+    .max(100, "Font family cannot exceed 100 characters")
+    .default("Inter"),
+  custom_css: z
+    .string()
+    .max(50000, "Custom CSS cannot exceed 50000 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 
   // Localisation
   currency: z
@@ -373,6 +383,10 @@ export const siteConfigCreateSchema = z.object({
     .record(z.string().max(100), z.unknown())
     .optional()
     .default({}),
+  theme_config: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .default({}),
 
   meta_info: metaInfoSchema,
 });
@@ -386,7 +400,16 @@ export type SiteConfigUpdateInput = z.infer<typeof siteConfigUpdateSchema>;
 // ============================================================
 
 export const sitePageCreateSchema = z.object({
-  slug: slugSchema,
+  slug: z
+    .string()
+    .trim()
+    .min(1, "Page slug is required")
+    .max(255, "Slug cannot exceed 255 characters")
+    .regex(
+      /^(?:\/|[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*|\[[a-z0-9_-]+\]|product\/\[slug\]|category\/\[slug\])$/i,
+      "Slug must contain lowercase alphanumeric characters and hyphens (or / for home page)",
+    )
+    .transform((val) => (val === "/" ? "/" : val.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, ""))),
   title: z
     .string()
     .trim()
@@ -394,21 +417,25 @@ export const sitePageCreateSchema = z.object({
     .max(255, "Title cannot exceed 255 characters"),
   content: z
     .string()
-    .min(1, "Page content is required")
-    .max(500000, "Page content cannot exceed 500KB"),
+    .max(500000, "Page content cannot exceed 500KB")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  custom_css: z
+    .string()
+    .max(500000, "Custom CSS cannot exceed 500KB")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   is_active: z.boolean().default(true),
   show_in_header: z.boolean().default(false),
   show_in_footer: z.boolean().default(true),
-  sort_order: z.number().int().min(-10000).max(10000).default(0),
+  sort_order: z.coerce.number().int().min(-10000).max(10000).default(0),
   theme_config: z
     .record(z.string().max(100), z.unknown())
     .optional()
     .default({}),
-  components_config: z
-    .array(z.record(z.string().max(100), z.unknown()))
-    .optional()
-    .default([]),
-  meta_info: metaInfoSchema,
+  meta_info: metaInfoSchema.optional().default({}),
 });
 export type SitePageCreateInput = z.infer<typeof sitePageCreateSchema>;
 
@@ -416,48 +443,68 @@ export const sitePageUpdateSchema = sitePageCreateSchema.partial();
 export type SitePageUpdateInput = z.infer<typeof sitePageUpdateSchema>;
 
 // ============================================================
-// SITE COMPONENTS (site_component)
+// THEMES & THEME COMPONENTS
 // ============================================================
 
-export const siteComponentCreateSchema = z.object({
+export const themeColorsConfigSchema = z.object({
+  bg_color: z.string().optional(),
+  fg_color: z.string().optional(),
+  text_color: z.string().optional(),
+  link_color: z.string().optional(),
+  hover_color: z.string().optional(),
+  accent_color: z.string().optional(),
+}).passthrough();
+export type ThemeColorsConfigInput = z.infer<typeof themeColorsConfigSchema>;
+
+export const themeCreateSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Component name is required")
-    .max(255, "Component name cannot exceed 255 characters"),
-  component_key: z
+    .min(1, "Theme name is required")
+    .max(100, "Theme name cannot exceed 100 characters"),
+  slug: z
     .string()
     .trim()
-    .min(1, "Component key is required")
-    .max(100, "Component key cannot exceed 100 characters")
-    .regex(/^[a-z0-9_]+$/, "Component key must be lowercase with underscores"),
-  category: z
-    .string()
-    .trim()
-    .min(1, "Category is required")
-    .max(50, "Category cannot exceed 50 characters")
-    .default("section"),
+    .min(1, "Folder name / identifier is required")
+    .max(200, "Folder name cannot exceed 200 characters"),
   description: z
     .string()
     .trim()
     .max(1000, "Description cannot exceed 1000 characters")
     .optional()
     .nullable(),
-  default_props: z
+  is_active: z.boolean().default(true),
+});
+export type ThemeCreateInput = z.infer<typeof themeCreateSchema>;
+
+export const themeUpdateSchema = themeCreateSchema.partial();
+export type ThemeUpdateInput = z.infer<typeof themeUpdateSchema>;
+
+export const themeComponentCreateSchema = z.object({
+  theme_id: z.number().int().positive("Theme is required"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Component name is required")
+    .max(100, "Component name cannot exceed 100 characters"),
+  component_type: z.enum(["header", "footer", "home", "product", "category", "page"], {
+    message: "Component type must be header, footer, home, product, category, or page",
+  }),
+  file_path: z
+    .string()
+    .trim()
+    .min(1, "File path is required")
+    .max(255, "File path cannot exceed 255 characters"),
+  theme_config: z
     .record(z.string().max(100), z.unknown())
     .optional()
     .default({}),
-  thumbnail_url: urlSchema.optional().nullable(),
   is_active: z.boolean().default(true),
 });
-export type SiteComponentCreateInput = z.infer<
-  typeof siteComponentCreateSchema
->;
+export type ThemeComponentCreateInput = z.infer<typeof themeComponentCreateSchema>;
 
-export const siteComponentUpdateSchema = siteComponentCreateSchema.partial();
-export type SiteComponentUpdateInput = z.infer<
-  typeof siteComponentUpdateSchema
->;
+export const themeComponentUpdateSchema = themeComponentCreateSchema.partial();
+export type ThemeComponentUpdateInput = z.infer<typeof themeComponentUpdateSchema>;
 
 // ============================================================
 // EMAIL CONFIG

@@ -5,6 +5,8 @@ export interface PageFilterParams {
   title?: string;
   slug?: string;
   is_active?: string; // "true" | "false" | ""
+  show_in_header?: string; // "true" | "false" | ""
+  show_in_footer?: string; // "true" | "false" | ""
 }
 
 export function buildPageWhereInput(
@@ -28,6 +30,18 @@ export function buildPageWhereInput(
     where.is_active = true;
   } else if (params.is_active === "false") {
     where.is_active = false;
+  }
+
+  if (params.show_in_header === "true") {
+    where.show_in_header = true;
+  } else if (params.show_in_header === "false") {
+    where.show_in_header = false;
+  }
+
+  if (params.show_in_footer === "true") {
+    where.show_in_footer = true;
+  } else if (params.show_in_footer === "false") {
+    where.show_in_footer = false;
   }
 
   return where;

@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import type { ProductFull } from "@/lib/storefront";
 import AddToCartButton from "../_components/AddToCartButton";
 import CartProvider from "../_components/CartProvider";
-import FeaturedProducts from "../_components/FeaturedProducts";
 
 export interface ProductDetailMainProps {
   content: { product: ProductFull | null };
@@ -183,11 +182,6 @@ export default function ProductDetailMain({
             )}
           </div>
         </div>
-      </div>
-
-      {/* ── Featured Products Block ("You Might Also Like") ──────────────── */}
-      <div className="border-t border-zinc-100">
-        <FeaturedProducts />
       </div>
     </div>
   );

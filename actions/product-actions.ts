@@ -197,6 +197,7 @@ export async function createProduct(
     revalidateTag(`product-${slug}`, "max");
     if (is_featured) revalidateTag("featured-products", "max");
     if (categorySlug) revalidateTag(`category-${categorySlug}`, "max");
+    revalidateTag("home-page", "max");
 
     revalidatePath("/dashboard/products");
 
@@ -347,6 +348,7 @@ export async function updateProduct(
     if (newCategorySlug) {
       revalidateTag(`category-${newCategorySlug}`, "max");
     }
+    revalidateTag("home-page", "max");
 
     revalidatePath("/dashboard/products");
 

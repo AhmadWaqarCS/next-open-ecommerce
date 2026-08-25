@@ -1,7 +1,8 @@
 "use cache";
 
 import type { Metadata } from "next";
-import { getCheckoutPageData } from "@/lib/storefront";
+import { getCheckoutPageData, getPageThemeConfig } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import CheckoutForm from "./CheckoutForm";
 import { Suspense } from "react";
 import CartProvider from "../_components/CartProvider";
@@ -16,12 +17,38 @@ export default async function CheckoutPage() {
   cacheTag("checkout");
   cacheLife("max");
 
-  const { shippingMethods, paymentMethods, checkoutConfig } =
-    await getCheckoutPageData();
+  const [{ shippingMethods, paymentMethods, checkoutConfig }, pageThemeCfg] =
+    await Promise.all([
+      getCheckoutPageData(),
+      getPageThemeConfig(["checkout"]),
+    ]);
+
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomCheckout = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomCheckout) {
+      return (
+        <>
+          {pageThemeCfg.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+          )}
+          <CustomCheckout
+            content={{ shippingMethods, paymentMethods, checkoutConfig }}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
 
   if (!checkoutConfig) {
     return (
       <div className="min-h-screen flex items-center justify-center">
+        {pageThemeCfg.custom_css && (
+          <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+        )}
         <p className="text-zinc-500">Store configuration not found.</p>
       </div>
     );
@@ -29,6 +56,9 @@ export default async function CheckoutPage() {
 
   return (
     <div className="page-enter">
+      {pageThemeCfg.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+      )}
       {/* Dark banner */}
       <div className="bg-zinc-950 relative overflow-hidden border-b border-zinc-800/40">
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-900/30 to-zinc-950" />

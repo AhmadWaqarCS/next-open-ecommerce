@@ -38,9 +38,11 @@ export async function createSiteConfig(
     light_logo_url,
     dark_logo_url,
     favicon_url,
-    primary_color,
-    secondary_color,
-    accent_color,
+    font_family,
+    custom_css,
+    theme_config,
+    header_config,
+    footer_config,
     currency,
     currency_symbol,
     email,
@@ -69,9 +71,11 @@ export async function createSiteConfig(
         light_logo_url: light_logo_url || null,
         dark_logo_url: dark_logo_url || null,
         favicon_url: favicon_url || null,
-        primary_color,
-        secondary_color,
-        accent_color,
+        font_family,
+        custom_css: custom_css || null,
+        theme_config,
+        header_config,
+        footer_config,
         currency,
         currency_symbol,
         email: email || null,
@@ -140,9 +144,11 @@ export async function updateSiteConfig(
     light_logo_url,
     dark_logo_url,
     favicon_url,
-    primary_color,
-    secondary_color,
-    accent_color,
+    font_family,
+    custom_css,
+    theme_config,
+    header_config,
+    footer_config,
     currency,
     currency_symbol,
     email,
@@ -176,9 +182,11 @@ export async function updateSiteConfig(
         dark_logo_url:
           dark_logo_url !== undefined ? dark_logo_url || null : undefined,
         favicon_url: favicon_url !== undefined ? favicon_url || null : undefined,
-        primary_color,
-        secondary_color,
-        accent_color,
+        font_family,
+        custom_css: custom_css !== undefined ? custom_css || null : undefined,
+        theme_config,
+        header_config,
+        footer_config,
         currency,
         currency_symbol,
         email: email !== undefined ? email || null : undefined,
@@ -203,6 +211,7 @@ export async function updateSiteConfig(
       name !== undefined ||
       light_logo_url !== undefined ||
       dark_logo_url !== undefined ||
+      header_config !== undefined ||
       topbar_message !== undefined;
     if (headerChanged) revalidateTag("site-header", "max");
 
@@ -212,15 +221,15 @@ export async function updateSiteConfig(
       email !== undefined ||
       phone !== undefined ||
       address !== undefined ||
+      footer_config !== undefined ||
       social_links !== undefined;
     if (footerChanged) revalidateTag("site-footer", "max");
 
     const heroChanged =
       tagline !== undefined ||
       description !== undefined ||
-      accent_color !== undefined ||
-      primary_color !== undefined;
-    if (heroChanged) revalidateTag("hero-banner", "max");
+      theme_config !== undefined;
+    if (heroChanged) revalidateTag("home-page", "max");
 
     const checkoutChanged =
       currency !== undefined ||
@@ -233,9 +242,9 @@ export async function updateSiteConfig(
     if (checkoutChanged) revalidateTag("checkout", "max");
 
     const layoutChanged =
-      primary_color !== undefined ||
-      secondary_color !== undefined ||
-      accent_color !== undefined;
+      font_family !== undefined ||
+      custom_css !== undefined ||
+      theme_config !== undefined;
     if (layoutChanged) revalidateTag("layout", "max");
 
     revalidatePath("/dashboard/settings");

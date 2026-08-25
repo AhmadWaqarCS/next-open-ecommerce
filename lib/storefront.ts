@@ -19,11 +19,9 @@ export interface StorefrontConfig {
   light_logo_url: string | null;
   dark_logo_url: string | null;
   favicon_url: string | null;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
   font_family: string;
   custom_css: string | null;
+  theme_config: Record<string, unknown>;
   header_config: Record<string, unknown>;
   footer_config: Record<string, unknown>;
   email: string | null;
@@ -62,6 +60,8 @@ export interface HeaderData {
   lightLogoUrl: string | null;
   darkLogoUrl: string | null;
   topbarMessage: string | null;
+  headerConfig?: Record<string, unknown>;
+  themeConfig?: Record<string, unknown>;
   categories: NavCategory[];
   sitePages: { title: string; slug: string }[];
 }
@@ -96,6 +96,8 @@ export interface FooterData {
     turnstileSiteKey?: string | null;
     recaptchaSiteKey?: string | null;
   };
+  footerConfig?: Record<string, unknown>;
+  themeConfig?: Record<string, unknown>;
   categories: FooterCategory[];
   sitePages: { title: string; slug: string }[];
   shippingMethods: StorefrontShippingMethod[];
@@ -118,6 +120,66 @@ export interface HeroBannerData {
   accentColor: string;
   primaryColor: string;
   categories: ShopCategory[];
+}
+
+// ─── Home Page Component Config Types ────────────────────────────────────────
+
+export type HeroType = "hero-banner" | "hero-carousel";
+
+export interface ComponentClassOverrides {
+  [slotKey: string]: string;
+}
+
+export interface HeroBannerProps {
+  tagline?: string;
+  description?: string;
+  accentColor?: string;
+  primaryColor?: string;
+  ctaCategory1Slug?: string;
+  ctaCategory2Slug?: string;
+  classOverrides?: ComponentClassOverrides;
+}
+
+export interface HeroCarouselProps {
+  autoPlayInterval?: number;
+  classOverrides?: ComponentClassOverrides;
+}
+
+export interface CategoryCarouselConfig {
+  limit?: number;
+  autoScrollInterval?: number;
+  classOverrides?: ComponentClassOverrides;
+}
+
+export interface PageComponentConfig {
+  component_key: string;
+  enabled: boolean;
+  sort_order: number;
+  props?: Record<string, unknown>;
+}
+
+export interface FeaturedProductsConfig {
+  limit?: number;
+  classOverrides?: ComponentClassOverrides;
+}
+
+export interface HomePageData {
+  pageTitle: string;
+  meta_info: Record<string, string>;
+  themeConfig: Record<string, unknown>;
+  custom_css?: string | null;
+  customThemeComponent?: {
+    theme_name?: string;
+    component_path?: string;
+    theme_config?: Record<string, unknown>;
+  } | null;
+  heroType: HeroType;
+  heroBannerProps: HeroBannerProps;
+  heroCarouselProps: HeroCarouselProps;
+  categoryCarouselConfig: CategoryCarouselConfig;
+  featuredProductsConfig: FeaturedProductsConfig;
+  homeCategories: ShopCategory[];
+  categoryCarousels: CategoryCarouselItem[];
 }
 
 export interface ProductCard {
@@ -184,14 +246,9 @@ export interface CategoryPageData {
 export interface SitePage {
   title: string;
   content: string | null;
+  custom_css?: string | null;
   meta_info: Record<string, string>;
   theme_config: Record<string, unknown>;
-  components_config: {
-    component_key: string;
-    enabled: boolean;
-    sort_order: number;
-    props?: Record<string, unknown>;
-  }[];
 }
 
 export interface PublicOrder {
@@ -271,110 +328,70 @@ export interface CheckoutPageData {
 
 // ─── Central Site Config Fetcher (Cached) ────────────────────────────────────
 
-export const getSiteConfig = cache(async function getSiteConfig(): Promise<StorefrontConfig | null> {
-  "use cache";
-  cacheTag("site-config");
-  cacheLife("max");
+export const getSiteConfig = cache(
+  async function getSiteConfig(): Promise<StorefrontConfig | null> {
+    "use cache";
+    cacheTag("site-config");
+    cacheLife("max");
 
-  const row = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
-    select: {
-      name: true,
-      tagline: true,
-      description: true,
-      site_url: true,
-      light_logo_url: true,
-      dark_logo_url: true,
-      favicon_url: true,
-      primary_color: true,
-      secondary_color: true,
-      accent_color: true,
-      font_family: true,
-      custom_css: true,
-      header_config: true,
-      footer_config: true,
-      email: true,
-      phone: true,
-      address: true,
-      social_links: true,
-      currency: true,
-      currency_symbol: true,
-      meta_info: true,
-      topbar_message: true,
-      require_phone: true,
-      allow_order_notes: true,
-      tax_rate: true,
-      tax_inclusive: true,
-      tax_label: true,
-      captcha_provider: true,
-    },
-  });
+    const row = await prisma.site_config.findFirst({
+      where: { deleted_at: null },
+      select: {
+        name: true,
+        tagline: true,
+        description: true,
+        site_url: true,
+        light_logo_url: true,
+        dark_logo_url: true,
+        favicon_url: true,
+        font_family: true,
+        custom_css: true,
+        theme_config: true,
+        header_config: true,
+        footer_config: true,
+        email: true,
+        phone: true,
+        address: true,
+        social_links: true,
+        currency: true,
+        currency_symbol: true,
+        meta_info: true,
+        topbar_message: true,
+        require_phone: true,
+        allow_order_notes: true,
+        tax_rate: true,
+        tax_inclusive: true,
+        tax_label: true,
+        captcha_provider: true,
+      },
+    });
 
-  if (!row) return null;
-  return {
-    ...row,
-    header_config: (row.header_config ?? {}) as Record<string, unknown>,
-    footer_config: (row.footer_config ?? {}) as Record<string, unknown>,
-    social_links: (row.social_links ?? {}) as Record<string, string | null>,
-    meta_info: (row.meta_info ?? {}) as Record<string, string>,
-    tax_rate: row.tax_rate !== null ? Number(row.tax_rate) : null,
-    captcha_provider: row.captcha_provider ?? "none",
-    turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
-    recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
-  };
-});
+    if (!row) return null;
+    return {
+      ...row,
+      theme_config: (row.theme_config ?? {}) as Record<string, unknown>,
+      header_config: (row.header_config ?? {}) as Record<string, unknown>,
+      footer_config: (row.footer_config ?? {}) as Record<string, unknown>,
+      social_links: (row.social_links ?? {}) as Record<string, string | null>,
+      meta_info: (row.meta_info ?? {}) as Record<string, string>,
+      tax_rate: row.tax_rate !== null ? Number(row.tax_rate) : null,
+      captcha_provider: row.captcha_provider ?? "none",
+      turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
+      recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
+    };
+  },
+);
 
 // ─── 1. Header Data ───────────────────────────────────────────────────────────
 
-export const getHeaderData = cache(async function getHeaderData(): Promise<HeaderData> {
-  const config = await getSiteConfig();
-  const [navCategories, sitePages] = await prisma.$transaction([
-    prisma.category.findMany({
-      where: {
-        is_active: true,
-        show_in_header: true,
-        parent_id: null,
-        deleted_at: null,
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        children: {
-          where: { is_active: true, show_in_header: true, deleted_at: null },
-          select: { id: true, name: true, slug: true },
-          orderBy: { sort_order: "asc" },
-        },
-      },
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.site_page.findMany({
-      where: { is_active: true, show_in_header: true },
-      select: { title: true, slug: true },
-      orderBy: { sort_order: "asc" },
-    }),
-  ]);
-
-  return {
-    siteName: config?.name || "Store",
-    lightLogoUrl: config?.light_logo_url || null,
-    darkLogoUrl: config?.dark_logo_url || null,
-    topbarMessage: config?.topbar_message || null,
-    categories: navCategories || [],
-    sitePages: sitePages || [],
-  };
-});
-
-// ─── 2. Footer Data ───────────────────────────────────────────────────────────
-
-export const getFooterData = cache(async function getFooterData(): Promise<FooterData> {
-  const config = await getSiteConfig();
-  const [categories, sitePages, shippingMethods, paymentMethods] =
-    await prisma.$transaction([
+export const getHeaderData = cache(
+  async function getHeaderData(): Promise<HeaderData> {
+    const config = await getSiteConfig();
+    const [navCategories, sitePages] = await prisma.$transaction([
       prisma.category.findMany({
         where: {
           is_active: true,
-          show_in_footer: true,
+          show_in_header: true,
           parent_id: null,
           deleted_at: null,
         },
@@ -382,80 +399,309 @@ export const getFooterData = cache(async function getFooterData(): Promise<Foote
           id: true,
           name: true,
           slug: true,
+          children: {
+            where: { is_active: true, show_in_header: true, deleted_at: null },
+            select: { id: true, name: true, slug: true },
+            orderBy: { sort_order: "asc" },
+          },
         },
         orderBy: { sort_order: "asc" },
       }),
       prisma.site_page.findMany({
-        where: { is_active: true, show_in_footer: true },
+        where: { is_active: true, show_in_header: true },
         select: { title: true, slug: true },
         orderBy: { sort_order: "asc" },
       }),
-      prisma.shipping_method.findMany({
-        where: { is_active: true, deleted_at: null },
+    ]);
+
+    return {
+      siteName: config?.name || "Store",
+      lightLogoUrl: config?.light_logo_url || null,
+      darkLogoUrl: config?.dark_logo_url || null,
+      topbarMessage: config?.topbar_message || null,
+      headerConfig: config?.header_config || {},
+      themeConfig: config?.theme_config || {},
+      categories: navCategories || [],
+      sitePages: sitePages || [],
+    };
+  },
+);
+
+// ─── 2. Footer Data ───────────────────────────────────────────────────────────
+
+export const getFooterData = cache(
+  async function getFooterData(): Promise<FooterData> {
+    const config = await getSiteConfig();
+    const [categories, sitePages, shippingMethods, paymentMethods] =
+      await prisma.$transaction([
+        prisma.category.findMany({
+          where: {
+            is_active: true,
+            show_in_footer: true,
+            parent_id: null,
+            deleted_at: null,
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+          orderBy: { sort_order: "asc" },
+        }),
+        prisma.site_page.findMany({
+          where: { is_active: true, show_in_footer: true },
+          select: { title: true, slug: true },
+          orderBy: { sort_order: "asc" },
+        }),
+        prisma.shipping_method.findMany({
+          where: { is_active: true, deleted_at: null },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            free_over: true,
+            estimated_days_min: true,
+            estimated_days_max: true,
+          },
+          orderBy: { sort_order: "asc" },
+        }),
+        prisma.payment_method.findMany({
+          where: { is_active: true },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            provider: true,
+            extra_charge: true,
+            instructions: true,
+          },
+          orderBy: { sort_order: "asc" },
+        }),
+      ]);
+
+    return {
+      siteConfig: {
+        name: config?.name || "Store",
+        description: config?.description || null,
+        email: config?.email || null,
+        phone: config?.phone || null,
+        address: config?.address || null,
+        captchaProvider: config?.captcha_provider || "none",
+        turnstileSiteKey: config?.turnstile_site_key || null,
+        recaptchaSiteKey: config?.recaptcha_site_key || null,
+      },
+      categories: categories || [],
+      sitePages: sitePages || [],
+      footerConfig: config?.footer_config || {},
+      themeConfig: config?.theme_config || {},
+      shippingMethods: (shippingMethods || []).map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        price: Number(m.price),
+        free_over: m.free_over !== null ? Number(m.free_over) : null,
+        estimated_days_min: m.estimated_days_min,
+        estimated_days_max: m.estimated_days_max,
+      })),
+      paymentMethods: (paymentMethods || []).map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        provider: m.provider,
+        extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
+        instructions: m.instructions,
+      })),
+      socialLinks: (config?.social_links ?? {}) as Record<
+        string,
+        string | null
+      >,
+    };
+  },
+);
+
+// ─── 4. Home Page Data ────────────────────────────────────────────────────────
+
+export const getHomePageData = cache(
+  async function getHomePageData(): Promise<HomePageData> {
+    "use cache";
+    cacheTag("home-page");
+    cacheLife("max");
+
+    // ── Single transaction: site_page + site_config + home categories ──────────
+    const [pageRow, configRow, categoryRows] = await prisma.$transaction([
+      prisma.site_page.findUnique({
+        where: { slug: "/", is_active: true },
         select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          free_over: true,
-          estimated_days_min: true,
-          estimated_days_max: true,
+          title: true,
+          meta_info: true,
+          theme_config: true,
+          custom_css: true,
         },
-        orderBy: { sort_order: "asc" },
       }),
-      prisma.payment_method.findMany({
-        where: { is_active: true },
+      prisma.site_config.findFirst({
+        where: { deleted_at: null },
+        select: {
+          tagline: true,
+          description: true,
+          theme_config: true,
+        },
+      }),
+      prisma.category.findMany({
+        where: { is_active: true, show_in_home: true, deleted_at: null },
         select: {
           id: true,
           name: true,
-          description: true,
-          provider: true,
-          extra_charge: true,
-          instructions: true,
+          slug: true,
+          image_url: true,
+          bg_color: true,
+          product_count: true,
+          _count: {
+            select: {
+              products: { where: { is_active: true, deleted_at: null } },
+            },
+          },
+          children: {
+            where: { is_active: true, deleted_at: null },
+            select: {
+              id: true,
+              children: {
+                where: { is_active: true, deleted_at: null },
+                select: { id: true },
+              },
+            },
+          },
         },
         orderBy: { sort_order: "asc" },
       }),
     ]);
 
-  return {
-    siteConfig: {
-      name: config?.name || "Store",
-      description: config?.description || null,
-      email: config?.email || null,
-      phone: config?.phone || null,
-      address: config?.address || null,
-      captchaProvider: config?.captcha_provider || "none",
-      turnstileSiteKey: config?.turnstile_site_key || null,
-      recaptchaSiteKey: config?.recaptcha_site_key || null,
-    },
-    categories: categories || [],
-    sitePages: sitePages || [],
-    shippingMethods: (shippingMethods || []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      price: Number(m.price),
-      free_over: m.free_over !== null ? Number(m.free_over) : null,
-      estimated_days_min: m.estimated_days_min,
-      estimated_days_max: m.estimated_days_max,
-    })),
-    paymentMethods: (paymentMethods || []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: m.provider,
-      extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
-      instructions: m.instructions,
-    })),
-    socialLinks: (config?.social_links ?? {}) as Record<string, string | null>,
-  };
-});
+    const pageThemeConfig = (pageRow?.theme_config ?? {}) as Record<string, any>;
+    const customThemeComponent =
+      pageThemeConfig.theme_name && pageThemeConfig.component_path
+        ? {
+            theme_name: pageThemeConfig.theme_name as string,
+            component_path: pageThemeConfig.component_path as string,
+            theme_config: (pageThemeConfig.theme_config ?? {}) as Record<string, unknown>,
+          }
+        : null;
 
-// ─── 4. Home Page Data ────────────────────────────────────────────────────────
+    const heroType: HeroType = "hero-banner";
+    const heroBannerProps: HeroBannerProps = {};
+    const heroCarouselProps: HeroCarouselProps = {};
+    const categoryCarouselConfig: CategoryCarouselConfig = {};
+    const featuredProductsConfig: FeaturedProductsConfig = {};
 
-export const getHomePageData = cache(async function getHomePageData(): Promise<{}> {
-  return {};
-});
+    // ── Build home categories (shared between hero + carousel) ─────────────────
+    const homeCategories: ShopCategory[] = categoryRows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      image_url: r.image_url,
+      bg_color: r.bg_color,
+      product_count: r._count.products,
+    }));
+
+    // ── Fetch products per home category (for CategoryCarousel) ────────────────
+    const carouselLimit = categoryCarouselConfig.limit ?? 10;
+    const categoryCarousels: CategoryCarouselItem[] = [];
+
+    await prisma.$transaction(async (tx) => {
+      for (const cat of categoryRows) {
+        const categoryIds = [
+          cat.id,
+          ...cat.children.flatMap((child) => [
+            child.id,
+            ...child.children.map((sub) => sub.id),
+          ]),
+        ];
+
+        const products = await tx.product.findMany({
+          where: {
+            is_active: true,
+            deleted_at: null,
+            category_id: { in: categoryIds },
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            feature_image_url: true,
+            feature_image_alt_text: true,
+            price: true,
+            compare_at_price: true,
+            category_name: true,
+            is_featured: true,
+          },
+          orderBy: [{ sort_order: "asc" }, { id: "desc" }],
+          take: carouselLimit,
+        });
+
+        if (products.length > 0) {
+          categoryCarousels.push({
+            category: {
+              id: cat.id,
+              name: cat.name,
+              slug: cat.slug,
+              description: null,
+            },
+            products: products.map((r) => ({
+              ...r,
+              price: String(r.price),
+              compare_at_price:
+                r.compare_at_price !== null ? String(r.compare_at_price) : null,
+            })),
+          });
+        }
+      }
+    });
+
+    return {
+      pageTitle: pageRow?.title ?? "Home",
+      meta_info: (pageRow?.meta_info ?? {}) as Record<string, string>,
+      themeConfig: pageThemeConfig,
+      custom_css: pageRow?.custom_css ?? null,
+      customThemeComponent,
+      heroType,
+      heroBannerProps: {
+        tagline:
+          heroBannerProps.tagline ??
+          configRow?.tagline ??
+          "Wear what you love.",
+        description:
+          heroBannerProps.description ??
+          configRow?.description ??
+          "Curated fashion for every occasion.",
+        accentColor:
+          heroBannerProps.accentColor ??
+          (configRow?.theme_config as any)?.accent_color ??
+          "#f59e0b",
+        primaryColor:
+          heroBannerProps.primaryColor ??
+          (configRow?.theme_config as any)?.bg_color ??
+          "#09090b",
+        ctaCategory1Slug: heroBannerProps.ctaCategory1Slug,
+        ctaCategory2Slug: heroBannerProps.ctaCategory2Slug,
+        classOverrides: heroBannerProps.classOverrides ?? {},
+      },
+      heroCarouselProps: {
+        autoPlayInterval: heroCarouselProps.autoPlayInterval ?? 5000,
+        classOverrides: heroCarouselProps.classOverrides ?? {},
+      },
+      categoryCarouselConfig: {
+        limit: carouselLimit,
+        autoScrollInterval: categoryCarouselConfig.autoScrollInterval ?? 4000,
+        classOverrides: categoryCarouselConfig.classOverrides ?? {},
+      },
+      featuredProductsConfig: {
+        limit: featuredProductsConfig.limit ?? 4,
+        classOverrides: featuredProductsConfig.classOverrides ?? {},
+      },
+      homeCategories,
+      categoryCarousels,
+    };
+  },
+);
 
 // ─── 5. Featured Products ─────────────────────────────────────────────────────
 
@@ -587,7 +833,9 @@ export const getCategoryPageData = cache(async function getCategoryPageData(
 
 // ─── 7. Category Slugs ────────────────────────────────────────────────────────
 
-export const getCategorySlugs = cache(async function getCategorySlugs(limit = 1): Promise<string[]> {
+export const getCategorySlugs = cache(async function getCategorySlugs(
+  limit = 1,
+): Promise<string[]> {
   const rows = await prisma.category.findMany({
     where: { is_active: true, deleted_at: null },
     select: { slug: true },
@@ -666,7 +914,9 @@ export const getProductPageData = cache(async function getProductPageData(
 
 // ─── 9. Product Page Slugs ────────────────────────────────────────────────────
 
-export const getProductPageSlugs = cache(async function getProductPageSlugs(limit = 1): Promise<string[]> {
+export const getProductPageSlugs = cache(async function getProductPageSlugs(
+  limit = 1,
+): Promise<string[]> {
   const rows = await prisma.product.findMany({
     where: { is_active: true, deleted_at: null },
     select: { slug: true },
@@ -737,6 +987,20 @@ export const getSearchPageProducts = cache(async function getSearchPageProducts(
 
 // ─── 11. Page Data ────────────────────────────────────────────────────────────
 
+export const getPageThemeConfig = cache(async function getPageThemeConfig(
+  slugs: string[],
+): Promise<Record<string, any>> {
+  const pageRow = await prisma.site_page.findFirst({
+    where: { slug: { in: slugs }, is_active: true },
+    select: { theme_config: true, custom_css: true },
+  });
+  const themeCfg = (pageRow?.theme_config ?? {}) as Record<string, any>;
+  return {
+    ...themeCfg,
+    custom_css: pageRow?.custom_css ?? null,
+  };
+});
+
 export const getPageData = cache(async function getPageData(
   slug: string,
 ): Promise<{ page: SitePage | null }> {
@@ -745,9 +1009,9 @@ export const getPageData = cache(async function getPageData(
     select: {
       title: true,
       content: true,
+      custom_css: true,
       meta_info: true,
       theme_config: true,
-      components_config: true,
     },
   });
 
@@ -758,25 +1022,64 @@ export const getPageData = cache(async function getPageData(
       ...row,
       meta_info: (row.meta_info ?? {}) as Record<string, string>,
       theme_config: (row.theme_config ?? {}) as Record<string, unknown>,
-      components_config: (Array.isArray(row.components_config)
-        ? row.components_config
-        : []) as {
-        component_key: string;
-        enabled: boolean;
-        sort_order: number;
-        props?: Record<string, unknown>;
-      }[],
+      custom_css: row.custom_css ?? null,
     },
   };
 });
 
 // ─── 12. Hero Banner Data ─────────────────────────────────────────────────────
 
-export const getHeroBannerData = cache(async function getHeroBannerData(): Promise<HeroBannerData> {
-  const [config, categoryRows] = await prisma.$transaction([
-    prisma.site_config.findFirst({ where: { deleted_at: null } }),
-    prisma.category.findMany({
-      where: { is_active: true, show_in_home: true, deleted_at: null },
+export const getHeroBannerData = cache(
+  async function getHeroBannerData(): Promise<HeroBannerData> {
+    const [config, categoryRows] = await prisma.$transaction([
+      prisma.site_config.findFirst({ where: { deleted_at: null } }),
+      prisma.category.findMany({
+        where: { is_active: true, show_in_home: true, deleted_at: null },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          image_url: true,
+          bg_color: true,
+          product_count: true,
+          _count: {
+            select: {
+              products: {
+                where: { is_active: true, deleted_at: null },
+              },
+            },
+          },
+        },
+        orderBy: { sort_order: "asc" },
+      }),
+    ]);
+
+    const configTheme = (config?.theme_config ?? {}) as Record<string, any>;
+    return {
+      tagline: config?.tagline || "Wear what you love.",
+      description: config?.description || "Curated fashion for every occasion.",
+      accentColor: configTheme.accent_color || "#f59e0b",
+      primaryColor: configTheme.bg_color || "#09090b",
+      categories: categoryRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        image_url: r.image_url,
+        bg_color: r.bg_color,
+        product_count: r._count.products,
+      })),
+    };
+  },
+);
+
+// ─── 12b. All Categories Page Data ───────────────────────────────────────────
+
+export const getAllCategoriesPageData = cache(
+  async function getAllCategoriesPageData(): Promise<{
+    categories: ShopCategory[];
+  }> {
+    const categoryRows = await prisma.category.findMany({
+      where: { is_active: true, deleted_at: null },
       select: {
         id: true,
         name: true,
@@ -793,68 +1096,29 @@ export const getHeroBannerData = cache(async function getHeroBannerData(): Promi
         },
       },
       orderBy: { sort_order: "asc" },
-    }),
-  ]);
+    });
 
-  return {
-    tagline: config?.tagline || "Wear what you love.",
-    description: config?.description || "Curated fashion for every occasion.",
-    accentColor: config?.accent_color || "#e8c98e",
-    primaryColor: config?.primary_color || "#0f0f0f",
-    categories: categoryRows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      image_url: r.image_url,
-      bg_color: r.bg_color,
-      product_count: r._count.products,
-    })),
-  };
-});
-
-// ─── 12b. All Categories Page Data ───────────────────────────────────────────
-
-export const getAllCategoriesPageData = cache(async function getAllCategoriesPageData(): Promise<{
-  categories: ShopCategory[];
-}> {
-  const categoryRows = await prisma.category.findMany({
-    where: { is_active: true, deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      image_url: true,
-      bg_color: true,
-      product_count: true,
-      _count: {
-        select: {
-          products: {
-            where: { is_active: true, deleted_at: null },
-          },
-        },
-      },
-    },
-    orderBy: { sort_order: "asc" },
-  });
-
-  return {
-    categories: categoryRows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      slug: r.slug,
-      image_url: r.image_url,
-      bg_color: r.bg_color,
-      product_count: r._count.products,
-    })),
-  };
-});
+    return {
+      categories: categoryRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        image_url: r.image_url,
+        bg_color: r.bg_color,
+        product_count: r._count.products,
+      })),
+    };
+  },
+);
 
 export function maskEmail(email: string): string {
   if (!email || !email.includes("@")) return "***";
   const [user, domain] = email.split("@");
   const maskStr = (str: string) => {
     if (str.length <= 2) return str[0] + "*";
-    return str[0] + "*".repeat(Math.max(1, str.length - 2)) + str[str.length - 1];
+    return (
+      str[0] + "*".repeat(Math.max(1, str.length - 2)) + str[str.length - 1]
+    );
   };
   const domainParts = domain.split(".");
   const maskedDomainName = maskStr(domainParts[0]);
@@ -864,79 +1128,85 @@ export function maskEmail(email: string): string {
 
 // ─── 14. Checkout Page Data ───────────────────────────────────────────────────
 
-export const getCheckoutPageData = cache(async function getCheckoutPageData(): Promise<CheckoutPageData> {
-  const stripeActive = isStripeConfigured();
+export const getCheckoutPageData = cache(
+  async function getCheckoutPageData(): Promise<CheckoutPageData> {
+    const stripeActive = isStripeConfigured();
 
-  const [shippingMethods, paymentMethods, config] = await prisma.$transaction([
-    prisma.shipping_method.findMany({
-      where: { is_active: true, deleted_at: null },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        price: true,
-        free_over: true,
-        estimated_days_min: true,
-        estimated_days_max: true,
-      },
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.payment_method.findMany({
-      where: { is_active: true },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        provider: true,
-        extra_charge: true,
-        instructions: true,
-      },
-      orderBy: { sort_order: "asc" },
-    }),
-    prisma.site_config.findFirst({ where: { deleted_at: null } }),
-  ]);
+    const [shippingMethods, paymentMethods, config] = await prisma.$transaction(
+      [
+        prisma.shipping_method.findMany({
+          where: { is_active: true, deleted_at: null },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            free_over: true,
+            estimated_days_min: true,
+            estimated_days_max: true,
+          },
+          orderBy: { sort_order: "asc" },
+        }),
+        prisma.payment_method.findMany({
+          where: { is_active: true },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            provider: true,
+            extra_charge: true,
+            instructions: true,
+          },
+          orderBy: { sort_order: "asc" },
+        }),
+        prisma.site_config.findFirst({ where: { deleted_at: null } }),
+      ],
+    );
 
-  const activePaymentMethods = (paymentMethods || []).filter((m) => {
-    if (m.provider === "stripe") {
-      return stripeActive;
-    }
-    return true;
-  });
+    const activePaymentMethods = (paymentMethods || []).filter((m) => {
+      if (m.provider === "stripe") {
+        return stripeActive;
+      }
+      return true;
+    });
 
-  return {
-    shippingMethods: (shippingMethods || []).map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      price: Number(m.price),
-      free_over: m.free_over !== null ? Number(m.free_over) : null,
-      estimated_days_min: m.estimated_days_min,
-      estimated_days_max: m.estimated_days_max,
-    })),
-    paymentMethods: activePaymentMethods.map((m) => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      provider: m.provider,
-      extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
-      instructions: m.instructions,
-    })),
-    checkoutConfig: config
-      ? {
-          currency: config.currency,
-          currency_symbol: config.currency_symbol,
-          require_phone: config.require_phone,
-          allow_order_notes: config.allow_order_notes,
-          tax_rate: config.tax_rate !== null ? Number(config.tax_rate) : null,
-          tax_inclusive: config.tax_inclusive,
-          tax_label: config.tax_label,
-          captcha_provider: config.captcha_provider ?? "none",
-          turnstile_site_key: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
-          recaptcha_site_key: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
-        }
-      : null,
-  };
-});
+    return {
+      shippingMethods: (shippingMethods || []).map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        price: Number(m.price),
+        free_over: m.free_over !== null ? Number(m.free_over) : null,
+        estimated_days_min: m.estimated_days_min,
+        estimated_days_max: m.estimated_days_max,
+      })),
+      paymentMethods: activePaymentMethods.map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        provider: m.provider,
+        extra_charge: m.extra_charge !== null ? Number(m.extra_charge) : null,
+        instructions: m.instructions,
+      })),
+      checkoutConfig: config
+        ? {
+            currency: config.currency,
+            currency_symbol: config.currency_symbol,
+            require_phone: config.require_phone,
+            allow_order_notes: config.allow_order_notes,
+            tax_rate: config.tax_rate !== null ? Number(config.tax_rate) : null,
+            tax_inclusive: config.tax_inclusive,
+            tax_label: config.tax_label,
+            captcha_provider: config.captcha_provider ?? "none",
+            turnstile_site_key:
+              process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
+            recaptcha_site_key:
+              process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
+          }
+        : null,
+    };
+  },
+);
 
 // ─── 15. Category Carousel Data ────────────────────────────────────────────────
 
@@ -1034,5 +1304,3 @@ export const getHomeCategoryCarousels = cache(
     });
   },
 );
-
-

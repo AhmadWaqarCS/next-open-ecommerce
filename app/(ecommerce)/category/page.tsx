@@ -2,6 +2,7 @@
 
 import type { Metadata } from "next";
 import { getAllCategoriesPageData, getPageData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import AllCategoriesMain from "./AllCategoriesMain";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -24,15 +25,41 @@ export default async function CategoriesPage() {
     getPageData("category"),
   ]);
 
+  const pageThemeCfg = (page?.theme_config ?? {}) as Record<string, any>;
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomCategoriesPage = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomCategoriesPage) {
+      return (
+        <>
+          {page?.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+          )}
+          <CustomCategoriesPage
+            content={{ page, categories: data.categories }}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
   const title = page?.title ?? "All Categories";
   const description = page?.meta_info?.description;
 
   return (
-    <AllCategoriesMain
-      categories={data.categories}
-      siteName="Store"
-      title={title}
-      description={description}
-    />
+    <>
+      {page?.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+      )}
+      <AllCategoriesMain
+        categories={data.categories}
+        siteName="Store"
+        title={title}
+        description={description}
+      />
+    </>
   );
 }

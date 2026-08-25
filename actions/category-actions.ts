@@ -153,7 +153,7 @@ export async function createCategory(
     revalidateTag("page-categories", "max");
     if (show_in_header) revalidateTag("site-header", "max");
     if (show_in_footer) revalidateTag("site-footer", "max");
-    if (show_in_home) revalidateTag("hero-banner", "max");
+    if (show_in_home) revalidateTag("home-page", "max");
     if (parentSlug) revalidateTag(`category-${parentSlug}`, "max");
 
     revalidatePath("/dashboard/categories");
@@ -309,7 +309,7 @@ export async function updateCategory(
       is_active !== undefined;
 
     if (homeVisibilityChanged || (isHomeRelevant && homeFieldsChanged)) {
-      revalidateTag("hero-banner", "max");
+      revalidateTag("home-page", "max");
     }
 
     if (existing.parent?.slug) {
@@ -357,7 +357,7 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
     if (existing.show_in_header) revalidateTag("site-header", "max");
     if (existing.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.show_in_home) revalidateTag("home-page", "max");
     if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories");
@@ -399,7 +399,7 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
     if (existing.show_in_header) revalidateTag("site-header", "max");
     if (existing.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.show_in_home) revalidateTag("home-page", "max");
     if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories/trash");
@@ -444,7 +444,7 @@ export async function permanentlyDeleteCategory(
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
     if (existing.show_in_header) revalidateTag("site-header", "max");
     if (existing.show_in_footer) revalidateTag("site-footer", "max");
-    if (existing.show_in_home) revalidateTag("hero-banner", "max");
+    if (existing.show_in_home) revalidateTag("home-page", "max");
     if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
 
     revalidatePath("/dashboard/categories/trash");
@@ -499,7 +499,7 @@ export async function bulkDeleteCategories(
     }
     if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
     if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
-    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("home-page", "max");
 
     revalidatePath("/dashboard/categories");
     revalidatePath("/dashboard/categories/trash");
@@ -552,7 +552,7 @@ export async function bulkRestoreCategories(
     }
     if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
     if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
-    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("home-page", "max");
 
     revalidatePath("/dashboard/categories/trash");
     revalidatePath("/dashboard/categories");
@@ -605,7 +605,7 @@ export async function bulkPermanentlyDeleteCategories(
     }
     if (affected.some((c) => c.show_in_header)) revalidateTag("site-header", "max");
     if (affected.some((c) => c.show_in_footer)) revalidateTag("site-footer", "max");
-    if (affected.some((c) => c.show_in_home)) revalidateTag("hero-banner", "max");
+    if (affected.some((c) => c.show_in_home)) revalidateTag("home-page", "max");
 
     revalidatePath("/dashboard/categories/trash");
 

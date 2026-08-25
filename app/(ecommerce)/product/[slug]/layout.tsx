@@ -20,8 +20,6 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  cacheTag(`product-${slug}`);
-  cacheLife("max");
 
   const { product } = await getProductPageData(slug);
   if (!product) return { title: "Product Not Found" };

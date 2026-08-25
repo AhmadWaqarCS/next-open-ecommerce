@@ -58,11 +58,36 @@ export default async function EcommerceRootLayout({
 
   if (!config) throw new Error("Site config not found.");
 
+  const themeConfig = (config.theme_config ?? {}) as Record<string, string>;
+  const bgColor = themeConfig.bg_color || "#ffffff";
+  const fgColor = themeConfig.fg_color || "#18181b";
+  const textColor = themeConfig.text_color || "#09090b";
+  const accentColor = themeConfig.accent_color || "#f59e0b";
+  const hoverColor = themeConfig.hover_color || "#38bdf8";
+  const linkColor = themeConfig.link_color || accentColor;
+
+  const fontFamily = config.font_family || "Inter";
+
   const colorStyle = `
     :root {
-      --color-primary: ${config.primary_color};
-      --color-secondary: ${config.secondary_color};
-      --color-accent: ${config.accent_color};
+      --font-family-base: '${fontFamily}', sans-serif;
+      --background: ${bgColor};
+      --foreground: ${textColor};
+      --color-primary: ${bgColor};
+      --color-secondary: ${fgColor};
+      --color-accent: ${accentColor};
+      --color-accent-hover: ${hoverColor};
+      --color-text-primary: ${textColor};
+      --color-link: ${linkColor};
+      --theme-bg: ${bgColor};
+      --theme-fg: ${fgColor};
+      --theme-text: ${textColor};
+      --theme-accent: ${accentColor};
+      --theme-hover: ${hoverColor};
+      --theme-link: ${linkColor};
+    }
+    body {
+      font-family: var(--font-family-base);
     }
     ${config.custom_css ? config.custom_css : ""}
   `;
@@ -76,9 +101,9 @@ export default async function EcommerceRootLayout({
       <head>
         <style dangerouslySetInnerHTML={{ __html: colorStyle }} />
       </head>
-      <body className="min-h-full flex flex-col bg-white text-zinc-900 antialiased">
+      <body>
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        <main>{children}</main>
         <SiteFooter />
       </body>
     </html>

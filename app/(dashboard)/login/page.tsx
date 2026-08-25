@@ -2,13 +2,22 @@ import { auth } from "@/lib/auth";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import LoginForm from "./login-form";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Login - Dashboard",
   description: "Login to your account",
 };
 
-export default async function DashboardLoginPage() {
+export default function DashboardLoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+async function LoginContent() {
   const session = await auth();
   if (session) {
     redirect("/dashboard");

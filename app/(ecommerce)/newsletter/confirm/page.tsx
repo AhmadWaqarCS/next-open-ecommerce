@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { confirmNewsletterSubscription } from "@/actions/newsletter-actions";
+import { getPageThemeConfig } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 
 export const metadata = {
   title: "Newsletter Subscription Confirmation",
@@ -23,8 +25,36 @@ async function ConfirmationContent({ searchParams }: ConfirmationPageProps) {
     result = await confirmNewsletterSubscription(token);
   }
 
+  const pageThemeCfg = await getPageThemeConfig([
+    "newsletter/confirm",
+    "newsletter",
+  ]);
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomConfirm = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomConfirm) {
+      return (
+        <>
+          {pageThemeCfg.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+          )}
+          <CustomConfirm
+            result={result}
+            token={token}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
   return (
     <div className="w-full max-w-md bg-zinc-900/90 border border-zinc-800 rounded-3xl p-8 shadow-2xl backdrop-blur-md text-center relative overflow-hidden">
+      {pageThemeCfg.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+      )}
       {/* Subtle background glow */}
       <div
         className={`absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl opacity-20 pointer-events-none ${

@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cacheLife, cacheTag } from "next/cache";
 import { getPageData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 
 export async function generateMetadata(): Promise<Metadata> {
   const pageRes = await getPageData("about");
@@ -28,11 +29,35 @@ export default async function AboutPage() {
     notFound();
   }
 
+  const pageThemeCfg = (page.theme_config ?? {}) as Record<string, any>;
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomAbout = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomAbout) {
+      return (
+        <>
+          {page.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+          )}
+          <CustomAbout
+            content={page}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
   const title = page.title;
   const body = page.content;
 
   return (
     <div className="page-enter">
+      {page.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+      )}
       {/* Hero */}
       <div className="bg-zinc-900 pt-28 pb-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

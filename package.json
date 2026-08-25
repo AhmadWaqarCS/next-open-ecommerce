@@ -1,6 +1,6 @@
 {
   "name": "next-open-ecommerce",
-  "version": "0.5.2",
+  "version": "0.6.3",
   "private": false,
   "scripts": {
     "dev": "next dev",

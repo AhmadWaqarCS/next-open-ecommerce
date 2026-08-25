@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cacheLife, cacheTag } from "next/cache";
 import { getPageData } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 
 export async function generateMetadata(): Promise<Metadata> {
   const pageRes = await getPageData("return-and-refund-policy");
@@ -25,8 +26,32 @@ export default async function ReturnAndRefundPolicyPage() {
     notFound();
   }
 
+  const pageThemeCfg = (page.theme_config ?? {}) as Record<string, any>;
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomPage = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomPage) {
+      return (
+        <>
+          {page.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+          )}
+          <CustomPage
+            content={page}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
   return (
     <div className="page-enter min-h-[80vh] bg-zinc-950 text-zinc-100 flex flex-col justify-between">
+      {page.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />
+      )}
       <div>
         <div className="border-b border-zinc-900 bg-gradient-to-b from-zinc-900/80 to-zinc-950 pt-28 pb-16">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

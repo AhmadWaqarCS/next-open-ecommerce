@@ -17,11 +17,9 @@ export async function createSiteConfigTransaction(
     light_logo_url?: string | null;
     dark_logo_url?: string | null;
     favicon_url?: string | null;
-    primary_color?: string;
-    secondary_color?: string;
-    accent_color?: string;
     font_family?: string;
     custom_css?: string | null;
+    theme_config?: object;
     header_config?: object;
     footer_config?: object;
     currency?: string;
@@ -72,11 +70,9 @@ export async function updateSiteConfigTransaction(
     light_logo_url?: string | null;
     dark_logo_url?: string | null;
     favicon_url?: string | null;
-    primary_color?: string;
-    secondary_color?: string;
-    accent_color?: string;
     font_family?: string;
     custom_css?: string | null;
+    theme_config?: object;
     header_config?: object;
     footer_config?: object;
     currency?: string;
@@ -117,7 +113,7 @@ export async function updateSiteConfigTransaction(
 
     const keysToCheck = [
       "name", "tagline", "description", "site_url", "topbar_message",
-      "primary_color", "secondary_color", "accent_color", "font_family", "custom_css",
+      "font_family", "custom_css",
       "currency", "currency_symbol", "email", "phone", "address",
       "business_name", "business_registration_number", "tax_rate", "tax_inclusive",
       "tax_label", "require_phone", "allow_order_notes", "captcha_provider"
@@ -129,6 +125,9 @@ export async function updateSiteConfigTransaction(
       }
     }
 
+    if (data.theme_config !== undefined && JSON.stringify(data.theme_config) !== JSON.stringify(existing.theme_config)) {
+      updatePayload.theme_config = data.theme_config;
+    }
     if (data.header_config !== undefined && JSON.stringify(data.header_config) !== JSON.stringify(existing.header_config)) {
       updatePayload.header_config = data.header_config;
     }
@@ -190,9 +189,11 @@ export async function getSiteConfigDashboardDataInDB() {
       light_logo_url: true,
       dark_logo_url: true,
       favicon_url: true,
-      primary_color: true,
-      secondary_color: true,
-      accent_color: true,
+      font_family: true,
+      custom_css: true,
+      theme_config: true,
+      header_config: true,
+      footer_config: true,
       currency: true,
       currency_symbol: true,
       email: true,

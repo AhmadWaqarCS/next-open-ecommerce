@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "./auth";
 import { CRUD } from "./types";
 import { getRolePermissions } from "./permissions";
@@ -20,9 +20,8 @@ export async function assertPermission(action: keyof CRUD, path: string) {
   const match = accessPaths.find((r) => r.path === path && r.crud[action]);
 
   if (!match) {
-    redirect("/dashboard");
+    notFound();
   }
 
   return { permissions: match.crud, user: session.user };
 }
-

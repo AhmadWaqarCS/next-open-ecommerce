@@ -4,32 +4,38 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "../../_components/toast-context";
-import { updateSiteConfig, revalidateSitemapAction } from "@/actions/site-actions";
+import {
+  updateSiteConfig,
+  revalidateSitemapAction,
+} from "@/actions/site-actions";
 import { uploadMediaImage } from "@/actions/media-actions";
 import MetaInput from "@/app/(dashboard)/_components/meta-input";
 import {
   SiteConfigUpdateInput,
   siteConfigUpdateSchema,
 } from "@/lib/validations";
-import { CRUD } from "@/lib/types";
+import { CRUD, theme, ThemeColorsConfig } from "@/lib/types";
 import ImageInput from "../../_components/image-input";
 import ImageInputGroup from "../../_components/image-input-group";
+import ThemeColorsInput from "../../_components/theme-colors-input";
 
 interface SiteConfigFormProps {
   initialData: any;
+  activeThemes: (theme & { components: any[] })[];
   permissions: CRUD;
 }
 
 const TABS = [
-  { id: "general", label: "General & Hero", icon: "🌐" },
-  { id: "style", label: "Branding & Style", icon: "🎨" },
+  { id: "general", label: "General & Branding", icon: "🌐" },
+  { id: "theme", label: "Themes & Layout", icon: "🎨" },
   { id: "checkout", label: "Business & Checkout", icon: "💳" },
-  { id: "seo", label: "SEO & Socials", icon: "🔍" },
-  { id: "captcha", label: "Security & CAPTCHA", icon: "🛡️" },
+  { id: "contact", label: "Contact & Socials", icon: "📱" },
+  { id: "security", label: "Security & SEO", icon: "🛡️" },
 ];
 
 export default function SiteConfigForm({
   initialData,
+  activeThemes = [],
   permissions,
 }: SiteConfigFormProps) {
   const [activeTab, setActiveTab] = useState("general");
@@ -42,7 +48,167 @@ export default function SiteConfigForm({
   const [pendingFavicon, setPendingFavicon] = useState<File | null>(null);
 
   const [isRevalidatingSitemap, setIsRevalidatingSitemap] = useState(false);
-  const [lastRevalidatedAt, setLastRevalidatedAt] = useState<string | null>(null);
+
+  // Global Theme Color States
+  const [globalColors, setGlobalColors] = useState<ThemeColorsConfig>({
+    bg_color: initialData.theme_config?.bg_color || "#09090b",
+    fg_color: initialData.theme_config?.fg_color || "#18181b",
+    text_color: initialData.theme_config?.text_color || "#ffffff",
+    accent_color: initialData.theme_config?.accent_color || "#f59e0b",
+    hover_color: initialData.theme_config?.hover_color || "#38bdf8",
+    link_color: initialData.theme_config?.link_color || "#f59e0b",
+    ...(initialData.theme_config || {}),
+  });
+
+  // Header Theme Component State
+  const initialHeaderCfg = initialData.header_config || {};
+  const [headerThemeId, setHeaderThemeId] = useState<string>(
+    initialHeaderCfg.theme_id ? String(initialHeaderCfg.theme_id) : "",
+  );
+  const [headerComponentId, setHeaderComponentId] = useState<string>(
+    initialHeaderCfg.component_id ? String(initialHeaderCfg.component_id) : "",
+  );
+  const [headerColors, setHeaderColors] = useState<ThemeColorsConfig>({
+    bg_color: initialHeaderCfg.theme_config?.bg_color || initialData.theme_config?.bg_color || "#09090b",
+    fg_color: initialHeaderCfg.theme_config?.fg_color || initialData.theme_config?.fg_color || "#18181b",
+    text_color: initialHeaderCfg.theme_config?.text_color || initialData.theme_config?.text_color || "#ffffff",
+    accent_color: initialHeaderCfg.theme_config?.accent_color || initialData.theme_config?.accent_color || "#f59e0b",
+    hover_color: initialHeaderCfg.theme_config?.hover_color || initialData.theme_config?.hover_color || "#38bdf8",
+    link_color: initialHeaderCfg.theme_config?.link_color || initialData.theme_config?.link_color || "#f59e0b",
+    ...(initialHeaderCfg.theme_config || {}),
+  });
+
+  // Footer Theme Component State
+  const initialFooterCfg = initialData.footer_config || {};
+  const [footerThemeId, setFooterThemeId] = useState<string>(
+    initialFooterCfg.theme_id ? String(initialFooterCfg.theme_id) : "",
+  );
+  const [footerComponentId, setFooterComponentId] = useState<string>(
+    initialFooterCfg.component_id ? String(initialFooterCfg.component_id) : "",
+  );
+  const [footerColors, setFooterColors] = useState<ThemeColorsConfig>({
+    bg_color: initialFooterCfg.theme_config?.bg_color || initialData.theme_config?.bg_color || "#09090b",
+    fg_color: initialFooterCfg.theme_config?.fg_color || initialData.theme_config?.fg_color || "#18181b",
+    text_color: initialFooterCfg.theme_config?.text_color || initialData.theme_config?.text_color || "#ffffff",
+    accent_color: initialFooterCfg.theme_config?.accent_color || initialData.theme_config?.accent_color || "#f59e0b",
+    hover_color: initialFooterCfg.theme_config?.hover_color || initialData.theme_config?.hover_color || "#38bdf8",
+    link_color: initialFooterCfg.theme_config?.link_color || initialData.theme_config?.link_color || "#f59e0b",
+    ...(initialFooterCfg.theme_config || {}),
+  });
+
+  // Filter themes that have header or footer components
+  const headerThemes = activeThemes.filter(
+    (t) =>
+      t.components &&
+      t.components.some(
+        (c: any) => c.component_type === "header" && c.is_active !== false,
+      ),
+  );
+  const footerThemes = activeThemes.filter(
+    (t) =>
+      t.components &&
+      t.components.some(
+        (c: any) => c.component_type === "footer" && c.is_active !== false,
+      ),
+  );
+
+  const selectedHeaderTheme = activeThemes.find(
+    (t) => String(t.id) === headerThemeId,
+  );
+  const headerComponents = selectedHeaderTheme
+    ? selectedHeaderTheme.components.filter(
+        (c: any) => c.component_type === "header" && c.is_active !== false,
+      )
+    : [];
+
+  const selectedFooterTheme = activeThemes.find(
+    (t) => String(t.id) === footerThemeId,
+  );
+  const footerComponents = selectedFooterTheme
+    ? selectedFooterTheme.components.filter(
+        (c: any) => c.component_type === "footer" && c.is_active !== false,
+      )
+    : [];
+
+  const handleHeaderThemeChange = (newThemeId: string) => {
+    setHeaderThemeId(newThemeId);
+    if (!newThemeId) {
+      setHeaderComponentId("");
+      return;
+    }
+    const th = activeThemes.find((t) => String(t.id) === newThemeId);
+    const firstComp = th?.components.find(
+      (c: any) => c.component_type === "header" && c.is_active !== false,
+    );
+    if (firstComp) {
+      setHeaderComponentId(String(firstComp.id));
+      const cfg = (firstComp.theme_config ?? {}) as Record<string, any>;
+      setHeaderColors({
+        bg_color: cfg.bg_color || globalColors.bg_color || "#09090b",
+        fg_color: cfg.fg_color || globalColors.fg_color || "#18181b",
+        text_color: cfg.text_color || globalColors.text_color || "#ffffff",
+        accent_color: cfg.accent_color || globalColors.accent_color || "#f59e0b",
+        hover_color: cfg.hover_color || globalColors.hover_color || "#38bdf8",
+        link_color: cfg.link_color || globalColors.link_color || "#f59e0b",
+      });
+    }
+  };
+
+  const handleHeaderComponentChange = (newCompId: string) => {
+    setHeaderComponentId(newCompId);
+    const comp = headerComponents.find((c: any) => String(c.id) === newCompId);
+    if (comp) {
+      const cfg = (comp.theme_config ?? {}) as Record<string, any>;
+      setHeaderColors({
+        bg_color: cfg.bg_color || globalColors.bg_color || "#09090b",
+        fg_color: cfg.fg_color || globalColors.fg_color || "#18181b",
+        text_color: cfg.text_color || globalColors.text_color || "#ffffff",
+        accent_color: cfg.accent_color || globalColors.accent_color || "#f59e0b",
+        hover_color: cfg.hover_color || globalColors.hover_color || "#38bdf8",
+        link_color: cfg.link_color || globalColors.link_color || "#f59e0b",
+      });
+    }
+  };
+
+  const handleFooterThemeChange = (newThemeId: string) => {
+    setFooterThemeId(newThemeId);
+    if (!newThemeId) {
+      setFooterComponentId("");
+      return;
+    }
+    const th = activeThemes.find((t) => String(t.id) === newThemeId);
+    const firstComp = th?.components.find(
+      (c: any) => c.component_type === "footer" && c.is_active !== false,
+    );
+    if (firstComp) {
+      setFooterComponentId(String(firstComp.id));
+      const cfg = (firstComp.theme_config ?? {}) as Record<string, any>;
+      setFooterColors({
+        bg_color: cfg.bg_color || globalColors.bg_color || "#09090b",
+        fg_color: cfg.fg_color || globalColors.fg_color || "#18181b",
+        text_color: cfg.text_color || globalColors.text_color || "#ffffff",
+        accent_color: cfg.accent_color || globalColors.accent_color || "#f59e0b",
+        hover_color: cfg.hover_color || globalColors.hover_color || "#38bdf8",
+        link_color: cfg.link_color || globalColors.link_color || "#f59e0b",
+      });
+    }
+  };
+
+  const handleFooterComponentChange = (newCompId: string) => {
+    setFooterComponentId(newCompId);
+    const comp = footerComponents.find((c: any) => String(c.id) === newCompId);
+    if (comp) {
+      const cfg = (comp.theme_config ?? {}) as Record<string, any>;
+      setFooterColors({
+        bg_color: cfg.bg_color || globalColors.bg_color || "#09090b",
+        fg_color: cfg.fg_color || globalColors.fg_color || "#18181b",
+        text_color: cfg.text_color || globalColors.text_color || "#ffffff",
+        accent_color: cfg.accent_color || globalColors.accent_color || "#f59e0b",
+        hover_color: cfg.hover_color || globalColors.hover_color || "#38bdf8",
+        link_color: cfg.link_color || globalColors.link_color || "#f59e0b",
+      });
+    }
+  };
 
   const handleRevalidateSitemap = () => {
     setIsRevalidatingSitemap(true);
@@ -50,13 +216,18 @@ export default function SiteConfigForm({
       try {
         const res = await revalidateSitemapAction();
         if (res.success) {
-          toast(res.message || "Sitemap cache revalidated successfully!", "success");
-          setLastRevalidatedAt(new Date().toISOString());
+          toast(
+            res.message || "Sitemap cache revalidated successfully!",
+            "success",
+          );
         } else {
           toast(res.message || "Failed to revalidate sitemap.", "error");
         }
       } catch (err) {
-        toast("An unexpected error occurred while revalidating sitemap.", "error");
+        toast(
+          "An unexpected error occurred while revalidating sitemap.",
+          "error",
+        );
       } finally {
         setIsRevalidatingSitemap(false);
       }
@@ -66,10 +237,10 @@ export default function SiteConfigForm({
   const {
     register,
     handleSubmit,
-    watch,
     setValue,
-    formState: { errors, isDirty },
+    watch,
     reset,
+    formState: { errors, isDirty },
   } = useForm({
     resolver: zodResolver(siteConfigUpdateSchema),
     defaultValues: {
@@ -81,9 +252,8 @@ export default function SiteConfigForm({
       light_logo_url: initialData.light_logo_url || "",
       dark_logo_url: initialData.dark_logo_url || "",
       favicon_url: initialData.favicon_url || "",
-      primary_color: initialData.primary_color || "#18181b",
-      secondary_color: initialData.secondary_color || "#27272a",
-      accent_color: initialData.accent_color || "#f59e0b",
+      font_family: initialData.font_family || "Inter",
+      custom_css: initialData.custom_css || "",
       currency: initialData.currency || "USD",
       currency_symbol: initialData.currency_symbol || "$",
       email: initialData.email || "",
@@ -116,11 +286,6 @@ export default function SiteConfigForm({
     },
   });
 
-  // Watch color values only
-  const primaryColor = watch("primary_color");
-  const secondaryColor = watch("secondary_color");
-  const accentColor = watch("accent_color");
-
   const onSubmit = (data: SiteConfigUpdateInput) => {
     if (!permissions.update) {
       toast(
@@ -132,7 +297,7 @@ export default function SiteConfigForm({
 
     setGlobalError(null);
     startTransition(async () => {
-      // Upload staged images ONLY when the form is submitted
+      // Upload pending images
       if (pendingLightLogo) {
         const formData = new FormData();
         formData.append("file", pendingLightLogo);
@@ -141,7 +306,6 @@ export default function SiteConfigForm({
           data.light_logo_url = uploadRes.data.relativePath;
         } else {
           toast(uploadRes.message || "Failed to upload Light Logo.", "error");
-          setGlobalError(uploadRes.message || "Failed to upload Light Logo.");
           return;
         }
       }
@@ -154,7 +318,6 @@ export default function SiteConfigForm({
           data.dark_logo_url = uploadRes.data.relativePath;
         } else {
           toast(uploadRes.message || "Failed to upload Dark Logo.", "error");
-          setGlobalError(uploadRes.message || "Failed to upload Dark Logo.");
           return;
         }
       }
@@ -167,37 +330,86 @@ export default function SiteConfigForm({
           data.favicon_url = uploadRes.data.relativePath;
         } else {
           toast(uploadRes.message || "Failed to upload Favicon.", "error");
-          setGlobalError(uploadRes.message || "Failed to upload Favicon.");
           return;
         }
       }
 
-      const response = await updateSiteConfig(initialData.id, data);
-      if (!response.success) {
-        if (response.message) setGlobalError(response.message);
-        toast(response.message || "Failed to update configuration.", "error");
-        return;
+      // Build theme_config, header_config, footer_config
+      const theme_config = globalColors;
+
+      const selectedHComp = headerComponents.find(
+        (c: any) => String(c.id) === headerComponentId,
+      );
+      const header_config =
+        headerThemeId && selectedHComp
+          ? {
+              theme_id: Number(headerThemeId),
+              component_id: Number(headerComponentId),
+              theme_name: selectedHeaderTheme?.name,
+              component_path: selectedHComp.file_path,
+              theme_config: headerColors,
+            }
+          : {};
+
+      const selectedFComp = footerComponents.find(
+        (c: any) => String(c.id) === footerComponentId,
+      );
+      const footer_config =
+        footerThemeId && selectedFComp
+          ? {
+              theme_id: Number(footerThemeId),
+              component_id: Number(footerComponentId),
+              theme_name: selectedFooterTheme?.name,
+              component_path: selectedFComp.file_path,
+              theme_config: footerColors,
+            }
+          : {};
+
+      const payload: SiteConfigUpdateInput = {
+        ...data,
+        theme_config,
+        header_config,
+        footer_config,
+      };
+
+      try {
+        const res = await updateSiteConfig(initialData.id || 1, payload);
+        if (res.success) {
+          toast(
+            res.message || "Configuration updated successfully!",
+            "success",
+          );
+          setPendingLightLogo(null);
+          setPendingDarkLogo(null);
+          setPendingFavicon(null);
+          reset(data);
+        } else {
+          toast(res.message || "Failed to update configuration.", "error");
+          setGlobalError(res.message || "Failed to update configuration.");
+        }
+      } catch (err) {
+        toast(
+          "An unexpected error occurred while saving configuration.",
+          "error",
+        );
+        setGlobalError("An unexpected error occurred.");
       }
-
-      setPendingLightLogo(null);
-      setPendingDarkLogo(null);
-      setPendingFavicon(null);
-
-      // Reset dirty state to new values
-      reset(data);
-      toast("Configuration updated successfully.", "success");
     });
   };
 
-  const hasErrors = Object.keys(errors).length > 0;
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {globalError && (
+        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm">
+          {globalError}
+        </div>
+      )}
+
       {/* Top action header for form */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl gap-4">
         <div className="flex items-center gap-2">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span className="text-xs font-semibold text-zinc-550 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
             {isDirty
               ? "Unsaved changes detected"
               : "Configuration is up to date"}
@@ -218,9 +430,9 @@ export default function SiteConfigForm({
           </button>
           <button
             type="submit"
-            disabled={!isDirty || isPending || !permissions.update}
+            disabled={isPending || !permissions.update}
             className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-md ${
-              isDirty && permissions.update
+              permissions.update && !isPending
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/10 active:scale-[0.98]"
                 : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed shadow-none"
             }`}
@@ -249,781 +461,599 @@ export default function SiteConfigForm({
                 Saving Changes...
               </>
             ) : (
-              "Save Configuration"
+              "Save All Changes"
             )}
           </button>
         </div>
       </div>
 
-      {globalError && (
-        <div
-          role="alert"
-          className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 font-medium"
-        >
-          {globalError}
-        </div>
-      )}
-
-      {hasErrors && (
-        <div
-          role="alert"
-          className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm dark:bg-amber-950/20 dark:border-amber-900/30 dark:text-amber-400 font-medium"
-        >
-          Please check the form tabs for validation errors.
-        </div>
-      )}
-
-      {/* Sub Horizontal Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                isActive
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/10"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
-              }`}
-            >
-              <span className="text-base">{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+      {/* Tabs */}
+      <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-2 overflow-x-auto pb-px">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === tab.id
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-zinc-900"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:border-zinc-300"
+            }`}
+          >
+            <span>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
       </div>
+      {/* TAB 1: General & Branding */}
+      {activeTab === "general" && (
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-6 shadow-sm">
+          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+            General Identity & Branding
+          </h3>
 
-      {/* Main Tab Contents Panel */}
-      <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-xs min-h-[450px]">
-          {/* TAB 1: GENERAL */}
-          {activeTab === "general" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Store Profile
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Basic identification details for your online store.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Store Name *
+              </label>
+              <input
+                {...register("name")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {errors.name && (
+                <p className="text-xs text-rose-500 mt-1">
+                  {errors.name.message}
                 </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Store Name *
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("name")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="Luma Store"
-                  />
-                  {errors.name && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.name.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Store Tagline
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("tagline")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="Wear what you love."
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Site URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("site_url")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="https://luma.store"
-                  />
-                  {errors.site_url && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.site_url.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Store Description
-                  </label>
-                  <textarea
-                    disabled={!permissions.update}
-                    rows={3}
-                    {...register("description")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="Tell your customers about your store..."
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    Header & Hero Options
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Settings directly controlling storefront dynamic sections.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                      Topbar Promo Message
-                    </label>
-                    <input
-                      type="text"
-                      disabled={!permissions.update}
-                      {...register("topbar_message")}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                      placeholder="Free shipping on orders over $75 · Use code WELCOME10 for 10% off"
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
-          )}
 
-          {/* TAB 2: BRANDING & STYLE */}
-          {activeTab === "style" && (
-            <div className="space-y-6">
-              <ImageInputGroup
-                title="Logos & Assets"
-                description="Specify public URLs for storefront branding images."
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ImageInput
-                    label="Light Logo"
-                    value={initialData.light_logo_url || ""}
-                    file={pendingLightLogo}
-                    onFileSelect={(f) => {
-                      setPendingLightLogo(f);
-                      setValue("light_logo_url", initialData.light_logo_url || "", {
-                        shouldDirty: true,
-                      });
-                    }}
-                    error={errors.light_logo_url?.message}
-                    disabled={!permissions.update}
-                    uploadFolder="branding"
-                    showAltField={false}
-                  />
-
-                  <ImageInput
-                    label="Dark Logo"
-                    value={initialData.dark_logo_url || ""}
-                    file={pendingDarkLogo}
-                    onFileSelect={(f) => {
-                      setPendingDarkLogo(f);
-                      setValue("dark_logo_url", initialData.dark_logo_url || "", {
-                        shouldDirty: true,
-                      });
-                    }}
-                    error={errors.dark_logo_url?.message}
-                    disabled={!permissions.update}
-                    uploadFolder="branding"
-                    showAltField={false}
-                  />
-
-                  <ImageInput
-                    label="Favicon"
-                    value={initialData.favicon_url || ""}
-                    file={pendingFavicon}
-                    onFileSelect={(f) => {
-                      setPendingFavicon(f);
-                      setValue("favicon_url", initialData.favicon_url || "", {
-                        shouldDirty: true,
-                      });
-                    }}
-                    error={errors.favicon_url?.message}
-                    disabled={!permissions.update}
-                    uploadFolder="branding"
-                    showAltField={false}
-                  />
-                </div>
-              </ImageInputGroup>
-
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    Color Palette
-                  </h3>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400 font-semibold mb-2">
-                    Note: Color Hex values must be valid formats starting with #
-                    (e.g. #0f0f0f).
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Primary Color */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Primary Color
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        disabled={!permissions.update}
-                        value={primaryColor || "#18181b"}
-                        onChange={(e) =>
-                          setValue("primary_color", e.target.value, {
-                            shouldDirty: true,
-                          })
-                        }
-                        className="h-10 w-10 rounded-xl border border-zinc-200 dark:border-zinc-800 cursor-pointer p-1"
-                      />
-                      <input
-                        type="text"
-                        disabled={!permissions.update}
-                        {...register("primary_color")}
-                        className="flex-1 px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm font-mono"
-                      />
-                    </div>
-                    {errors.primary_color && (
-                      <p className="mt-1 text-xs text-red-500 font-medium">
-                        {errors.primary_color.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Secondary Color */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Secondary Color
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        disabled={!permissions.update}
-                        value={secondaryColor || "#27272a"}
-                        onChange={(e) =>
-                          setValue("secondary_color", e.target.value, {
-                            shouldDirty: true,
-                          })
-                        }
-                        className="h-10 w-10 rounded-xl border border-zinc-200 dark:border-zinc-800 cursor-pointer p-1"
-                      />
-                      <input
-                        type="text"
-                        disabled={!permissions.update}
-                        {...register("secondary_color")}
-                        className="flex-1 px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm font-mono"
-                      />
-                    </div>
-                    {errors.secondary_color && (
-                      <p className="mt-1 text-xs text-red-500 font-medium">
-                        {errors.secondary_color.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Accent Color */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Accent Color
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="color"
-                        disabled={!permissions.update}
-                        value={accentColor || "#f59e0b"}
-                        onChange={(e) =>
-                          setValue("accent_color", e.target.value, {
-                            shouldDirty: true,
-                          })
-                        }
-                        className="h-10 w-10 rounded-xl border border-zinc-200 dark:border-zinc-800 cursor-pointer p-1"
-                      />
-                      <input
-                        type="text"
-                        disabled={!permissions.update}
-                        {...register("accent_color")}
-                        className="flex-1 px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm font-mono"
-                      />
-                    </div>
-                    {errors.accent_color && (
-                      <p className="mt-1 text-xs text-red-500 font-medium">
-                        {errors.accent_color.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Tagline
+              </label>
+              <input
+                {...register("tagline")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
-          )}
+          </div>
 
-
-
-          {/* TAB 4: BUSINESS & CHECKOUT */}
-          {activeTab === "checkout" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Business Identity
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Legal business settings for invoices and compliance.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Business Name
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("business_name")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="Luma Fashion Inc."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Business Registration / Tax ID
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("business_registration_number")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="NTN-1234567-8"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Tax Rate (e.g. 0.0825 for 8.25%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    disabled={!permissions.update}
-                    {...register("tax_rate")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
-                    placeholder="0.0825"
-                  />
-                  {errors.tax_rate && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.tax_rate.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Tax Label
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("tax_label")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="GST / VAT"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2.5 py-2 md:col-span-2">
-                  <input
-                    type="checkbox"
-                    id="tax_inclusive"
-                    disabled={!permissions.update}
-                    {...register("tax_inclusive")}
-                    className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
-                  />
-                  <label
-                    htmlFor="tax_inclusive"
-                    className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
-                  >
-                    Prices include tax (tax inclusive)
-                  </label>
-                </div>
-              </div>
-
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-6">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                    Checkout Settings
-                  </h3>
-                  <p className="text-xs text-zinc-550 dark:text-zinc-400 font-semibold">
-                    Tweak user fields and Cash on Delivery features.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="flex items-center gap-2.5 py-1">
-                    <input
-                      type="checkbox"
-                      id="require_phone"
-                      disabled={!permissions.update}
-                      {...register("require_phone")}
-                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
-                    />
-                    <label
-                      htmlFor="require_phone"
-                      className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
-                    >
-                      Require phone number at checkout
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 py-1">
-                    <input
-                      type="checkbox"
-                      id="allow_order_notes"
-                      disabled={!permissions.update}
-                      {...register("allow_order_notes")}
-                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer"
-                    />
-                    <label
-                      htmlFor="allow_order_notes"
-                      className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer select-none"
-                    >
-                      Allow customers to add custom notes
-                    </label>
-                  </div>
-
-                  <div className="border-t border-zinc-100 dark:border-zinc-800/60 pt-4 md:col-span-2">
-                    <div className="p-4 rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-900/50 flex items-start gap-3">
-                      <svg className="h-5 w-5 text-violet-600 dark:text-violet-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-violet-900 dark:text-violet-200">Payment Methods & Surcharges</p>
-                        <p className="text-xs text-violet-700 dark:text-violet-400 mt-0.5">
-                          Checkout payment options (Cash on Delivery, Stripe, PayPal, etc.), customer instructions, and fees are managed under the{" "}
-                          <a href="/dashboard/payment-methods" className="font-bold underline hover:text-violet-900 dark:hover:text-violet-100">
-                            Payment Methods Module
-                          </a>.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Site URL
+              </label>
+              <input
+                {...register("site_url")}
+                placeholder="https://example.com"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
-          )}
 
-          {/* TAB 5: SEO & SOCIALS */}
-          {activeTab === "seo" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Social Media Integrations
-                </h3>
-                <p className="text-xs text-zinc-550 dark:text-zinc-400 font-semibold">
-                  Storefront link configuration for icon routing in footer.
-                </p>
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Topbar Announcement Message
+              </label>
+              <input
+                {...register("topbar_message")}
+                placeholder="e.g. Free shipping on orders over $50"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Instagram URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("social_links.instagram")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="https://instagram.com/handle"
-                  />
-                  {errors.social_links?.instagram && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.social_links.instagram.message}
-                    </p>
-                  )}
-                </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+              Store Description
+            </label>
+            <textarea
+              {...register("description")}
+              rows={3}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            />
+          </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Twitter / X URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("social_links.twitter")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="https://twitter.com/handle"
-                  />
-                  {errors.social_links?.twitter && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.social_links.twitter.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    Facebook URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("social_links.facebook")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="https://facebook.com/handle"
-                  />
-                  {errors.social_links?.facebook && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.social_links.facebook.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    TikTok URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("social_links.tiktok")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="https://tiktok.com/@handle"
-                  />
-                  {errors.social_links?.tiktok && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.social_links.tiktok.message}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-                    YouTube URL
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!permissions.update}
-                    {...register("social_links.youtube")}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm"
-                    placeholder="https://youtube.com/channel"
-                  />
-                  {errors.social_links?.youtube && (
-                    <p className="mt-1 text-xs text-red-500 font-medium">
-                      {errors.social_links.youtube.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
-                <MetaInput
-                  register={register}
-                  watch={watch}
-                  setValue={setValue}
-                  errors={errors}
-                  disabled={!permissions.update}
+          {/* Logo uploads */}
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <ImageInputGroup
+              title="Logos & Brand Icons"
+              description="Upload and optimize brand logos and browser favicon."
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <ImageInput
+                  label="Light Theme Logo"
+                  value={initialData.light_logo_url || ""}
+                  file={pendingLightLogo}
+                  onFileSelect={(f) => setPendingLightLogo(f)}
                   uploadFolder="branding"
-                  defaultTitle={watch("name") || initialData.name}
-                  defaultDescription={watch("description") || initialData.description}
+                  showAltField={false}
+                />
+                <ImageInput
+                  label="Dark Theme Logo"
+                  value={initialData.dark_logo_url || ""}
+                  file={pendingDarkLogo}
+                  onFileSelect={(f) => setPendingDarkLogo(f)}
+                  uploadFolder="branding"
+                  showAltField={false}
+                />
+                <ImageInput
+                  label="Favicon Icon"
+                  value={initialData.favicon_url || ""}
+                  file={pendingFavicon}
+                  onFileSelect={(f) => setPendingFavicon(f)}
+                  uploadFolder="branding"
+                  showAltField={false}
                 />
               </div>
-
-              {/* Dynamic Sitemap & Static Cache */}
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 space-y-4">
-                <div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <span>Dynamic Sitemap & Static Cache</span>
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      Static Cache Active
-                    </span>
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    Sitemap is dynamically rendered and statically cached via <code className="text-indigo-600 dark:text-indigo-400 font-mono">app/sitemap.ts</code> using Next.js <code className="text-indigo-600 dark:text-indigo-400 font-mono">"use cache"</code>.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-800/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Status:{" "}
-                      <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                        Cached via Next.js Dynamic IO
-                      </span>
-                    </p>
-                    {lastRevalidatedAt && (
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                        Last revalidated: {new Date(lastRevalidatedAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <a
-                      href="/sitemap.xml"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                      View sitemap.xml ↗
-                    </a>
-                    <button
-                      type="button"
-                      disabled={!permissions.update || isRevalidatingSitemap || isPending}
-                      onClick={handleRevalidateSitemap}
-                      className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      {isRevalidatingSitemap ? (
-                        <>
-                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Revalidating...
-                        </>
-                      ) : (
-                        "🔄 Revalidate Sitemap"
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 6: CAPTCHA & SECURITY */}
-          {activeTab === "captcha" && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <span>Storefront Abuse & Bot Protection</span>
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                    Active Choice
-                  </span>
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Select which CAPTCHA provider to run on sensitive actions (Checkout Place Order button & Newsletter Subscription). Keys are configured via environment variables (`.env`).
-                </p>
-              </div>
-
-              {/* Provider Selection Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* None */}
-                <label
-                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    watch("captcha_provider") === "none"
-                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
-                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xl">🚫</span>
-                      <input
-                        type="radio"
-                        value="none"
-                        disabled={!permissions.update}
-                        {...register("captcha_provider")}
-                        className="text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Disabled</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      No CAPTCHA verification required. Form submissions proceed without bot checks.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] font-semibold text-zinc-400">Default / Dev Mode</span>
-                </label>
-
-                {/* Turnstile */}
-                <label
-                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    watch("captcha_provider") === "turnstile"
-                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
-                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xl">🌀</span>
-                      <input
-                        type="radio"
-                        value="turnstile"
-                        disabled={!permissions.update}
-                        {...register("captcha_provider")}
-                        className="text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Cloudflare Turnstile</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Recommended. Non-interactive & smart protection. Privacy-friendly with zero annoying puzzles.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] font-semibold text-amber-500">⭐ Recommended</span>
-                </label>
-
-                {/* Google reCAPTCHA v3 */}
-                <label
-                  className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                    watch("captcha_provider") === "recaptcha_v3"
-                      ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20"
-                      : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xl">🟢</span>
-                      <input
-                        type="radio"
-                        value="recaptcha_v3"
-                        disabled={!permissions.update}
-                        {...register("captcha_provider")}
-                        className="text-indigo-600 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Google reCAPTCHA v3</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Invisible background risk scoring. Evaluates traffic score in the background without user interaction.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] font-semibold text-emerald-500">Google Risk Engine</span>
-                </label>
-              </div>
-
-              {/* Keys & Environment Status Instructions */}
-              <div className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  Required Environment Variables (`.env`)
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                  <div className="p-3.5 rounded-xl bg-zinc-900 text-zinc-200 space-y-1">
-                    <p className="font-bold text-amber-400 font-sans text-xs mb-1">Cloudflare Turnstile Keys:</p>
-                    <p className="text-zinc-400">NEXT_PUBLIC_TURNSTILE_SITE_KEY="..."</p>
-                    <p className="text-zinc-400">TURNSTILE_SECRET_KEY="..."</p>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-zinc-900 text-zinc-200 space-y-1">
-                    <p className="font-bold text-emerald-400 font-sans text-xs mb-1">Google reCAPTCHA v3 Keys:</p>
-                    <p className="text-zinc-400">NEXT_PUBLIC_RECAPTCHA_SITE_KEY="..."</p>
-                    <p className="text-zinc-400">RECAPTCHA_SECRET_KEY="..."</p>
-                  </div>
-                </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  💡 Note: If environment secret keys are not configured, the system will automatically bypass server-side verification to keep testing uninterrupted.
-                </p>
-              </div>
-            </div>
-          )}
+            </ImageInputGroup>
+          </div>
         </div>
+      )}
+
+      {/* TAB 2: Themes & Layout */}
+      {activeTab === "theme" && (
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm divide-y divide-zinc-100 dark:divide-zinc-800">
+          {/* Header Component Selection */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Header Component Selection
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Choose whether to use the default system header or a
+                  registered theme header component.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Theme Source
+                </label>
+                <select
+                  value={headerThemeId}
+                  onChange={(e) => handleHeaderThemeChange(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                >
+                  <option value="">Default System Header</option>
+                  {headerThemes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} (Custom Theme)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {headerThemeId && (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Header Variant
+                  </label>
+                  <select
+                    value={headerComponentId}
+                    onChange={(e) =>
+                      handleHeaderComponentChange(e.target.value)
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                  >
+                    {headerComponents.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.file_path})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {headerThemeId && (
+              <ThemeColorsInput
+                title="Header Scoped Colors"
+                description="Customize the color palette specifically for the selected header component."
+                value={headerColors}
+                onChange={setHeaderColors}
+                disabled={!permissions.update}
+                borderless={true}
+              />
+            )}
+          </div>
+
+          {/* Footer Component Selection */}
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Footer Component Selection
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Choose whether to use the default system footer or a
+                  registered theme footer component.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Theme Source
+                </label>
+                <select
+                  value={footerThemeId}
+                  onChange={(e) => handleFooterThemeChange(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                >
+                  <option value="">Default System Footer</option>
+                  {footerThemes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} (Custom Theme)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {footerThemeId && (
+                <div>
+                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Footer Variant
+                  </label>
+                  <select
+                    value={footerComponentId}
+                    onChange={(e) =>
+                      handleFooterComponentChange(e.target.value)
+                    }
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                  >
+                    {footerComponents.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.file_path})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {footerThemeId && (
+              <ThemeColorsInput
+                title="Footer Scoped Colors"
+                description="Customize the color palette specifically for the selected footer component."
+                value={footerColors}
+                onChange={setFooterColors}
+                disabled={!permissions.update}
+                borderless={true}
+              />
+            )}
+          </div>
+
+          {/* Global Theme Colors */}
+          <div className="p-6">
+            <ThemeColorsInput
+              title="Global Theme Color Palette (JSON)"
+              description="These colors define the store-wide baseline and default values for all registered theme components."
+              value={globalColors}
+              onChange={setGlobalColors}
+              disabled={!permissions.update}
+              borderless={true}
+            />
+          </div>
+
+          {/* Typography & Custom CSS */}
+          <div className="p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                Typography & Custom CSS
+              </h3>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Configure the storefront primary font family and inject custom CSS stylesheet rules.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Primary Font Family
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <select
+                    {...register("font_family")}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                  >
+                    <option value="Inter">Inter (Default)</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Outfit">Outfit</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="system-ui">System UI (Native OS)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Custom CSS (Injected into Storefront &lt;head&gt;)
+                </label>
+                <textarea
+                  {...register("custom_css")}
+                  rows={6}
+                  placeholder={`/* Custom CSS injected directly into storefront */\n:root {\n  /* custom variables */\n}`}
+                  className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-950 text-zinc-100 dark:bg-zinc-950 outline-none resize-y"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: Business & Checkout */}
+      {activeTab === "checkout" && (
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-6 shadow-sm">
+          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+            Business & Checkout Settings
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Business Legal Name
+              </label>
+              <input
+                {...register("business_name")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Business Registration / Tax Number
+              </label>
+              <input
+                {...register("business_registration_number")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Currency ISO Code
+              </label>
+              <input
+                {...register("currency")}
+                placeholder="USD"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none uppercase font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Currency Symbol
+              </label>
+              <input
+                {...register("currency_symbol")}
+                placeholder="$"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Tax Rate (0.00 - 1.00)
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                {...register("tax_rate")}
+                placeholder="e.g. 0.05 for 5%"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="tax_inclusive"
+                {...register("tax_inclusive")}
+                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+              />
+              <label
+                htmlFor="tax_inclusive"
+                className="text-xs font-medium cursor-pointer"
+              >
+                Prices are Tax Inclusive
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="require_phone"
+                {...register("require_phone")}
+                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+              />
+              <label
+                htmlFor="require_phone"
+                className="text-xs font-medium cursor-pointer"
+              >
+                Require Phone Number on Checkout
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="allow_order_notes"
+                {...register("allow_order_notes")}
+                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+              />
+              <label
+                htmlFor="allow_order_notes"
+                className="text-xs font-medium cursor-pointer"
+              >
+                Allow Customer Order Notes
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: Contact & Socials */}
+      {activeTab === "contact" && (
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-6 shadow-sm">
+          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+            Contact Information & Social Links
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Support Email
+              </label>
+              <input
+                type="email"
+                {...register("email")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                Contact Phone
+              </label>
+              <input
+                {...register("phone")}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+              Store Physical Address
+            </label>
+            <input
+              {...register("address")}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+              Social Media Links
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  Instagram URL
+                </label>
+                <input
+                  {...register("social_links.instagram")}
+                  placeholder="https://instagram.com/yourstore"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  Twitter / X URL
+                </label>
+                <input
+                  {...register("social_links.twitter")}
+                  placeholder="https://x.com/yourstore"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  Facebook URL
+                </label>
+                <input
+                  {...register("social_links.facebook")}
+                  placeholder="https://facebook.com/yourstore"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  YouTube URL
+                </label>
+                <input
+                  {...register("social_links.youtube")}
+                  placeholder="https://youtube.com/@yourstore"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: Security & SEO */}
+      {activeTab === "security" && (
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="p-6 space-y-6">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              Security & Anti-Bot Protection
+            </h3>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                CAPTCHA Provider
+              </label>
+              <select
+                {...register("captcha_provider")}
+                className="w-full md:w-1/2 px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+              >
+                <option value="none">Disabled (No CAPTCHA)</option>
+                <option value="turnstile">Cloudflare Turnstile</option>
+                <option value="recaptcha">Google reCAPTCHA v3</option>
+              </select>
+            </div>
+
+            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Dynamic Sitemap
+                </h4>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Revalidates the cache for /sitemap.xml across all products,
+                  categories, and site pages.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRevalidateSitemap}
+                disabled={isRevalidatingSitemap}
+                className="px-4 py-2 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50 transition"
+              >
+                {isRevalidatingSitemap
+                  ? "Revalidating..."
+                  : "Revalidate Sitemap"}
+              </button>
+            </div>
+          </div>
+
+          {/* SEO Meta */}
+          <div className="p-6">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-4">
+              Default Store SEO Metadata
+            </h3>
+            <MetaInput
+              register={register}
+              watch={watch}
+              setValue={setValue}
+              errors={errors}
+              prefix="meta_info"
+            />
+          </div>
+        </div>
+      )}
     </form>
   );
 }

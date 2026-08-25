@@ -1,9 +1,31 @@
 import { Suspense } from "react";
 import NotFoundActions from "./_components/NotFoundActions";
+import { getPageThemeConfig } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 
 export default async function StorefrontNotFound() {
+  const pageThemeCfg = await getPageThemeConfig(["404", "not-found"]);
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const Custom404 = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (Custom404) {
+      return (
+        <>
+          {pageThemeCfg.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+          )}
+          <Custom404 themeConfig={pageThemeCfg.theme_config} />
+        </>
+      );
+    }
+  }
   return (
     <div className="min-h-[85vh] flex flex-col justify-between bg-zinc-900 text-white">
+      {pageThemeCfg.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+      )}
       <div className="flex-1 flex flex-col items-center justify-center pt-36 pb-20 px-4 text-center">
         <div className="max-w-xl w-full mx-auto">
           {/* Big 404 Numbers */}

@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { getPageThemeConfig } from "@/lib/storefront";
+import { loadThemeComponent } from "@/lib/theme-loader";
 import SearchPageMain from "./SearchPageMain";
 
 // Sanitize search query: trim, max 100 chars, strip non-printable chars
@@ -36,7 +38,36 @@ async function SearchPageInner({ searchParams }: SearchPageProps) {
   const query = sanitizeQuery(q);
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
-  return <SearchPageMain query={query} page={page} />;
+  const pageThemeCfg = await getPageThemeConfig(["search"]);
+  if (pageThemeCfg.theme_name && pageThemeCfg.component_path) {
+    const CustomSearch = await loadThemeComponent(
+      pageThemeCfg.theme_name,
+      pageThemeCfg.component_path,
+    );
+    if (CustomSearch) {
+      return (
+        <>
+          {pageThemeCfg.custom_css && (
+            <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+          )}
+          <CustomSearch
+            query={query}
+            page={page}
+            themeConfig={pageThemeCfg.theme_config}
+          />
+        </>
+      );
+    }
+  }
+
+  return (
+    <>
+      {pageThemeCfg.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: pageThemeCfg.custom_css }} />
+      )}
+      <SearchPageMain query={query} page={page} />
+    </>
+  );
 }
 
 export default function SearchPage(props: SearchPageProps) {

@@ -92,8 +92,8 @@ async function main() {
       is_super: false,
     },
     {
-      name: "Site Components",
-      path: "/dashboard/site-components",
+      name: "Themes",
+      path: "/dashboard/themes",
       enabled: true,
       is_super: false,
     },
@@ -210,9 +210,14 @@ async function main() {
       description:
         "Dynamic open-source e-commerce platform built with Next.js.",
       topbar_message: "Welcome to our store!",
-      primary_color: "#09090b",
-      secondary_color: "#18181b",
-      accent_color: "#f59e0b",
+      theme_config: {
+        bg_color: "#09090b",
+        fg_color: "#18181b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+        hover_color: "#38bdf8",
+        link_color: "#f59e0b",
+      },
       font_family: "Inter",
       custom_css: null,
       header_config: { layout: "standard", sticky: true },
@@ -239,58 +244,110 @@ async function main() {
   });
   console.log("  ✓ Minimal Site Config created");
 
-  // 5. System Registered Components Catalog
-  const components = [
+  // 5. System Registered Themes & Components
+  const dreamTheme = await prisma.theme.upsert({
+    where: { slug: "Dream" },
+    update: { name: "Dream", is_active: true },
+    create: {
+      name: "Dream",
+      slug: "Dream",
+      description: "Modern minimalist theme with dark mode aesthetics and glassmorphism.",
+      is_active: true,
+      created_by: 0,
+      updated_by: 0,
+    },
+  });
+
+  const themeComponents = [
     {
-      component_key: "hero_banner",
-      name: "Hero Banner",
-      category: "hero",
-      description: "Hero header banner with taglines and category links.",
-      default_props: {},
+      theme_id: dreamTheme.id,
+      name: "Dream Header (header-1)",
+      component_type: "header",
+      file_path: "_components/headers/header-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+        hover_color: "#38bdf8",
+      },
     },
     {
-      component_key: "featured_products",
-      name: "Featured Products",
-      category: "products",
-      description: "Grid of featured storefront products.",
-      default_props: { limit: 4 },
+      theme_id: dreamTheme.id,
+      name: "Dream Footer (footer-1)",
+      component_type: "footer",
+      file_path: "_components/footers/footer-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+      },
     },
     {
-      component_key: "category_grid",
-      name: "Category Grid",
-      category: "products",
-      description: "Visual grid of product categories.",
-      default_props: {},
+      theme_id: dreamTheme.id,
+      name: "Dream Home (home-1)",
+      component_type: "home",
+      file_path: "pages/homes/home-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+      },
     },
     {
-      component_key: "newsletter_section",
-      name: "Newsletter Section",
-      category: "marketing",
-      description: "Newsletter subscription form section.",
-      default_props: {},
+      theme_id: dreamTheme.id,
+      name: "Dream Product Detail (product-1)",
+      component_type: "product",
+      file_path: "pages/products/product-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+      },
     },
     {
-      component_key: "rich_text",
-      name: "Rich Text Content",
-      category: "content",
-      description: "Custom HTML / Markdown content block.",
-      default_props: {},
+      theme_id: dreamTheme.id,
+      name: "Dream Category Detail (category-1)",
+      component_type: "category",
+      file_path: "pages/categories/category-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+      },
+    },
+    {
+      theme_id: dreamTheme.id,
+      name: "Dream CMS Page (page-1)",
+      component_type: "page",
+      file_path: "pages/pages/page-1.tsx",
+      theme_config: {
+        bg_color: "#09090b",
+        fg_color: "#18181b",
+        text_color: "#ffffff",
+        accent_color: "#f59e0b",
+      },
     },
   ];
 
-  for (const c of components) {
-    await prisma.site_component.upsert({
-      where: { component_key: c.component_key },
+  for (const tc of themeComponents) {
+    await prisma.theme_component.upsert({
+      where: {
+        theme_id_component_type_file_path: {
+          theme_id: tc.theme_id,
+          component_type: tc.component_type,
+          file_path: tc.file_path,
+        },
+      },
       update: {},
       create: {
-        ...c,
+        ...tc,
         is_active: true,
         created_by: 0,
         updated_by: 0,
       },
     });
   }
-  console.log(`  ✓ System Components Catalog (${components.length}) seeded`);
+  console.log(`  ✓ Dream Theme & Components (${themeComponents.length}) seeded`);
 
   // 6. Active Storefront Pages (Matching existing app/(ecommerce) routes)
   const pages = [
@@ -301,29 +358,25 @@ async function main() {
       show_in_header: false,
       show_in_footer: false,
       sort_order: 0,
-      components_config: [
-        { component_key: "hero_banner", enabled: true, sort_order: 1 },
-        { component_key: "featured_products", enabled: true, sort_order: 2 },
-      ],
+      theme_config: {},
     },
     {
-      slug: "about",
-      title: "About Us",
-      show_in_header: true,
-      show_in_footer: true,
+      slug: "product",
+      title: "All Products",
+      show_in_header: false,
+      show_in_footer: false,
       sort_order: 1,
-      content: `<h2>Our Story</h2>
-<p>Welcome to <strong>${STORE_NAME}</strong>! We are dedicated to providing high quality products, exceptional customer experience, and seamless delivery.</p>`,
-      components_config: [],
+      content: null,
+      theme_config: {},
     },
     {
-      slug: "contact",
-      title: "Contact Us",
-      show_in_header: true,
-      show_in_footer: true,
+      slug: "product/[slug]",
+      title: "Product Details",
+      show_in_header: false,
+      show_in_footer: false,
       sort_order: 2,
-      content: `<p>Have questions or feedback? We would love to hear from you. Reach out to our customer support team at any time!</p>`,
-      components_config: [],
+      content: null,
+      theme_config: {},
     },
     {
       slug: "category",
@@ -332,16 +385,35 @@ async function main() {
       show_in_footer: false,
       sort_order: 3,
       content: null,
-      components_config: [],
+      theme_config: {},
     },
     {
-      slug: "product",
-      title: "All Products",
+      slug: "category/[slug]",
+      title: "Category Products",
       show_in_header: false,
       show_in_footer: false,
       sort_order: 4,
       content: null,
-      components_config: [],
+      theme_config: {},
+    },
+    {
+      slug: "about",
+      title: "About Us",
+      show_in_header: true,
+      show_in_footer: true,
+      sort_order: 5,
+      content: `<h2>Our Story</h2>
+<p>Welcome to <strong>${STORE_NAME}</strong>! We are dedicated to providing high quality products, exceptional customer experience, and seamless delivery.</p>`,
+      theme_config: {},
+    },
+    {
+      slug: "contact",
+      title: "Contact Us",
+      show_in_header: true,
+      show_in_footer: true,
+      sort_order: 6,
+      content: `<p>Have questions or feedback? We would love to hear from you. Reach out to our customer support team at any time!</p>`,
+      theme_config: {},
     },
     {
       slug: "privacy-policy",
@@ -354,7 +426,7 @@ async function main() {
 
 <h2>2. How We Protect Your Data</h2>
 <p>Your privacy is strictly guarded. We never sell, rent, or trade customer personal information to third parties.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "terms-and-conditions",
@@ -367,7 +439,7 @@ async function main() {
 
 <h2>2. Product Orders & Pricing</h2>
 <p>We reserve the right to adjust prices, modify product descriptions, or discontinue items at any time without notice.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "shipping-policy",
@@ -377,7 +449,7 @@ async function main() {
       sort_order: 12,
       content: `<h2>1. Order Processing Times</h2>
 <p>All orders are processed within 1 to 2 business days. You will receive an automated email confirmation once your order has dispatched.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "return-and-refund-policy",
@@ -387,7 +459,7 @@ async function main() {
       sort_order: 13,
       content: `<h2>1. 14-Day Return Guarantee</h2>
 <p>We accept returns on eligible products within 14 days of delivery. Items must be unworn, unused, in original packaging, and with all tags attached.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "payment-policy",
@@ -397,7 +469,7 @@ async function main() {
       sort_order: 14,
       content: `<h2>1. Accepted Payment Methods</h2>
 <p>We accept Cash on Delivery (COD) and major credit/debit card options for storefront purchases.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "legal-disclaimer",
@@ -407,7 +479,7 @@ async function main() {
       sort_order: 15,
       content: `<h2>1. General Information & Scope</h2>
 <p>The information provided by <strong>${STORE_NAME}</strong> on this website is for general informational and shopping purposes only.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "order-cancellation-policy",
@@ -417,7 +489,7 @@ async function main() {
       sort_order: 16,
       content: `<h2>1. Customer Order Cancellation</h2>
 <p>You may cancel your order free of charge at any time prior to item dispatch by contacting our support team.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "cookie-policy",
@@ -427,7 +499,7 @@ async function main() {
       sort_order: 17,
       content: `<h2>1. What Are Cookies?</h2>
 <p>Cookies are small text files stored on your device when you visit our website to remember preferences and cart items.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "faq",
@@ -438,7 +510,7 @@ async function main() {
       content: `<h2>General Questions</h2>
 <p><strong>Q: How do I place an order?</strong><br/>
 A: Browse our catalog, select your items, add them to your cart, and proceed to checkout.</p>`,
-      components_config: [],
+      theme_config: {},
     },
     {
       slug: "copyright-notice",
@@ -448,7 +520,7 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
       sort_order: 19,
       content: `<h2>1. Intellectual Property Ownership</h2>
 <p>All content on this website is the property of <strong>${STORE_NAME}</strong> and is protected by international copyright laws.</p>`,
-      components_config: [],
+      theme_config: {},
     },
   ];
 
@@ -465,8 +537,8 @@ A: Browse our catalog, select your items, add them to your cart, and proceed to 
         sort_order: page.sort_order,
         is_active: true,
         meta_info: { title: page.title },
-        theme_config: {},
-        components_config: page.components_config,
+        theme_config: page.theme_config || {},
+        custom_css: null,
         created_by: 0,
         updated_by: 0,
       },

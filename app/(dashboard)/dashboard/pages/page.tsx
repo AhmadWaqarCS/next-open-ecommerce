@@ -31,7 +31,16 @@ export default async function DashboardPagesPage({
     id: typeof params?.id === "string" ? params.id : undefined,
     title: typeof params?.title === "string" ? params.title : undefined,
     slug: typeof params?.slug === "string" ? params.slug : undefined,
-    is_active: typeof params?.is_active === "string" ? params.is_active : undefined,
+    is_active:
+      typeof params?.is_active === "string" ? params.is_active : undefined,
+    show_in_header:
+      typeof params?.show_in_header === "string"
+        ? params.show_in_header
+        : undefined,
+    show_in_footer:
+      typeof params?.show_in_footer === "string"
+        ? params.show_in_footer
+        : undefined,
   };
 
   const where = buildPageWhereInput(filterParams);
@@ -47,6 +56,7 @@ export default async function DashboardPagesPage({
     <div className="space-y-6 flex-1 flex flex-col">
       <PagesTable
         pages={pages as any}
+        dashboardUsers={dashboardUsers}
         filterParams={filterParams}
         permissions={permissions}
         userNames={userNames}
