@@ -12,10 +12,28 @@ export async function createUserTransaction(
   userId: number,
 ) {
   return await prisma.$transaction(async (tx) => {
+    const existing = await tx.dashboard_user.findUnique({
+      where: { email: data.email },
+    });
+    if (existing) {
+      throw new Error("EMAIL_ALREADY_EXISTS");
+    }
+
+    const targetRole = await tx.role.findUnique({
+      where: { name: data.role_name },
+    });
+    if (!targetRole) {
+      throw new Error("ROLE_NOT_FOUND");
+    }
+
     return await tx.dashboard_user.create({
       data: {
-        ...data,
-        role: { connect: { name: data.role_name } },
+        email: data.email,
+        password: data.password,
+        role_name: data.role_name,
+        is_active: data.is_active,
+        name: data.name ?? null,
+        role: { connect: { id: targetRole.id } },
         created_by: userId,
         updated_by: userId,
       },
@@ -57,24 +75,70 @@ export async function updateUserTransaction(
       }
     }
 
+    if (data.email && data.email !== targetUser.email) {
+      const existingEmail = await tx.dashboard_user.findUnique({
+        where: { email: data.email },
+      });
+      if (existingEmail && existingEmail.id !== id) {
+        throw new Error("EMAIL_ALREADY_EXISTS");
+      }
+    }
+
+    const updateData: Prisma.dashboard_userUpdateInput = {
+      updated_by: currentUserId,
+    };
+
+    if (data.email !== undefined && data.email !== "" && data.email !== targetUser.email) {
+      updateData.email = data.email;
+    }
+
+    if (data.password !== undefined && data.password !== "") {
+      updateData.password = data.password;
+    }
+
+    if (data.name !== undefined && data.name !== targetUser.name) {
+      updateData.name = data.name !== "" ? data.name : null;
+    }
+
+    if (data.role_name !== undefined && data.role_name !== "" && data.role_name !== targetUser.role_name) {
+      updateData.role_name = isSuperadmin ? "superadmin" : data.role_name;
+      updateData.role = {
+        connect: { name: isSuperadmin ? "superadmin" : data.role_name },
+      };
+    }
+
+    if (data.is_active !== undefined && data.is_active !== targetUser.is_active) {
+      updateData.is_active = isSuperadmin ? true : data.is_active;
+    }
+
     const updatedUser = await tx.dashboard_user.update({
       where: { id },
-      data: {
-        ...data,
-        role_name: isSuperadmin
-          ? "superadmin"
-          : data.role_name !== ""
-            ? data.role_name
-            : undefined,
-        ...(data.role_name && {
-          role: { connect: { name: isSuperadmin ? "superadmin" : data.role_name } },
-        }),
-        is_active: isSuperadmin ? true : data.is_active,
-        updated_by: currentUserId,
-      },
+      data: updateData,
     });
 
     return { targetUser, updatedUser };
+  });
+}
+
+export async function toggleUserStatusTransaction(
+  id: number,
+  is_active: boolean,
+  currentUserId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const targetUser = await tx.dashboard_user.findUnique({ where: { id } });
+    if (!targetUser) throw new Error("USER_NOT_FOUND");
+    if (targetUser.role_name === "superadmin" && !is_active) {
+      throw new Error("SUPERADMIN_ACTIVE_IMMUTABLE");
+    }
+
+    return await tx.dashboard_user.update({
+      where: { id },
+      data: {
+        is_active,
+        updated_by: currentUserId,
+      },
+    });
   });
 }
 
@@ -143,15 +207,22 @@ export async function bulkDeleteUsersTransaction(
   userId: number = 0,
 ) {
   return await prisma.$transaction(async (tx) => {
+    const notConditions: Prisma.dashboard_userWhereInput[] = [
+      { role_name: "superadmin" },
+    ];
+    if (userId > 0) {
+      notConditions.push({ id: userId });
+    }
+
     let whereCondition: Prisma.dashboard_userWhereInput;
     if (selectAllScope) {
       if (filterWhere) {
-        whereCondition = { AND: [filterWhere, { NOT: { role_name: "superadmin" } }] };
+        whereCondition = { AND: [filterWhere, { NOT: notConditions }] };
       } else {
-        whereCondition = { deleted_at: null, NOT: { role_name: "superadmin" } };
+        whereCondition = { deleted_at: null, NOT: notConditions };
       }
     } else {
-      whereCondition = { id: { in: ids }, NOT: { role_name: "superadmin" } };
+      whereCondition = { id: { in: ids }, NOT: notConditions };
     }
 
     return await tx.dashboard_user.updateMany({
@@ -190,17 +261,25 @@ export async function bulkPermanentlyDeleteUsersTransaction(
   ids: number[],
   selectAllScope: boolean = false,
   filterWhere?: Prisma.dashboard_userWhereInput,
+  userId: number = 0,
 ) {
   return await prisma.$transaction(async (tx) => {
+    const notConditions: Prisma.dashboard_userWhereInput[] = [
+      { role_name: "superadmin" },
+    ];
+    if (userId > 0) {
+      notConditions.push({ id: userId });
+    }
+
     let whereCondition: Prisma.dashboard_userWhereInput;
     if (selectAllScope) {
       if (filterWhere) {
-        whereCondition = { AND: [filterWhere, { NOT: { role_name: "superadmin" } }] };
+        whereCondition = { AND: [filterWhere, { NOT: notConditions }] };
       } else {
-        whereCondition = { NOT: [{ role_name: "superadmin" }, { deleted_at: null }] };
+        whereCondition = { NOT: [...notConditions, { deleted_at: null }] };
       }
     } else {
-      whereCondition = { id: { in: ids }, NOT: { role_name: "superadmin" } };
+      whereCondition = { id: { in: ids }, NOT: notConditions };
     }
 
     return await tx.dashboard_user.deleteMany({
@@ -289,4 +368,3 @@ export async function getUserTrashDashboardDataInDB(
     return { users, roles, totalUsers, dashboardUsers };
   });
 }
-

@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import UserTable from "./user-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { UserFilterParams, getUserFilterWhere } from "@/lib/filters/user-filters";
 import { getUsersDashboardDataInDB } from "@/services/user-services";
 
@@ -73,13 +72,6 @@ async function DashboardUsersPageContent({
         currentUser={user}
         userNames={userNames}
         totalCount={totalUsers}
-      />
-
-      <Pagination
-        totalItems={totalUsers}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        itemName="users"
       />
     </div>
   );

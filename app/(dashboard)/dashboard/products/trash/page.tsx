@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import ProductTrashTable from "./product-trash-table";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { ProductFilterParams, getProductFilterWhere } from "@/lib/filters/product-filters";
 import { getProductTrashDashboardDataInDB } from "@/services/product-services";
 
@@ -84,13 +83,6 @@ async function DashboardProductsTrashPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalProducts}
-      />
-
-      <Pagination
-        totalItems={totalProducts}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        itemName="products"
       />
     </div>
   );

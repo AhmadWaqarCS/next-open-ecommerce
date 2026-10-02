@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializePages } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   PageFilterParams,
   buildPageWhereInput,
@@ -29,9 +28,7 @@ export default function DashboardPagesPage(props: PageProps) {
   );
 }
 
-async function DashboardPagesPageContent({
-  searchParams,
-}: PageProps) {
+async function DashboardPagesPageContent({ searchParams }: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/pages");
   const params = await searchParams;
 
@@ -43,6 +40,7 @@ async function DashboardPagesPageContent({
     id: typeof params?.id === "string" ? params.id : undefined,
     title: typeof params?.title === "string" ? params.title : undefined,
     slug: typeof params?.slug === "string" ? params.slug : undefined,
+    search: typeof params?.search === "string" ? params.search : undefined,
     is_active:
       typeof params?.is_active === "string" ? params.is_active : undefined,
     show_in_header:
@@ -53,6 +51,18 @@ async function DashboardPagesPageContent({
       typeof params?.show_in_footer === "string"
         ? params.show_in_footer
         : undefined,
+    created_by:
+      typeof params?.created_by === "string" ? params.created_by : undefined,
+    updated_by:
+      typeof params?.updated_by === "string" ? params.updated_by : undefined,
+    created_from:
+      typeof params?.created_from === "string" ? params.created_from : undefined,
+    created_to:
+      typeof params?.created_to === "string" ? params.created_to : undefined,
+    updated_from:
+      typeof params?.updated_from === "string" ? params.updated_from : undefined,
+    updated_to:
+      typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
 
   const where = buildPageWhereInput(filterParams);
@@ -73,13 +83,8 @@ async function DashboardPagesPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalPages}
-      />
-
-      <Pagination
-        totalItems={totalPages}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="pages"
       />
     </div>
   );

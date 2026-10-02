@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import nodemailer from "nodemailer";
 import { updateCampaignRecipientStatusInDB } from "@/services/email-campaign-services";
-import { createSentEmailInDB, updateSentEmailInDB } from "@/services/email-services";
+import { createSentEmailInDB } from "@/services/sent-email-services";
 import { renderEmailTemplate } from "@/lib/email-template-engine";
 
 function sleep(ms: number) {
@@ -47,7 +47,6 @@ export async function executeCampaignSendingEngine(campaignId: number, retryFail
   }
 
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true, email: true },
   });
 
@@ -127,17 +126,6 @@ export async function executeCampaignSendingEngine(campaignId: number, retryFail
     const { subject: finalSubject, bodyHtml: finalBodyHtml } =
       renderEmailTemplate(rawBodyHtml, rawSubject, variables);
 
-    // Create Sent Email audit log record
-    const sentRecord = await createSentEmailInDB({
-      type: "marketing_campaign",
-      sender_email: fromEmail,
-      recipient_email: contact.email,
-      recipient_name: recipientName,
-      subject: finalSubject,
-      status: "pending",
-      body_html: finalBodyHtml,
-    });
-
     try {
       await transporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
@@ -147,8 +135,15 @@ export async function executeCampaignSendingEngine(campaignId: number, retryFail
         html: finalBodyHtml,
       });
 
-      await updateSentEmailInDB(sentRecord.id, {
+      // Create Sent Email audit record strictly upon successful transmission
+      await createSentEmailInDB({
+        type: "marketing",
+        sender_email: fromEmail,
+        recipient_email: contact.email,
+        recipient_name: recipientName,
+        subject: finalSubject,
         status: "successful",
+        body_html: finalBodyHtml,
         sent_at: new Date(),
       });
 
@@ -157,11 +152,6 @@ export async function executeCampaignSendingEngine(campaignId: number, retryFail
     } catch (err: any) {
       const errMsg = err?.message || String(err);
       console.error(`[CampaignEngine] Failed to send to ${contact.email}:`, errMsg);
-
-      await updateSentEmailInDB(sentRecord.id, {
-        status: "failed",
-        error_message: errMsg,
-      });
 
       await updateCampaignRecipientStatusInDB(recipient.id, "failed", errMsg);
       failedCount++;

@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const passwordSchema = z
   .string()
-  .min(8, "Password must be at least 6 characters long")
+  .min(8, "Password must be at least 8 characters long")
   .max(128, "Password cannot exceed 128 characters");
 
 const emailSchema = z
@@ -138,7 +138,10 @@ export const userCreateSchema = z.object({
     .string()
     .trim()
     .min(1, "Please select a role")
-    .max(100, "Role name is too long"),
+    .max(100, "Role name is too long")
+    .refine((val) => val.toLowerCase() !== "superadmin", {
+      message: "Cannot create a user with the superadmin role",
+    }),
   is_active: z.boolean(),
   name: z
     .string()
@@ -166,6 +169,12 @@ export const userUpdateSchema = z.object({
 });
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
+export const userStatusToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_active: z.boolean(),
+});
+export type UserStatusToggleInput = z.infer<typeof userStatusToggleSchema>;
+
 // ============================================================
 // ROLES
 // ============================================================
@@ -174,8 +183,15 @@ export const roleCreateSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Role name is required")
-    .max(100, "Role name cannot exceed 100 characters"),
+    .min(2, "Role name must be at least 2 characters")
+    .max(100, "Role name cannot exceed 100 characters")
+    .regex(
+      /^[a-zA-Z0-9_\-\s]+$/,
+      "Role name can only contain letters, numbers, spaces, hyphens, and underscores",
+    )
+    .refine((val) => val.toLowerCase() !== "superadmin", {
+      message: "Cannot create a role with the superadmin name",
+    }),
   is_active: z.boolean().default(true),
 });
 export type RoleCreateInput = z.infer<typeof roleCreateSchema>;
@@ -184,12 +200,49 @@ export const roleUpdateSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Role name is required")
+    .min(2, "Role name must be at least 2 characters")
     .max(100, "Role name cannot exceed 100 characters")
+    .regex(
+      /^[a-zA-Z0-9_\-\s]+$/,
+      "Role name can only contain letters, numbers, spaces, hyphens, and underscores",
+    )
+    .refine((val) => val.toLowerCase() !== "superadmin", {
+      message: "Cannot rename a role to superadmin",
+    })
     .optional(),
   is_active: z.boolean().optional(),
 });
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
+
+export const roleStatusToggleSchema = z.object({
+  id: z.number().int().positive("Invalid role ID").max(2147483647),
+  is_active: z.boolean(),
+});
+export type RoleStatusToggleInput = z.infer<typeof roleStatusToggleSchema>;
+
+export const rolePermissionsUpdateSchema = z.object({
+  role_id: z.number().int().positive("Invalid role ID").max(2147483647),
+  permissions: z
+    .array(
+      z.object({
+        site_feature_id: z
+          .number()
+          .int()
+          .positive("Invalid feature ID")
+          .max(2147483647),
+        access_crud: z.object({
+          create: z.boolean(),
+          read: z.boolean(),
+          update: z.boolean(),
+          delete: z.boolean(),
+        }),
+      }),
+    )
+    .min(1, "Permissions list cannot be empty"),
+});
+export type RolePermissionsUpdateInput = z.infer<
+  typeof rolePermissionsUpdateSchema
+>;
 
 // ============================================================
 // SITE FEATURES
@@ -360,8 +413,13 @@ export const siteConfigCreateSchema = z.object({
     .or(z.literal("")),
   tax_rate: z.preprocess(
     (val) =>
-      val === "" || val === undefined || val === null ? undefined : Number(val),
-    z.number().min(0).max(1, "Tax rate must be between 0 and 1").optional(),
+      val === "" || val === undefined || val === null ? null : Number(val),
+    z
+      .number()
+      .min(0, "Tax rate cannot be negative")
+      .max(1, "Tax rate must be between 0 and 1")
+      .nullable()
+      .optional(),
   ),
   tax_inclusive: z.boolean().default(false),
   tax_label: z
@@ -373,7 +431,7 @@ export const siteConfigCreateSchema = z.object({
   // Checkout & Security
   require_phone: z.boolean().default(false),
   allow_order_notes: z.boolean().default(true),
-  captcha_provider: z.string().default("none"),
+  captcha_provider: z.enum(["none", "turnstile", "recaptcha"]).default("none"),
 
   header_config: z
     .record(z.string().max(100), z.unknown())
@@ -409,7 +467,11 @@ export const sitePageCreateSchema = z.object({
       /^(?:\/|[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*|\[[a-z0-9_-]+\]|product\/\[slug\]|category\/\[slug\])$/i,
       "Slug must contain lowercase alphanumeric characters and hyphens (or / for home page)",
     )
-    .transform((val) => (val === "/" ? "/" : val.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, ""))),
+    .transform((val) => (val === "/" ? "/" : val.toLowerCase().replace(/^\/+/, "").replace(/\/+$/, "")))
+    .refine(
+      (slug) => !["product", "category", "product/[slug]", "category/[slug]"].includes(slug),
+      { message: "This slug is reserved for core system pages." },
+    ),
   title: z
     .string()
     .trim()
@@ -442,6 +504,25 @@ export type SitePageCreateInput = z.infer<typeof sitePageCreateSchema>;
 export const sitePageUpdateSchema = sitePageCreateSchema.partial();
 export type SitePageUpdateInput = z.infer<typeof sitePageUpdateSchema>;
 
+export const sitePageStatusToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_active: z.boolean(),
+});
+export type SitePageStatusToggleInput = z.infer<typeof sitePageStatusToggleSchema>;
+
+export const bulkSetSitePagesStatusSchema = z.object({
+  ids: z.array(z.number().int().positive().max(2147483647)),
+  is_active: z.boolean(),
+  selectAllScope: z.boolean().default(false),
+});
+export type BulkSetSitePagesStatusInput = z.infer<typeof bulkSetSitePagesStatusSchema>;
+
+export const bulkDeleteSitePagesSchema = z.object({
+  ids: z.array(z.number().int().positive().max(2147483647)),
+  selectAllScope: z.boolean().default(false),
+});
+export type BulkDeleteSitePagesInput = z.infer<typeof bulkDeleteSitePagesSchema>;
+
 // ============================================================
 // THEMES & THEME COMPONENTS
 // ============================================================
@@ -466,7 +547,8 @@ export const themeCreateSchema = z.object({
     .string()
     .trim()
     .min(1, "Folder name / identifier is required")
-    .max(200, "Folder name cannot exceed 200 characters"),
+    .max(100, "Folder name cannot exceed 100 characters")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Folder slug can only contain letters, numbers, hyphens, and underscores"),
   description: z
     .string()
     .trim()
@@ -479,6 +561,17 @@ export type ThemeCreateInput = z.infer<typeof themeCreateSchema>;
 
 export const themeUpdateSchema = themeCreateSchema.partial();
 export type ThemeUpdateInput = z.infer<typeof themeUpdateSchema>;
+
+export const themeBulkStatusSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "Select at least one theme"),
+  is_active: z.boolean(),
+});
+export type ThemeBulkStatusInput = z.infer<typeof themeBulkStatusSchema>;
+
+export const themeBulkDeleteSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "Select at least one theme"),
+});
+export type ThemeBulkDeleteInput = z.infer<typeof themeBulkDeleteSchema>;
 
 export const themeComponentCreateSchema = z.object({
   theme_id: z.number().int().positive("Theme is required"),
@@ -494,7 +587,8 @@ export const themeComponentCreateSchema = z.object({
     .string()
     .trim()
     .min(1, "File path is required")
-    .max(255, "File path cannot exceed 255 characters"),
+    .max(255, "File path cannot exceed 255 characters")
+    .refine((p) => !p.includes("..") && !p.startsWith("/"), "File path cannot contain '..' or start with '/'"),
   theme_config: z
     .record(z.string().max(100), z.unknown())
     .optional()
@@ -505,6 +599,17 @@ export type ThemeComponentCreateInput = z.infer<typeof themeComponentCreateSchem
 
 export const themeComponentUpdateSchema = themeComponentCreateSchema.partial();
 export type ThemeComponentUpdateInput = z.infer<typeof themeComponentUpdateSchema>;
+
+export const themeComponentBulkStatusSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "Select at least one component"),
+  is_active: z.boolean(),
+});
+export type ThemeComponentBulkStatusInput = z.infer<typeof themeComponentBulkStatusSchema>;
+
+export const themeComponentBulkDeleteSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "Select at least one component"),
+});
+export type ThemeComponentBulkDeleteInput = z.infer<typeof themeComponentBulkDeleteSchema>;
 
 // ============================================================
 // EMAIL CONFIG
@@ -660,6 +765,23 @@ export const shippingMethodUpdateSchema = z
   );
 export type ShippingMethodUpdateInput = z.infer<
   typeof shippingMethodUpdateSchema
+>;
+
+export const shippingMethodStatusToggleSchema = z.object({
+  id: z.number().int().positive(),
+  is_active: z.boolean(),
+});
+export type ShippingMethodStatusToggleInput = z.infer<
+  typeof shippingMethodStatusToggleSchema
+>;
+
+export const bulkSetShippingMethodsStatusSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "At least one ID is required"),
+  is_active: z.boolean(),
+  selectAllScope: z.boolean().default(false),
+});
+export type BulkSetShippingMethodsStatusInput = z.infer<
+  typeof bulkSetShippingMethodsStatusSchema
 >;
 
 // ============================================================
@@ -840,6 +962,19 @@ export const couponUpdateSchema = z
     },
   );
 export type CouponUpdateInput = z.infer<typeof couponUpdateSchema>;
+
+export const couponStatusToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_active: z.boolean(),
+});
+export type CouponStatusToggleInput = z.infer<typeof couponStatusToggleSchema>;
+
+export const bulkSetCouponsStatusSchema = z.object({
+  ids: z.array(z.number().int().positive().max(2147483647)),
+  is_active: z.boolean(),
+  selectAllScope: z.boolean().default(false),
+});
+export type BulkSetCouponsStatusInput = z.infer<typeof bulkSetCouponsStatusSchema>;
 
 // ============================================================
 // ORDERS
@@ -1041,6 +1176,34 @@ export const orderUpdateSchema = z.object({
 });
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;
 
+export const orderBulkStatusUpdateSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("Order ID must be a positive integer"))
+    .min(1, "Select at least one order to update"),
+  fulfillment_status: z
+    .enum([
+      "unfulfilled",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+      "returned",
+    ])
+    .optional(),
+  payment_status: z
+    .enum([
+      "pending",
+      "cod_pending",
+      "paid",
+      "failed",
+      "refunded",
+      "partially_refunded",
+    ])
+    .optional(),
+});
+export type OrderBulkStatusUpdateInput = z.infer<typeof orderBulkStatusUpdateSchema>;
+
+
 // ============================================================
 // ORDER REFUNDS
 // ============================================================
@@ -1097,11 +1260,16 @@ export const categoryCreateSchema = z.object({
     .max(255, "Alt text cannot exceed 255 characters")
     .optional()
     .or(z.literal("")),
-  bg_color: colorHexSchema.optional().or(z.literal("")),
+  bg_color: z
+    .string()
+    .trim()
+    .max(100, "Background styling cannot exceed 100 characters")
+    .optional()
+    .or(z.literal("")),
   show_in_header: z.boolean().default(true),
   show_in_footer: z.boolean().default(true),
   show_in_home: z.boolean().default(true),
-  parent_id: z.number().int().positive().max(2147483647).optional(),
+  parent_id: z.number().int().positive().max(2147483647).nullable().optional(),
   sort_order: z.number().int().min(-10000).max(10000).default(0),
   is_active: z.boolean().default(true),
   meta_info: metaInfoSchema,
@@ -1111,9 +1279,76 @@ export type CategoryCreateInput = z.infer<typeof categoryCreateSchema>;
 export const categoryUpdateSchema = categoryCreateSchema.partial();
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>;
 
+export const categoryStatusToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_active: z.boolean(),
+});
+export type CategoryStatusToggleInput = z.infer<typeof categoryStatusToggleSchema>;
+
 // ============================================================
 // PRODUCTS
 // ============================================================
+
+export const productGalleryImageItemSchema = z.object({
+  id: z.number().int().positive().max(2147483647).optional(),
+  url: z.string().trim().min(1, "Image URL is required").max(2048, "Image URL is too long"),
+  alt_text: z
+    .string()
+    .trim()
+    .max(255, "Alt text cannot exceed 255 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  sort_order: z.number().int().min(-10000).max(10000).default(0),
+});
+export type ProductGalleryImageItemInput = z.infer<typeof productGalleryImageItemSchema>;
+
+export const productVariantItemSchema = z.object({
+  id: z.number().int().positive().max(2147483647).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Variant name is required")
+    .max(255, "Variant name cannot exceed 255 characters"),
+  sku: z
+    .string()
+    .trim()
+    .max(100, "SKU cannot exceed 100 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  price: z
+    .number()
+    .positive("Price must be positive")
+    .max(1000000, "Price is too high")
+    .optional()
+    .nullable(),
+  compare_at_price: z
+    .number()
+    .positive("Compare-at price must be positive")
+    .max(1000000, "Compare-at price is too high")
+    .optional()
+    .nullable(),
+  stock_quantity: z.number().int().min(0).max(1000000).default(0),
+  options: z.record(z.string().trim().max(50), z.string().trim().max(100)).default({}),
+  image_url: z
+    .string()
+    .trim()
+    .max(2048, "Image URL is too long")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  image_url_alt_text: z
+    .string()
+    .trim()
+    .max(255, "Alt text cannot exceed 255 characters")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().min(-10000).max(10000).default(0),
+});
+export type ProductVariantItemInput = z.infer<typeof productVariantItemSchema>;
 
 export const productCreateSchema = z.object({
   name: z
@@ -1133,6 +1368,13 @@ export const productCreateSchema = z.object({
     .max(2000, "Short description cannot exceed 2000 characters")
     .optional()
     .or(z.literal("")),
+  feature_image_url: z
+    .string()
+    .trim()
+    .max(2048, "Image URL is too long")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   feature_image_alt_text: z
     .string()
     .trim()
@@ -1148,12 +1390,14 @@ export const productCreateSchema = z.object({
     .number()
     .positive("Compare-at price must be positive")
     .max(1000000, "Compare-at price is too high")
-    .optional(),
+    .optional()
+    .nullable(),
   cost_price: z
     .number()
     .positive("Cost price must be positive")
     .max(1000000, "Cost price is too high")
-    .optional(),
+    .optional()
+    .nullable(),
 
   sku: z
     .string()
@@ -1165,27 +1409,51 @@ export const productCreateSchema = z.object({
   low_stock_threshold: z.number().int().min(0).max(100000).default(5),
   track_inventory: z.boolean().default(true),
 
-  weight: z.number().positive().max(100000).optional(),
+  weight: z.number().positive().max(100000).optional().nullable(),
   dimensions: z
     .object({
-      length: z.number().positive().max(10000).optional(),
-      width: z.number().positive().max(10000).optional(),
-      height: z.number().positive().max(10000).optional(),
+      length: z.number().positive().max(10000).optional().nullable(),
+      width: z.number().positive().max(10000).optional().nullable(),
+      height: z.number().positive().max(10000).optional().nullable(),
     })
-    .optional(),
+    .optional()
+    .nullable(),
 
-  category_id: z.number().int().positive().max(2147483647).optional(),
+  category_id: z.number().int().positive().max(2147483647).optional().nullable(),
 
   is_featured: z.boolean().default(false),
   is_active: z.boolean().default(true),
   sort_order: z.number().int().min(-10000).max(10000).default(0),
 
   meta_info: metaInfoSchema,
+
+  gallery_images: z
+    .array(productGalleryImageItemSchema)
+    .max(10, "Maximum 10 gallery images allowed")
+    .optional()
+    .default([]),
+  variants: z
+    .array(productVariantItemSchema)
+    .max(100, "Maximum 100 variants allowed")
+    .optional()
+    .default([]),
 });
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 
 export const productUpdateSchema = productCreateSchema.partial();
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
+
+export const productStatusToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_active: z.boolean(),
+});
+export type ProductStatusToggleInput = z.infer<typeof productStatusToggleSchema>;
+
+export const productFeaturedToggleSchema = z.object({
+  id: z.number().int().positive().max(2147483647),
+  is_featured: z.boolean(),
+});
+export type ProductFeaturedToggleInput = z.infer<typeof productFeaturedToggleSchema>;
 
 // ============================================================
 // PRODUCT IMAGES
@@ -1337,6 +1605,7 @@ export const checkoutFormSchema = z
       .min(1, "Last name is required")
       .max(100, "Last name cannot exceed 100 characters"),
     customer_phone: phoneSchema.optional().or(z.literal("")),
+    send_marketing_emails: z.boolean().default(false).optional(),
 
     // Shipping address
     shipping_address_line1: z
@@ -1511,6 +1780,45 @@ export type PaymentMethodToggleInput = z.infer<
   typeof paymentMethodToggleSchema
 >;
 
+export const paymentMethodUpdateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Payment method name is required")
+    .max(100, "Name cannot exceed 100 characters"),
+  description: z
+    .string()
+    .trim()
+    .max(255, "Description cannot exceed 255 characters")
+    .optional()
+    .nullable(),
+  extra_charge: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? null : val),
+    z.coerce
+      .number()
+      .min(0, "Extra charge must be 0 or greater")
+      .max(1000000, "Extra charge is too high")
+      .optional()
+      .nullable(),
+  ),
+  instructions: z
+    .string()
+    .trim()
+    .max(2000, "Instructions cannot exceed 2000 characters")
+    .optional()
+    .nullable(),
+  sort_order: z.coerce
+    .number()
+    .int("Sort order must be an integer")
+    .min(0, "Sort order must be 0 or greater")
+    .max(9999, "Sort order must be 9999 or less")
+    .default(0),
+  is_active: z.boolean().default(true),
+});
+export type PaymentMethodUpdateInput = z.infer<
+  typeof paymentMethodUpdateSchema
+>;
+
 // ============================================================
 // MEDIA MANAGEMENT SCHEMAS
 // ============================================================
@@ -1527,6 +1835,34 @@ export const bulkDeleteMediaSchema = z.object({
     .max(500, "Cannot delete more than 500 files at once"),
 });
 export type BulkDeleteMediaInput = z.infer<typeof bulkDeleteMediaSchema>;
+
+export const storageKeySchema = z.object({
+  storageKey: z
+    .string()
+    .trim()
+    .min(1, "Storage key is required.")
+    .max(50, "Storage key is too long."),
+});
+export type StorageKeyInput = z.infer<typeof storageKeySchema>;
+
+export const storageMigrationSchema = z
+  .object({
+    sourceKey: z
+      .string()
+      .trim()
+      .min(1, "Source storage key is required.")
+      .max(50, "Source storage key is too long."),
+    targetKey: z
+      .string()
+      .trim()
+      .min(1, "Target storage key is required.")
+      .max(50, "Target storage key is too long."),
+  })
+  .refine((data) => data.sourceKey !== data.targetKey, {
+    message: "Source and target storage options must be different.",
+    path: ["targetKey"],
+  });
+export type StorageMigrationInput = z.infer<typeof storageMigrationSchema>;
 
 export const fetchStorageFilesSchema = z.object({
   storageKey: z
@@ -1578,12 +1914,34 @@ export type InvoiceCreateInput = InvoiceFormInput;
 export const invoiceUpdateSchema = invoiceFormSchema.partial();
 export type InvoiceUpdateInput = z.infer<typeof invoiceUpdateSchema>;
 
+export const invoiceBulkStatusUpdateSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("Invalid invoice ID"))
+    .min(1, "Please select at least one invoice"),
+  status: z.enum(["draft", "issued", "paid", "cancelled"]),
+});
+export type InvoiceBulkStatusUpdateInput = z.infer<
+  typeof invoiceBulkStatusUpdateSchema
+>;
+
 // ============================================================
 // SENT EMAILS
 // ============================================================
 
+export const sentEmailTypeSchema = z.enum([
+  "marketing",
+  "newsletter",
+  "order",
+  "invoice",
+  "support",
+]);
+export type SentEmailType = z.infer<typeof sentEmailTypeSchema>;
+
+export const resendEmailSchema = idSchema;
+export type ResendEmailInput = z.infer<typeof resendEmailSchema>;
+
 export const sentEmailCreateSchema = z.object({
-  type: z.string().trim().max(50).default("invoice"),
+  type: sentEmailTypeSchema.default("invoice"),
   sender_email: emailSchema,
   recipient_email: emailSchema,
   recipient_name: z
@@ -1603,7 +1961,7 @@ export const sentEmailCreateSchema = z.object({
     .max(50, "Order number cannot exceed 50 characters")
     .optional()
     .nullable(),
-  status: z.enum(["pending", "successful", "failed"]).default("pending"),
+  status: z.enum(["pending", "successful", "failed"]).default("successful"),
   error_message: z
     .string()
     .trim()
@@ -1720,6 +2078,13 @@ export const addToGroupSchema = z.object({
   contact_ids: z.array(z.number().int().positive()).min(1, "Select at least one customer contact"),
 });
 export type AddToGroupInput = z.infer<typeof addToGroupSchema>;
+
+export const bulkAddToCampaignSchema = z.object({
+  campaign_id: z.number().int().positive().optional(),
+  new_campaign_name: z.string().trim().max(150).optional(),
+  contact_ids: z.array(z.number().int().positive()).min(1, "Select at least one customer contact"),
+});
+export type BulkAddToCampaignInput = z.infer<typeof bulkAddToCampaignSchema>;
 
 export const emailCampaignCreateSchema = z.object({
   name: z.string().trim().min(1, "Campaign name is required").max(150, "Campaign name cannot exceed 150 characters"),

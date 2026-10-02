@@ -30,10 +30,7 @@ const nextConfig: NextConfig = {
     unoptimized: true,
     remotePatterns,
   },
-  cacheHandler:
-    process.env.USE_CUSTOM_CACHE === "true"
-      ? require.resolve("./lib/cache-handler.mjs")
-      : undefined,
+  output: "standalone",
 };
 
 export default nextConfig;

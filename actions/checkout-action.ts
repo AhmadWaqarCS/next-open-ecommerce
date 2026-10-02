@@ -126,6 +126,7 @@ export async function placeOrder(
     customer_phone: customer_phone ?? null,
     customer_ip: customerIp,
     customer_user_agent: customerUserAgent,
+    send_marketing_emails: validatedFields.data.send_marketing_emails ?? false,
 
     billing_address_line1: billingLine1,
     billing_address_line2: billingLine2,

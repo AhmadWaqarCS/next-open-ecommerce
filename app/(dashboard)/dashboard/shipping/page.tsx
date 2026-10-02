@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeShippingMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { ShippingFilterParams, buildShippingWhereInput } from "@/lib/filters/shipping-filters";
 import { getShippingDashboardDataInDB } from "@/services/shipping-services";
 import ShippingTable from "./shipping-table";
@@ -63,7 +62,7 @@ async function DashboardShippingPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <ShippingTable
         shippingMethods={shippingMethods as any}
         dashboardUsers={dashboardUsers}
@@ -71,13 +70,8 @@ async function DashboardShippingPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalShippingMethods}
-      />
-
-      <Pagination
-        totalItems={totalShippingMethods}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="shipping methods"
       />
     </div>
   );

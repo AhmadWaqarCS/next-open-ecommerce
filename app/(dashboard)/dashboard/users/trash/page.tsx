@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import UserTrashTable from "./user-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { UserFilterParams, getUserFilterWhere } from "@/lib/filters/user-filters";
 import { getUserTrashDashboardDataInDB } from "@/services/user-services";
 import type { Metadata } from "next";
@@ -70,13 +69,6 @@ async function DashboardUsersTrashPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalUsers}
-      />
-
-      <Pagination
-        totalItems={totalUsers}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        itemName="users"
       />
     </div>
   );

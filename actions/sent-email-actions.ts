@@ -1,19 +1,35 @@
 "use server";
 
-import { ActionResponse, logActivity } from "@/lib/action-utils";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import { sendEmailWithNodemailer, getSentEmailByIdFromDB } from "@/services/email-services";
-import { revalidatePath } from "next/cache";
+import { resendEmailSchema } from "@/lib/validations";
+import { getSentEmailByIdFromDB } from "@/services/sent-email-services";
+import { sendEmailWithNodemailer } from "@/services/email-services";
 
+/**
+ * Server action to resend a previously dispatched email.
+ * Validates the ID with Zod, re-dispatches through nodemailer, logs activity,
+ * and creates a new sent_email audit entry upon success.
+ */
 export async function resendEmailAction(sentEmailId: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("update", "/dashboard/sent-emails");
+  const { user } = await assertPermission("read", "/dashboard/sent-emails");
 
-  if (sentEmailId < 1) return { success: false, message: "Invalid email ID." };
+  const parsed = resendEmailSchema.safeParse({ id: sentEmailId });
+  if (!parsed.success) {
+    return {
+      success: false,
+      errors: formatZodErrors(parsed.error),
+      message: "Invalid email ID provided.",
+    };
+  }
 
-  const existingLog = await getSentEmailByIdFromDB(sentEmailId);
-
+  const existingLog = await getSentEmailByIdFromDB(parsed.data.id);
   if (!existingLog) {
-    return { success: false, message: "Email record not found." };
+    return {
+      success: false,
+      message: "Email log record not found.",
+    };
   }
 
   try {
@@ -29,23 +45,33 @@ export async function resendEmailAction(sentEmailId: number): Promise<ActionResp
     });
 
     revalidatePath("/dashboard/sent-emails");
-    revalidatePath(`/dashboard/sent-emails/${sentEmailId}`);
+    revalidatePath(`/dashboard/sent-emails/${parsed.data.id}`);
+    revalidateTag("sent-emails", "max");
 
     await logActivity({
       action: "resend_email",
       entity_type: "sent_email",
-      entity_id: sentEmailId,
+      entity_id: parsed.data.id,
       user,
       status: result.success ? "SUCCESS" : "FAILED",
-      details: { sentEmailId, recipient: existingLog.recipient_email },
+      details: {
+        sentEmailId: parsed.data.id,
+        recipient: existingLog.recipient_email,
+        subject: existingLog.subject,
+        newSentEmailId: result.sentEmailId,
+      },
     });
 
     if (result.success) {
-      return { success: true, message: "Email resent successfully." };
+      return {
+        success: true,
+        message: `Email successfully resent to ${existingLog.recipient_email}.`,
+        data: { sentEmailId: result.sentEmailId },
+      };
     } else {
       return {
         success: false,
-        message: `Failed to resend email: ${result.error || "Unknown error"}`,
+        message: `Failed to resend email: ${result.error || "Delivery error"}`,
       };
     }
   } catch (error: any) {
@@ -53,14 +79,14 @@ export async function resendEmailAction(sentEmailId: number): Promise<ActionResp
     await logActivity({
       action: "resend_email",
       entity_type: "sent_email",
-      entity_id: sentEmailId,
+      entity_id: parsed.data.id,
       user,
       status: "FAILED",
-      details: { sentEmailId, error: String(error) },
+      details: { sentEmailId: parsed.data.id, error: String(error) },
     });
     return {
       success: false,
-      message: error?.message || "Failed to resend email.",
+      message: error?.message || "An unexpected error occurred while resending the email.",
     };
   }
 }

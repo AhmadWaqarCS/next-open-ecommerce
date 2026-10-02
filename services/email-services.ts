@@ -13,59 +13,15 @@ export async function getActiveEmailTemplateFromDB(key: string) {
   });
 }
 
-// ─── DB MUTATIONS FOR SENT EMAILS ──────────────────────────────────────────────
+// ─── SENT EMAIL SERVICES RE-EXPORTS ──────────────────────────────────────────
 
-export async function createSentEmailInDB(data: {
-  type?: string;
-  sender_email: string;
-  recipient_email: string;
-  recipient_name?: string | null;
-  subject: string;
-  order_number?: string | null;
-  status?: string;
-  error_message?: string | null;
-  body_html: string;
-  invoice_id?: number | null;
-  order_id?: number | null;
-  sent_at?: Date | null;
-}) {
-  return await prisma.sent_email.create({
-    data: {
-      type: data.type || "invoice",
-      sender_email: data.sender_email,
-      recipient_email: data.recipient_email,
-      recipient_name: data.recipient_name || null,
-      subject: data.subject,
-      order_number: data.order_number || null,
-      status: data.status || "pending",
-      error_message: data.error_message || null,
-      body_html: data.body_html,
-      invoice_id: data.invoice_id || null,
-      order_id: data.order_id || null,
-      sent_at: data.sent_at !== undefined ? data.sent_at : new Date(),
-    },
-  });
-}
-
-export async function updateSentEmailInDB(
-  id: number,
-  data: {
-    status?: string;
-    error_message?: string | null;
-    sent_at?: Date | null;
-  },
-) {
-  return await prisma.sent_email.update({
-    where: { id },
-    data,
-  });
-}
-
-export async function getSentEmailByIdFromDB(id: number) {
-  return await prisma.sent_email.findUnique({
-    where: { id },
-  });
-}
+export {
+  createSentEmailInDB,
+  getSentEmailsDashboardDataInDB,
+  getSentEmailByIdFromDB,
+  getSentEmailDetailsDataInDB,
+} from "./sent-email-services";
+import { createSentEmailInDB } from "./sent-email-services";
 
 export interface SendEmailOptions {
   type?: string;
@@ -92,12 +48,26 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
     createdBy = 0,
   } = options;
 
+  // Standardize into the 5 supported email types: marketing, newsletter, order, invoice, support
+  let standardType = type;
+  if (
+    type === "order_notification" ||
+    type === "cod_otp" ||
+    type === "order_cancellation_otp" ||
+    type === "order_cancelled_confirmation"
+  ) {
+    standardType = "order";
+  } else if (type === "newsletter_confirmation") {
+    standardType = "newsletter";
+  } else if (type === "marketing_campaign") {
+    standardType = "marketing";
+  }
+
   const emailConfig = await prisma.email_config.findFirst({
     where: { deleted_at: null, is_active: true },
   });
 
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true, email: true },
   });
 
@@ -107,36 +77,17 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
       ? process.env.SMTP_USER
       : emailConfig?.from_email || siteConfig?.email || "noreply@store.com";
 
-  const sentEmailRecord = await createSentEmailInDB({
-    type,
-    sender_email: fromEmail,
-    recipient_email: toEmail,
-    recipient_name: toName || null,
-    subject,
-    order_number: orderNumber || null,
-    status: "pending",
-    body_html: bodyHtml,
-    invoice_id: invoiceId || null,
-    order_id: orderId || null,
-  });
-
   const { getSmtpEnvVarsForPurpose } = await import("@/lib/email-smtp-config");
-  const { host, port, secure, user, pass, envKeys } = getSmtpEnvVarsForPurpose(
+  const { host, port, secure, user, pass } = getSmtpEnvVarsForPurpose(
     emailConfig?.purpose || "order_completion",
   );
 
   if (!host) {
     console.warn(
-      "[sendEmailWithNodemailer] SMTP_HOST environment variable not configured. Marking email log as unconfigured/failed.",
+      "[sendEmailWithNodemailer] SMTP_HOST environment variable not configured. Delivery aborted.",
     );
-    await updateSentEmailInDB(sentEmailRecord.id, {
-      status: "failed",
-      error_message:
-        "SMTP settings not configured in server environment variables (SMTP_HOST missing).",
-    });
     return {
       success: false,
-      sentEmailId: sentEmailRecord.id,
       error: "SMTP_HOST env variable not configured.",
     };
   }
@@ -165,10 +116,19 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
       html: bodyHtml,
     });
 
-    await updateSentEmailInDB(sentEmailRecord.id, {
+    // In accordance with SENT-EMAILS.md, sent email audit rows are strictly created ONLY upon successful transmission
+    const sentEmailRecord = await createSentEmailInDB({
+      type: standardType,
+      sender_email: fromEmail,
+      recipient_email: toEmail,
+      recipient_name: toName || null,
+      subject,
+      order_number: orderNumber || null,
       status: "successful",
+      body_html: bodyHtml,
+      invoice_id: invoiceId || null,
+      order_id: orderId || null,
       sent_at: new Date(),
-      error_message: null,
     });
 
     return {
@@ -179,14 +139,8 @@ export async function sendEmailWithNodemailer(options: SendEmailOptions) {
     console.error("[sendEmailWithNodemailer] Error sending email:", error);
     const errorMessage = error?.message || String(error);
 
-    await updateSentEmailInDB(sentEmailRecord.id, {
-      status: "failed",
-      error_message: errorMessage,
-    });
-
     return {
       success: false,
-      sentEmailId: sentEmailRecord.id,
       error: errorMessage,
     };
   }
@@ -470,9 +424,7 @@ export async function sendInvoiceAndOrderEmailsForOrder(
     throw new Error(`Order ${orderId} not found.`);
   }
 
-  const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
-  });
+  const siteConfig = await prisma.site_config.findFirst();
   const storeName = siteConfig?.name || "Our Store";
 
   const symbol = invoice.currency === "USD" ? "$" : `${invoice.currency} `;
@@ -637,7 +589,7 @@ export async function sendInvoiceAndOrderEmailsForOrder(
     }
 
     await sendEmailWithNodemailer({
-      type: "order_notification",
+      type: "order",
       toEmail: emailConfig.admin_notification_email,
       toName: "Store Admin",
       subject: adminSubject,
@@ -653,35 +605,6 @@ export async function sendInvoiceAndOrderEmailsForOrder(
     invoice,
     customerResult,
   };
-}
-
-export async function getSentEmailsDashboardDataInDB(
-  where: any,
-  skipCount: number,
-  pageSize: number,
-) {
-  return await prisma.$transaction(async (tx) => {
-    const emailsRaw = await tx.sent_email.findMany({
-      where,
-      take: pageSize,
-      skip: skipCount,
-      orderBy: { sent_at: "desc" },
-    });
-
-    const totalEmails = await tx.sent_email.count({ where });
-
-    return { emailsRaw, totalEmails };
-  });
-}
-
-export async function getSentEmailDetailsDataInDB(id: number) {
-  return await prisma.sent_email.findUnique({
-    where: { id },
-    include: {
-      invoice: true,
-      order: true,
-    },
-  });
 }
 
 // ─── COD OTP EMAIL TEMPLATES & SENDER ────────────────────────────────────────
@@ -750,7 +673,6 @@ export async function sendCodOtpEmail(options: {
 }) {
   const { toEmail, customerName, otpCode, expiresMinutes = 10 } = options;
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true },
   });
   const storeName = siteConfig?.name || "Our Store";
@@ -855,7 +777,6 @@ export async function sendOrderCancellationOtpEmail(options: {
 }) {
   const { toEmail, customerName, orderNumber, otpCode, expiresMinutes = 10 } = options;
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true },
   });
   const storeName = siteConfig?.name || "Our Store";
@@ -902,7 +823,6 @@ export async function sendOrderCancelledConfirmationEmail(options: {
 }) {
   const { toEmail, customerName, orderNumber } = options;
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true },
   });
   const storeName = siteConfig?.name || "Our Store";
@@ -980,7 +900,6 @@ export async function sendNewsletterConfirmationEmail(options: {
   const { toEmail, confirmationUrl } = options;
 
   const siteConfig = await prisma.site_config.findFirst({
-    where: { deleted_at: null },
     select: { name: true },
   });
 

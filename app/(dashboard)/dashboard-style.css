@@ -6,16 +6,96 @@
   --background: #f8fafc;
   --foreground: #0f172a;
   --font-sans: var(--font-inter);
+
+  /* Dashboard Semantic Theme Tokens (Light) */
+  --dashboard-bg: #f8fafc;
+  --dashboard-fg: #0f172a;
+  --dashboard-card: #ffffff;
+  --dashboard-card-hover: #f8fafc;
+  --dashboard-border: #e2e8f0;
+  --dashboard-border-subtle: #f1f5f9;
+  --dashboard-muted: #64748b;
+  --dashboard-muted-bg: #f1f5f9;
+  --dashboard-primary: #059669;
+  --dashboard-primary-hover: #047857;
+  --dashboard-primary-fg: #ffffff;
+  --dashboard-accent: #10b981;
+  --dashboard-accent-subtle: #ecfdf5;
+  --dashboard-accent-fg: #065f46;
+  --dashboard-danger: #ef4444;
+  --dashboard-danger-hover: #dc2626;
+  --dashboard-danger-fg: #ffffff;
+  --dashboard-danger-subtle: #fef2f2;
+  --dashboard-table-header: #f8fafc;
+  --dashboard-table-odd: #ffffff;
+  --dashboard-table-even: #f8fafc;
+  --dashboard-table-hover: #f0fdf4;
+  --dashboard-table-selected: #ecfdf5;
+  --dashboard-floating-bg: rgba(255, 255, 255, 0.95);
+  --dashboard-floating-border: #cbd5e1;
 }
 
 :root.dark {
   --background: #09090b;
   --foreground: #fafafa;
+
+  /* Dashboard Semantic Theme Tokens (Dark) */
+  --dashboard-bg: #09090b;
+  --dashboard-fg: #fafafa;
+  --dashboard-card: #121215;
+  --dashboard-card-hover: #18181b;
+  --dashboard-border: #27272a;
+  --dashboard-border-subtle: #18181b;
+  --dashboard-muted: #a1a1aa;
+  --dashboard-muted-bg: #18181b;
+  --dashboard-primary: #10b981;
+  --dashboard-primary-hover: #059669;
+  --dashboard-primary-fg: #ffffff;
+  --dashboard-accent: #34d399;
+  --dashboard-accent-subtle: rgba(6, 78, 59, 0.3);
+  --dashboard-accent-fg: #6ee7b7;
+  --dashboard-danger: #f87171;
+  --dashboard-danger-hover: #ef4444;
+  --dashboard-danger-fg: #ffffff;
+  --dashboard-danger-subtle: rgba(127, 29, 29, 0.3);
+  --dashboard-table-header: #121215;
+  --dashboard-table-odd: #121215;
+  --dashboard-table-even: #18181b;
+  --dashboard-table-hover: rgba(6, 78, 59, 0.2);
+  --dashboard-table-selected: rgba(6, 78, 59, 0.35);
+  --dashboard-floating-bg: rgba(18, 18, 21, 0.95);
+  --dashboard-floating-border: #3f3f46;
 }
 
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   
+  --color-dashboard-bg: var(--dashboard-bg);
+  --color-dashboard-fg: var(--dashboard-fg);
+  --color-dashboard-card: var(--dashboard-card);
+  --color-dashboard-card-hover: var(--dashboard-card-hover);
+  --color-dashboard-border: var(--dashboard-border);
+  --color-dashboard-border-subtle: var(--dashboard-border-subtle);
+  --color-dashboard-muted: var(--dashboard-muted);
+  --color-dashboard-muted-bg: var(--dashboard-muted-bg);
+  --color-dashboard-primary: var(--dashboard-primary);
+  --color-dashboard-primary-hover: var(--dashboard-primary-hover);
+  --color-dashboard-primary-fg: var(--dashboard-primary-fg);
+  --color-dashboard-accent: var(--dashboard-accent);
+  --color-dashboard-accent-subtle: var(--dashboard-accent-subtle);
+  --color-dashboard-accent-fg: var(--dashboard-accent-fg);
+  --color-dashboard-danger: var(--dashboard-danger);
+  --color-dashboard-danger-hover: var(--dashboard-danger-hover);
+  --color-dashboard-danger-fg: var(--dashboard-danger-fg);
+  --color-dashboard-danger-subtle: var(--dashboard-danger-subtle);
+  --color-dashboard-table-header: var(--dashboard-table-header);
+  --color-dashboard-table-odd: var(--dashboard-table-odd);
+  --color-dashboard-table-even: var(--dashboard-table-even);
+  --color-dashboard-table-hover: var(--dashboard-table-hover);
+  --color-dashboard-table-selected: var(--dashboard-table-selected);
+  --color-dashboard-floating-bg: var(--dashboard-floating-bg);
+  --color-dashboard-floating-border: var(--dashboard-floating-border);
+
   --animate-fade-in: fade-in 0.2s ease-out forwards;
   --animate-slide-up: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-slide-in-right: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;

@@ -38,7 +38,6 @@ export async function createSiteConfigTransaction(
     captcha_provider?: string;
     meta_info?: object;
   },
-  userId: number,
 ) {
   const lightLogo = data.light_logo_url ? await processLogoOrFavicon(data.light_logo_url) : null;
   const darkLogo = data.dark_logo_url ? await processLogoOrFavicon(data.dark_logo_url) : null;
@@ -51,8 +50,6 @@ export async function createSiteConfigTransaction(
         light_logo_url: lightLogo,
         dark_logo_url: darkLogo,
         favicon_url: favicon,
-        created_by: userId,
-        updated_by: userId,
       },
     });
     return { config };
@@ -91,7 +88,6 @@ export async function updateSiteConfigTransaction(
     captcha_provider?: string;
     meta_info?: object;
   },
-  userId: number,
 ) {
   const processedLightLogo = data.light_logo_url !== undefined
     ? (data.light_logo_url ? await processLogoOrFavicon(data.light_logo_url) : null)
@@ -106,22 +102,48 @@ export async function updateSiteConfigTransaction(
   const removedMediaUrls: string[] = [];
 
   const result = await prisma.$transaction(async (tx) => {
-    const existing = await tx.site_config.findUnique({ where: { id } });
+    let existing = await tx.site_config.findUnique({ where: { id } });
+    if (!existing) {
+      existing = await tx.site_config.findFirst({ orderBy: { id: "asc" } });
+    }
     if (!existing) throw new Error("Site config not found.");
 
     const updatePayload: Record<string, any> = {};
 
     const keysToCheck = [
-      "name", "tagline", "description", "site_url", "topbar_message",
-      "font_family", "custom_css",
-      "currency", "currency_symbol", "email", "phone", "address",
-      "business_name", "business_registration_number", "tax_rate", "tax_inclusive",
-      "tax_label", "require_phone", "allow_order_notes", "captcha_provider"
+      "name",
+      "tagline",
+      "description",
+      "site_url",
+      "topbar_message",
+      "font_family",
+      "custom_css",
+      "currency",
+      "currency_symbol",
+      "email",
+      "phone",
+      "address",
+      "business_name",
+      "business_registration_number",
+      "tax_inclusive",
+      "tax_label",
+      "require_phone",
+      "allow_order_notes",
+      "captcha_provider",
     ];
 
     for (const k of keysToCheck) {
       if ((data as any)[k] !== undefined && (data as any)[k] !== (existing as any)[k]) {
         updatePayload[k] = (data as any)[k];
+      }
+    }
+
+    // Explicit Decimal diffing for tax_rate to prevent type mismatch false-positives
+    if (data.tax_rate !== undefined) {
+      const existingTaxNum = existing.tax_rate !== null ? Number(existing.tax_rate) : null;
+      const targetTaxNum = data.tax_rate !== null ? Number(data.tax_rate) : null;
+      if (existingTaxNum !== targetTaxNum) {
+        updatePayload.tax_rate = targetTaxNum;
       }
     }
 
@@ -156,9 +178,8 @@ export async function updateSiteConfigTransaction(
 
     let updated = existing as any;
     if (Object.keys(updatePayload).length > 0) {
-      updatePayload.updated_by = userId;
       updated = await tx.site_config.update({
-        where: { id },
+        where: { id: existing.id },
         data: updatePayload,
       });
     }
@@ -177,39 +198,49 @@ export async function updateSiteConfigTransaction(
 }
 
 export async function getSiteConfigDashboardDataInDB() {
+  const selectFields = {
+    id: true,
+    name: true,
+    tagline: true,
+    description: true,
+    site_url: true,
+    topbar_message: true,
+    light_logo_url: true,
+    dark_logo_url: true,
+    favicon_url: true,
+    font_family: true,
+    custom_css: true,
+    theme_config: true,
+    header_config: true,
+    footer_config: true,
+    currency: true,
+    currency_symbol: true,
+    email: true,
+    phone: true,
+    address: true,
+    social_links: true,
+    business_name: true,
+    business_registration_number: true,
+    tax_rate: true,
+    tax_inclusive: true,
+    tax_label: true,
+    require_phone: true,
+    allow_order_notes: true,
+    captcha_provider: true,
+    meta_info: true,
+    created_at: true,
+    updated_at: true,
+  };
+
+  const config = await prisma.site_config.findUnique({
+    where: { id: 1 },
+    select: selectFields,
+  });
+
+  if (config) return config;
+
   return await prisma.site_config.findFirst({
-    where: { deleted_at: null },
-    select: {
-      id: true,
-      name: true,
-      tagline: true,
-      description: true,
-      site_url: true,
-      topbar_message: true,
-      light_logo_url: true,
-      dark_logo_url: true,
-      favicon_url: true,
-      font_family: true,
-      custom_css: true,
-      theme_config: true,
-      header_config: true,
-      footer_config: true,
-      currency: true,
-      currency_symbol: true,
-      email: true,
-      phone: true,
-      address: true,
-      social_links: true,
-      business_name: true,
-      business_registration_number: true,
-      tax_rate: true,
-      tax_inclusive: true,
-      tax_label: true,
-      require_phone: true,
-      allow_order_notes: true,
-      captcha_provider: true,
-      meta_info: true,
-    },
+    orderBy: { id: "asc" },
+    select: selectFields,
   });
 }
-

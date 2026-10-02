@@ -76,14 +76,13 @@ export async function replaceOptimizedImageAndUpdateDB(
         data: { image_url: newUrl, updated_by: userId },
       });
 
-      const config = await tx.site_config.findFirst({ where: { deleted_at: null } });
+      const config = await tx.site_config.findFirst();
       if (config) {
-        const updates: Record<string, string | number> = {};
+        const updates: Record<string, string> = {};
         if (config.light_logo_url === oldNorm) updates.light_logo_url = newUrl;
         if (config.dark_logo_url === oldNorm) updates.dark_logo_url = newUrl;
         if (config.favicon_url === oldNorm) updates.favicon_url = newUrl;
         if (Object.keys(updates).length > 0) {
-          updates.updated_by = userId;
           await tx.site_config.update({ where: { id: config.id }, data: updates });
         }
       }

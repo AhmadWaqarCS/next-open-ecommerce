@@ -5,18 +5,15 @@ import { assertPermission } from "@/lib/guards";
 import {
   InvoiceCreateInput,
   InvoiceUpdateInput,
+  InvoiceBulkStatusUpdateInput,
   invoiceCreateSchema,
   invoiceUpdateSchema,
+  invoiceBulkStatusUpdateSchema,
 } from "@/lib/validations";
 import {
   createInvoiceTransaction,
   updateInvoiceTransaction,
-  deleteInvoiceTransaction,
-  restoreInvoiceTransaction,
-  permanentlyDeleteInvoiceTransaction,
-  bulkDeleteInvoicesTransaction,
-  bulkRestoreInvoicesTransaction,
-  bulkPermanentlyDeleteInvoicesTransaction,
+  bulkUpdateInvoiceStatusTransaction,
 } from "@/services/invoice-services";
 import { sendInvoiceAndOrderEmailsForOrder } from "@/services/email-services";
 import { revalidatePath } from "next/cache";
@@ -137,7 +134,7 @@ export async function updateInvoice(
   } = validatedFields.data;
 
   try {
-    await updateInvoiceTransaction(
+    const { updated } = await updateInvoiceTransaction(
       id,
       {
         status,
@@ -158,6 +155,9 @@ export async function updateInvoice(
 
     revalidatePath("/dashboard/invoices");
     revalidatePath(`/dashboard/invoices/${id}`);
+    if (updated.order_id) {
+      revalidatePath(`/dashboard/orders/${updated.order_id}`);
+    }
 
     await logActivity({
       action: "update_invoice",
@@ -169,7 +169,7 @@ export async function updateInvoice(
     });
 
     return { success: true, message: "Invoice updated successfully." };
-  } catch (error) {
+  } catch (error: any) {
     console.error("[updateInvoice] Error:", error);
     await logActivity({
       action: "update_invoice",
@@ -179,219 +179,47 @@ export async function updateInvoice(
       status: "FAILED",
       details: { id, error: String(error) },
     });
-    return { success: false, message: "Failed to update invoice." };
+    return { success: false, message: error?.message || "Failed to update invoice." };
   }
 }
 
-export async function deleteInvoice(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
+export async function bulkUpdateInvoiceStatus(
+  data: InvoiceBulkStatusUpdateInput,
+): Promise<ActionResponse> {
+  const { user } = await assertPermission("update", "/dashboard/invoices");
 
-  if (id < 1) return { success: false, message: "Invalid invoice ID." };
-
-  try {
-    await deleteInvoiceTransaction(id, Number(user.id));
-    revalidatePath("/dashboard/invoices");
-    revalidatePath("/dashboard/invoices/trash");
-
-    await logActivity({
-      action: "delete_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Invoice moved to trash." };
-  } catch (error) {
-    console.error("[deleteInvoice] Error:", error);
-    await logActivity({
-      action: "delete_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to delete invoice." };
+  const validatedFields = invoiceBulkStatusUpdateSchema.safeParse(data);
+  if (!validatedFields.success) {
+    return {
+      success: false,
+      errors: formatZodErrors(validatedFields.error),
+      message: "Please select valid invoices and status.",
+    };
   }
-}
 
-export async function restoreInvoice(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
-
-  if (id < 1) return { success: false, message: "Invalid invoice ID." };
+  const { ids, status } = validatedFields.data;
 
   try {
-    await restoreInvoiceTransaction(id, Number(user.id));
-    revalidatePath("/dashboard/invoices/trash");
+    await bulkUpdateInvoiceStatusTransaction(ids, status, Number(user.id));
+
     revalidatePath("/dashboard/invoices");
 
     await logActivity({
-      action: "restore_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Invoice restored successfully." };
-  } catch (error) {
-    console.error("[restoreInvoice] Error:", error);
-    await logActivity({
-      action: "restore_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to restore invoice." };
-  }
-}
-
-export async function permanentlyDeleteInvoice(
-  id: number,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
-
-  if (id < 1) return { success: false, message: "Invalid invoice ID." };
-
-  try {
-    await permanentlyDeleteInvoiceTransaction(id);
-    revalidatePath("/dashboard/invoices/trash");
-
-    await logActivity({
-      action: "permanently_delete_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Invoice permanently deleted." };
-  } catch (error) {
-    console.error("[permanentlyDeleteInvoice] Error:", error);
-    await logActivity({
-      action: "permanently_delete_invoice",
-      entity_type: "invoice",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to permanently delete invoice." };
-  }
-}
-
-export async function bulkDeleteInvoices(
-  ids: number[],
-  selectAllScope: boolean = false,
-  isTrash: boolean = false,
-  filterWhere?: any,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
-
-  try {
-    await bulkDeleteInvoicesTransaction(
-      ids,
-      selectAllScope,
-      isTrash,
-      filterWhere,
-      Number(user.id),
-    );
-    revalidatePath("/dashboard/invoices");
-    revalidatePath("/dashboard/invoices/trash");
-
-    await logActivity({
-      action: "bulk_delete_invoices",
+      action: "bulk_update_invoice_status",
       entity_type: "invoice",
       user,
       status: "SUCCESS",
-      details: { ids },
+      details: { ids, count: ids.length, status },
     });
 
-    return { success: true, message: "Selected invoices moved to trash." };
-  } catch (error) {
-    console.error("[bulkDeleteInvoices] Error:", error);
+    return {
+      success: true,
+      message: `Updated status to "${status}" for ${ids.length} invoice(s).`,
+    };
+  } catch (error: any) {
+    console.error("[bulkUpdateInvoiceStatus] Error:", error);
     await logActivity({
-      action: "bulk_delete_invoices",
-      entity_type: "invoice",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return { success: false, message: "Failed to delete selected invoices." };
-  }
-}
-
-export async function bulkRestoreInvoices(
-  ids: number[],
-  selectAllScope: boolean = false,
-  isTrash: boolean = true,
-  filterWhere?: any,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
-
-  try {
-    await bulkRestoreInvoicesTransaction(
-      ids,
-      selectAllScope,
-      isTrash,
-      filterWhere,
-      Number(user.id),
-    );
-    revalidatePath("/dashboard/invoices/trash");
-    revalidatePath("/dashboard/invoices");
-
-    await logActivity({
-      action: "bulk_restore_invoices",
-      entity_type: "invoice",
-      user,
-      status: "SUCCESS",
-      details: { ids },
-    });
-
-    return { success: true, message: "Selected invoices restored." };
-  } catch (error) {
-    console.error("[bulkRestoreInvoices] Error:", error);
-    await logActivity({
-      action: "bulk_restore_invoices",
-      entity_type: "invoice",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return { success: false, message: "Failed to restore selected invoices." };
-  }
-}
-
-export async function bulkPermanentlyDeleteInvoices(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterWhere?: any,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/invoices");
-
-  try {
-    await bulkPermanentlyDeleteInvoicesTransaction(ids, selectAllScope, filterWhere);
-    revalidatePath("/dashboard/invoices/trash");
-
-    await logActivity({
-      action: "bulk_permanently_delete_invoices",
-      entity_type: "invoice",
-      user,
-      status: "SUCCESS",
-      details: { ids },
-    });
-
-    return { success: true, message: "Selected invoices permanently deleted." };
-  } catch (error) {
-    console.error("[bulkPermanentlyDeleteInvoices] Error:", error);
-    await logActivity({
-      action: "bulk_permanently_delete_invoices",
+      action: "bulk_update_invoice_status",
       entity_type: "invoice",
       user,
       status: "FAILED",
@@ -399,7 +227,7 @@ export async function bulkPermanentlyDeleteInvoices(
     });
     return {
       success: false,
-      message: "Failed to permanently delete selected invoices.",
+      message: error?.message || "Failed to update invoice statuses.",
     };
   }
 }

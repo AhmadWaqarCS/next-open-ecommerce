@@ -15,7 +15,6 @@ export async function verifyCaptchaToken(
 ): Promise<VerifyCaptchaResult> {
   try {
     const config = await prisma.site_config.findFirst({
-      where: { deleted_at: null },
       select: { captcha_provider: true },
     });
 

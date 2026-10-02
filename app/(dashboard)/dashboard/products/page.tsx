@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import ProductTable from "./product-table";
 import { resolveUserNames, serializeProducts } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   ProductFilterParams,
   getProductFilterWhere,
@@ -85,13 +84,6 @@ async function DashboardProductsPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalProducts}
-      />
-
-      <Pagination
-        totalItems={totalProducts}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        itemName="products"
       />
     </div>
   );

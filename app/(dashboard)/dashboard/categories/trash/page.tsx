@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import CategoryTrashTable from "./category-trash-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { CategoryFilterParams, getCategoryFilterWhere } from "@/lib/filters/category-filters";
 import { getCategoryTrashDashboardDataInDB } from "@/services/category-services";
 
@@ -68,7 +67,7 @@ async function DashboardCategoriesTrashPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <CategoryTrashTable
         categories={categories as any}
         dashboardUsers={dashboardUsers}
@@ -76,13 +75,8 @@ async function DashboardCategoriesTrashPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalCategories}
-      />
-
-      <Pagination
-        totalItems={totalCategories}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="categories"
       />
     </div>
   );

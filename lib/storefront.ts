@@ -335,7 +335,6 @@ export const getSiteConfig = cache(
     cacheLife("max");
 
     const row = await prisma.site_config.findFirst({
-      where: { deleted_at: null },
       select: {
         name: true,
         tagline: true,
@@ -540,7 +539,6 @@ export const getHomePageData = cache(
         },
       }),
       prisma.site_config.findFirst({
-        where: { deleted_at: null },
         select: {
           tagline: true,
           description: true,
@@ -1032,7 +1030,7 @@ export const getPageData = cache(async function getPageData(
 export const getHeroBannerData = cache(
   async function getHeroBannerData(): Promise<HeroBannerData> {
     const [config, categoryRows] = await prisma.$transaction([
-      prisma.site_config.findFirst({ where: { deleted_at: null } }),
+      prisma.site_config.findFirst(),
       prisma.category.findMany({
         where: { is_active: true, show_in_home: true, deleted_at: null },
         select: {
@@ -1159,7 +1157,7 @@ export const getCheckoutPageData = cache(
           },
           orderBy: { sort_order: "asc" },
         }),
-        prisma.site_config.findFirst({ where: { deleted_at: null } }),
+        prisma.site_config.findFirst(),
       ],
     );
 

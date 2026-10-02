@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import RoleTable from "./role-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { RoleFilterParams, getRoleFilterWhere } from "@/lib/filters/role-filters";
 import { getRolesDashboardDataInDB } from "@/services/role-services";
 
@@ -62,7 +61,7 @@ async function DashboardRolesPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <RoleTable
         roles={roles as any}
         siteFeatures={siteFeatures}
@@ -71,13 +70,8 @@ async function DashboardRolesPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalRoles}
-      />
-
-      <Pagination
-        totalItems={totalRoles}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="roles"
       />
     </div>
   );

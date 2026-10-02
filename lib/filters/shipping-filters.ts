@@ -14,6 +14,9 @@ export interface ShippingFilterParams {
   updated_by?: string;
   updated_from?: string;
   updated_to?: string;
+  deleted_by?: string;
+  deleted_from?: string;
+  deleted_to?: string;
 }
 
 export function buildShippingWhereInput(
@@ -76,15 +79,12 @@ export function buildShippingWhereInput(
 
   // Created Date Range
   if (params.created_from || params.created_to) {
-    where.created_at = {};
-    if (params.created_from) {
-      where.created_at.gte = new Date(params.created_from);
-    }
-    if (params.created_to) {
-      const toDate = new Date(params.created_to);
-      toDate.setHours(23, 59, 59, 999);
-      where.created_at.lte = toDate;
-    }
+    where.created_at = {
+      ...(params.created_from ? { gte: new Date(params.created_from) } : {}),
+      ...(params.created_to
+        ? { lte: new Date(params.created_to + "T23:59:59.999Z") }
+        : {}),
+    };
   }
 
   // Updated By User
@@ -94,15 +94,27 @@ export function buildShippingWhereInput(
 
   // Updated Date Range
   if (params.updated_from || params.updated_to) {
-    where.updated_at = {};
-    if (params.updated_from) {
-      where.updated_at.gte = new Date(params.updated_from);
-    }
-    if (params.updated_to) {
-      const toDate = new Date(params.updated_to);
-      toDate.setHours(23, 59, 59, 999);
-      where.updated_at.lte = toDate;
-    }
+    where.updated_at = {
+      ...(params.updated_from ? { gte: new Date(params.updated_from) } : {}),
+      ...(params.updated_to
+        ? { lte: new Date(params.updated_to + "T23:59:59.999Z") }
+        : {}),
+    };
+  }
+
+  // Deleted By User (Trash table)
+  if (isTrash && params.deleted_by && !isNaN(Number(params.deleted_by))) {
+    where.deleted_by = Number(params.deleted_by);
+  }
+
+  // Deleted Date Range (Trash table)
+  if (isTrash && (params.deleted_from || params.deleted_to)) {
+    where.deleted_at = {
+      ...(params.deleted_from ? { gte: new Date(params.deleted_from) } : {}),
+      ...(params.deleted_to
+        ? { lte: new Date(params.deleted_to + "T23:59:59.999Z") }
+        : {}),
+    };
   }
 
   return where;

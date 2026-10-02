@@ -1,10 +1,7 @@
-"use cache";
-
 import Link from "next/link";
 import { getFooterData, type FooterData } from "@/lib/storefront";
 import { loadThemeComponent } from "@/lib/theme-loader";
 import NewsletterForm from "./NewsletterForm";
-import { cacheLife, cacheTag } from "next/cache";
 
 export interface SiteFooterProps {
   content: FooterData;
@@ -78,9 +75,6 @@ const footerScopedStyles = `
  * with concise, non-overlapping bottom bar legal links and dynamic payment badges.
  */
 export default async function SiteFooter() {
-  cacheTag("site-footer");
-  cacheLife("max");
-
   const content = await getFooterData();
   const footerConfig = (content?.footerConfig ?? {}) as Record<string, any>;
 

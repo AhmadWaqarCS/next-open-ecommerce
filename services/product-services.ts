@@ -53,11 +53,11 @@ export async function createProductTransaction(
   const now = new Date();
   const dest = `products/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  // Process feature image if base64/binary payload
+  // Process feature image if base64/binary payload; otherwise preserve existing URL string
   let processedFeatureImage: string | null = null;
   if (data.feature_image_url) {
     const res = await saveMediaToStorage(data.feature_image_url, undefined, dest);
-    processedFeatureImage = res ? res.relativePath : null;
+    processedFeatureImage = res ? res.relativePath : data.feature_image_url;
   }
 
   // Process gallery images if base64/binary payloads
@@ -89,11 +89,61 @@ export async function createProductTransaction(
   }
 
   return await prisma.$transaction(async (tx) => {
+    // 1. Uniqueness check: slug
+    const existingSlug = await tx.product.findFirst({
+      where: { slug: data.slug, deleted_at: null },
+      select: { id: true },
+    });
+    if (existingSlug) {
+      return { error: "SLUG_ALREADY_EXISTS" as const };
+    }
+
+    // 2. Uniqueness check: sku
+    if (data.sku) {
+      const existingSku = await tx.product.findFirst({
+        where: { sku: data.sku, deleted_at: null },
+        select: { id: true },
+      });
+      if (existingSku) {
+        return { error: "SKU_ALREADY_EXISTS" as const };
+      }
+    }
+
+    // 3. Variant SKUs check
+    if (processedVariants.length > 0) {
+      const variantSkus = processedVariants.map((v) => v.sku).filter(Boolean) as string[];
+      if (new Set(variantSkus).size !== variantSkus.length) {
+        return { error: "VARIANT_SKU_DUPLICATE_IN_INPUT" as const };
+      }
+      for (const vSku of variantSkus) {
+        const dupVariant = await tx.product_variant.findFirst({
+          where: { sku: vSku, deleted_at: null },
+          select: { id: true },
+        });
+        if (dupVariant) {
+          return { error: "VARIANT_SKU_ALREADY_EXISTS" as const, conflictSku: vSku };
+        }
+      }
+    }
+
     const { gallery_images, variants, ...productFields } = data;
+
+    // Denormalize category_name if category_id is provided
+    let categoryName: string | null = null;
+    let categorySlug: string | null = null;
+    if (productFields.category_id) {
+      const cat = await tx.category.findUnique({
+        where: { id: productFields.category_id },
+        select: { name: true, slug: true },
+      });
+      categoryName = cat?.name || null;
+      categorySlug = cat?.slug || null;
+    }
 
     const newProduct = await tx.product.create({
       data: {
         ...productFields,
+        category_name: categoryName,
         feature_image_url: processedFeatureImage,
         created_by: userId,
         updated_by: userId,
@@ -136,15 +186,6 @@ export async function createProductTransaction(
       });
     }
 
-    let categorySlug: string | null = null;
-    if (newProduct.category_id) {
-      const cat = await tx.category.findUnique({
-        where: { id: newProduct.category_id },
-        select: { slug: true },
-      });
-      categorySlug = cat?.slug || null;
-    }
-
     return { product: newProduct, categorySlug };
   });
 }
@@ -185,7 +226,7 @@ export async function updateProductTransaction(
   if (data.feature_image_url !== undefined) {
     if (data.feature_image_url) {
       const res = await saveMediaToStorage(data.feature_image_url, undefined, dest);
-      processedFeatureImage = res ? res.relativePath : null;
+      processedFeatureImage = res ? res.relativePath : data.feature_image_url;
     } else {
       processedFeatureImage = null;
     }
@@ -208,6 +249,52 @@ export async function updateProductTransaction(
     }
 
     const { gallery_images, variants, ...productFields } = data;
+
+    // 1. Check slug collision if slug changed
+    if (productFields.slug && productFields.slug !== existing.slug) {
+      const slugExists = await tx.product.findFirst({
+        where: { slug: productFields.slug, id: { not: id }, deleted_at: null },
+        select: { id: true },
+      });
+      if (slugExists) {
+        return { error: "SLUG_ALREADY_EXISTS" as const };
+      }
+    }
+
+    // 2. Check SKU collision if SKU changed
+    if (productFields.sku && productFields.sku !== existing.sku) {
+      const skuExists = await tx.product.findFirst({
+        where: { sku: productFields.sku, id: { not: id }, deleted_at: null },
+        select: { id: true },
+      });
+      if (skuExists) {
+        return { error: "SKU_ALREADY_EXISTS" as const };
+      }
+    }
+
+    // 3. Check variant SKUs if variants changed
+    if (variants !== undefined && variants.length > 0) {
+      const vSkus = variants.map((v) => v.sku).filter(Boolean) as string[];
+      if (new Set(vSkus).size !== vSkus.length) {
+        return { error: "VARIANT_SKU_DUPLICATE_IN_INPUT" as const };
+      }
+      for (const v of variants) {
+        if (v.sku) {
+          const dup = await tx.product_variant.findFirst({
+            where: {
+              sku: v.sku,
+              id: v.id ? { not: v.id } : undefined,
+              deleted_at: null,
+            },
+            select: { id: true },
+          });
+          if (dup) {
+            return { error: "VARIANT_SKU_ALREADY_EXISTS" as const, conflictSku: v.sku };
+          }
+        }
+      }
+    }
+
     const updatePayload: Record<string, any> = {};
 
     // Diff scalar fields against existing record
@@ -221,6 +308,18 @@ export async function updateProductTransaction(
     for (const k of keysToCheck) {
       if ((productFields as any)[k] !== undefined && (productFields as any)[k] !== (existing as any)[k]) {
         updatePayload[k] = (productFields as any)[k];
+      }
+    }
+
+    if (productFields.category_id !== undefined && productFields.category_id !== existing.category_id) {
+      if (productFields.category_id) {
+        const cat = await tx.category.findUnique({
+          where: { id: productFields.category_id },
+          select: { name: true },
+        });
+        updatePayload.category_name = cat?.name || null;
+      } else {
+        updatePayload.category_name = null;
       }
     }
 
@@ -404,6 +503,66 @@ export async function updateProductTransaction(
   }
 
   return result;
+}
+
+export async function toggleProductStatusTransaction(
+  id: number,
+  is_active: boolean,
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        is_featured: true,
+        category: { select: { slug: true } },
+      },
+    });
+
+    if (!existing) throw new Error("Product not found.");
+
+    const updated = await tx.product.update({
+      where: { id },
+      data: {
+        is_active,
+        updated_by: userId,
+      },
+    });
+
+    return { existing, updated };
+  });
+}
+
+export async function toggleProductFeaturedTransaction(
+  id: number,
+  is_featured: boolean,
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        is_featured: true,
+        category: { select: { slug: true } },
+      },
+    });
+
+    if (!existing) throw new Error("Product not found.");
+
+    const updated = await tx.product.update({
+      where: { id },
+      data: {
+        is_featured,
+        updated_by: userId,
+      },
+    });
+
+    return { existing, updated };
+  });
 }
 
 export async function deleteProductTransaction(id: number, userId: number) {

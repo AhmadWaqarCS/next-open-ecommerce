@@ -76,7 +76,7 @@ export default function CategoryForm({
       description: initialData?.description ?? "",
       image_alt_text: initialData?.image_alt_text ?? "",
       bg_color: initialData?.bg_color ?? "from-zinc-800 to-zinc-950",
-      parent_id: initialData?.parent_id ?? undefined,
+      parent_id: initialData?.parent_id ?? null,
       sort_order: initialData?.sort_order ?? 0,
       is_active: initialData?.is_active ?? true,
       show_in_header: initialData?.show_in_header ?? true,
@@ -100,7 +100,7 @@ export default function CategoryForm({
   // The current saved image URL — read-only, used only for preview display
   const currentImageUrl = initialData?.image_url ?? "";
 
-  // Reset staged file state whenever initialData changes (e.g. after edit/save)
+  // Reset staged file state whenever initialData changes
   useEffect(() => {
     setPendingFile(null);
   }, [initialData]);
@@ -135,7 +135,7 @@ export default function CategoryForm({
         setIsUploading(false);
 
         if (!uploadRes.success || !uploadRes.data?.relativePath) {
-          toast(uploadRes.message ?? "Failed to save image to disk", "error");
+          toast.error(uploadRes.message ?? "Failed to save image to disk");
           setGlobalError(uploadRes.message ?? "Failed to save image to disk");
           return;
         }
@@ -173,11 +173,9 @@ export default function CategoryForm({
       }
 
       setPendingFile(null);
-
-      toast(
+      toast.success(
         response.message ??
-          (isEdit ? "Category updated." : "Category created."),
-        "success",
+          (isEdit ? "Category updated successfully." : "Category created successfully."),
       );
       router.push("/dashboard/categories");
     });
@@ -192,13 +190,12 @@ export default function CategoryForm({
     );
 
     if (invalidFields.length > 0) {
-      setGlobalError(`Invalid fields: ${invalidFields.join(", ")}`);
+      setGlobalError(`Please correct the following fields: ${invalidFields.join(", ")}`);
     } else {
       setGlobalError("Please fix validation errors in the form.");
     }
   };
 
-  // Helper to check if a specific tab has validation errors
   const hasErrorsInTab = (tab: TabType): boolean => {
     if (tab === "details") {
       return Boolean(
@@ -221,82 +218,34 @@ export default function CategoryForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
-      {globalError && (
-        <div
-          role="alert"
-          className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 font-medium"
-        >
-          {globalError}
+      {/* Top Header: Title, Subtitle & Action Buttons at Top-Right */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-dashboard-border">
+        <div>
+          <h2 className="text-xl font-bold text-dashboard-fg">
+            {isEdit ? `Edit Category: ${initialData?.name}` : "Create Category"}
+          </h2>
+          <p className="text-xs text-dashboard-muted mt-0.5">
+            {isEdit
+              ? "Update hierarchy, storefront styling, and SEO parameters."
+              : "Define a new product category, layout hierarchy, and storefront styling."}
+          </p>
         </div>
-      )}
-
-      {/* Tabs & Form Actions Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 gap-4">
-        <nav
-          className="-mb-px flex space-x-2 sm:space-x-6 overflow-x-auto"
-          aria-label="Tabs"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveTab("details")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "details"
-                ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Category Details</span>
-            {hasErrorsInTab("details") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("meta")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "meta"
-                ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Meta &amp; SEO</span>
-            {hasErrorsInTab("meta") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("media")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "media"
-                ? "border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Media &amp; Styling</span>
-            {hasErrorsInTab("media") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-        </nav>
 
         <div className="flex items-center gap-3 shrink-0">
           <Link
             href="/dashboard/categories"
-            className="px-4 py-2 text-sm font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+            className="px-4 py-2 text-sm font-semibold rounded-xl border border-dashboard-border bg-dashboard-card hover:bg-dashboard-card-hover text-dashboard-muted hover:text-dashboard-fg transition-all cursor-pointer"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isPending || isUploading}
-            className="px-5 py-2 text-sm font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+            className="px-5 py-2 text-sm font-semibold rounded-xl bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
           >
             {(isPending || isUploading) && (
               <svg
-                className="animate-spin -ml-1 mr-1 h-4 w-4 text-white"
+                className="animate-spin -ml-1 mr-1 h-4 w-4 text-dashboard-primary-fg"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -321,11 +270,73 @@ export default function CategoryForm({
                 : isPending
                   ? "Saving Category..."
                   : isEdit
-                    ? "Update Category"
+                    ? "Save Changes"
                     : "Create Category"}
             </span>
           </button>
         </div>
+      </div>
+
+      {globalError && (
+        <div
+          role="alert"
+          className="p-4 rounded-xl bg-dashboard-danger-subtle border border-dashboard-danger text-dashboard-danger text-sm font-medium"
+        >
+          {globalError}
+        </div>
+      )}
+
+      {/* Tabs Navigation */}
+      <div className="border-b border-dashboard-border">
+        <nav
+          className="-mb-px flex space-x-2 sm:space-x-6 overflow-x-auto"
+          aria-label="Tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab("details")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "details"
+                ? "border-dashboard-primary text-dashboard-primary"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Category Details</span>
+            {hasErrorsInTab("details") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("meta")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "meta"
+                ? "border-dashboard-primary text-dashboard-primary"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Meta &amp; SEO</span>
+            {hasErrorsInTab("meta") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("media")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "media"
+                ? "border-dashboard-primary text-dashboard-primary"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Media &amp; Styling</span>
+            {hasErrorsInTab("media") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+        </nav>
       </div>
 
       {/* TAB 1: CATEGORY DETAILS */}
@@ -336,19 +347,19 @@ export default function CategoryForm({
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
-                Category Name <span className="text-red-500">*</span>
+                Category Name <span className="text-dashboard-danger">*</span>
               </label>
               <input
                 id="name"
                 type="text"
                 placeholder="e.g. Footwear, Electronics"
                 {...register("name")}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.name.message}
                 </p>
               )}
@@ -358,9 +369,9 @@ export default function CategoryForm({
             <div>
               <label
                 htmlFor="slug"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
-                Slug <span className="text-red-500">*</span>
+                Slug <span className="text-dashboard-danger">*</span>
               </label>
               <input
                 id="slug"
@@ -371,10 +382,10 @@ export default function CategoryForm({
                   setIsSlugManuallyEdited(true);
                   slugRegister.onChange(e);
                 }}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.slug && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.slug.message}
                 </p>
               )}
@@ -386,7 +397,7 @@ export default function CategoryForm({
             <div>
               <label
                 htmlFor="parent_id"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Parent Category (Optional)
               </label>
@@ -394,9 +405,9 @@ export default function CategoryForm({
                 id="parent_id"
                 {...register("parent_id", {
                   setValueAs: (v) =>
-                    v === "" || v === null ? undefined : Number(v),
+                    v === "" || v === null || v === undefined ? null : Number(v),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
               >
                 <option value="">None (Top Level Category)</option>
                 {parentCategories.map((cat) => (
@@ -406,7 +417,7 @@ export default function CategoryForm({
                 ))}
               </select>
               {errors.parent_id && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.parent_id.message}
                 </p>
               )}
@@ -416,22 +427,23 @@ export default function CategoryForm({
             <div>
               <label
                 htmlFor="sort_order"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Display Sort Order
               </label>
               <input
                 id="sort_order"
                 type="number"
-                min={0}
+                min={-10000}
+                max={10000}
                 {...register("sort_order", { valueAsNumber: true })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
               />
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 text-xs text-dashboard-muted">
                 Lower values display first on navigation menus and category listing pages.
               </p>
               {errors.sort_order && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.sort_order.message}
                 </p>
               )}
@@ -442,7 +454,7 @@ export default function CategoryForm({
           <div>
             <label
               htmlFor="description"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              className="block text-sm font-semibold text-dashboard-fg mb-1"
             >
               Description
             </label>
@@ -451,10 +463,10 @@ export default function CategoryForm({
               rows={4}
               placeholder="Brief summary of products in this category..."
               {...register("description")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
             />
             {errors.description && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
+              <p className="mt-1 text-xs text-dashboard-danger font-medium">
                 {errors.description.message}
               </p>
             )}
@@ -466,9 +478,9 @@ export default function CategoryForm({
               <input
                 type="checkbox"
                 {...register("is_active")}
-                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Active Category
               </span>
             </label>
@@ -477,9 +489,9 @@ export default function CategoryForm({
               <input
                 type="checkbox"
                 {...register("show_in_header")}
-                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Show in Header
               </span>
             </label>
@@ -488,9 +500,9 @@ export default function CategoryForm({
               <input
                 type="checkbox"
                 {...register("show_in_footer")}
-                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Show in Footer
               </span>
             </label>
@@ -499,9 +511,9 @@ export default function CategoryForm({
               <input
                 type="checkbox"
                 {...register("show_in_home")}
-                className="w-4 h-4 rounded-sm text-emerald-600 border-zinc-300 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Show on Home
               </span>
             </label>
@@ -531,6 +543,7 @@ export default function CategoryForm({
           <ImageInputGroup
             title="Category Media"
             description="Upload or specify the featured showcase image for this category."
+            fixed
           >
             <ImageInput
               label="Category Image File & Details"
@@ -546,9 +559,8 @@ export default function CategoryForm({
               onFileSelect={(file) => {
                 setPendingFile(file);
                 if (file) {
-                  toast(
-                    "Image staged. It will be saved when you submit the category.",
-                    "info",
+                  toast.info(
+                    "Image staged. It will be uploaded and saved when you submit the category.",
                   );
                 }
               }}
@@ -563,7 +575,7 @@ export default function CategoryForm({
           <div className="space-y-3 pt-2">
             <label
               htmlFor="bg_color"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300"
+              className="block text-sm font-semibold text-dashboard-fg"
             >
               Storefront Background / Styling (Tailwind CSS Classes)
             </label>
@@ -579,8 +591,8 @@ export default function CategoryForm({
                   }
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                     bgColorValue === preset.value
-                      ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-500 dark:text-emerald-300"
-                      : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
+                      ? "border-dashboard-primary bg-dashboard-accent-subtle text-dashboard-accent-fg"
+                      : "border-dashboard-border bg-dashboard-card text-dashboard-muted hover:text-dashboard-fg hover:bg-dashboard-card-hover"
                   }`}
                 >
                   {preset.label}
@@ -593,13 +605,13 @@ export default function CategoryForm({
               type="text"
               placeholder="from-zinc-800 to-zinc-950 or bg-emerald-900"
               {...register("bg_color")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 dark:focus:border-emerald-500 transition-all text-sm font-mono"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
             />
           </div>
 
-          {/* Live Preview Card */}
+          {/* Live Preview Banner Card */}
           <div className="pt-2">
-            <span className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+            <span className="block text-sm font-semibold text-dashboard-fg mb-2">
               Storefront Preview Banner
             </span>
             <div

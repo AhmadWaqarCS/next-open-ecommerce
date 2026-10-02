@@ -36,6 +36,9 @@ export type role = {
   updated_by: number;
   deleted_by?: number | null;
   deleted_at?: Date | null;
+  _count?: {
+    users?: number;
+  };
 };
 
 export type roleWithPermissions = role & {

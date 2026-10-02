@@ -8,14 +8,20 @@ import {
   getStorageMetrics,
 } from "@/services/storage-services";
 import StorageDetailClient from "./storage-detail-client";
-
-export const metadata = {
-  title: "Storage Detail - Control Panel",
-  description: "View and manage specific storage option configuration and data metrics.",
-};
+import type { Metadata } from "next";
 
 interface PageProps {
   params: Promise<{ key: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { key } = await params;
+  const option = await getSingleStorageOptionFromDB(key);
+
+  return {
+    title: option ? `${option.name} — Storage Options` : "Storage Option Details",
+    description: option?.description || "View and test storage driver configuration and metrics.",
+  };
 }
 
 export default function StorageDetailPage(props: PageProps) {

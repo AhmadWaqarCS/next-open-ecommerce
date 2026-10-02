@@ -3,9 +3,11 @@
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
+  OrderBulkStatusUpdateInput,
   OrderRefundCreateInput,
   OrderRefundUpdateInput,
   OrderUpdateInput,
+  orderBulkStatusUpdateSchema,
   orderRefundCreateSchema,
   orderRefundUpdateSchema,
   orderUpdateSchema,
@@ -16,9 +18,7 @@ import {
 } from "@/services/payment-services";
 import {
   updateOrderTransaction,
-  deleteOrderTransaction,
-  restoreOrderTransaction,
-  permanentlyDeleteOrderTransaction,
+  bulkUpdateOrderStatusTransaction,
 } from "@/services/order-services";
 import { revalidatePath } from "next/cache";
 
@@ -30,14 +30,14 @@ export async function updateOrder(
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/orders");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid order ID" };
 
   const validatedFields = orderUpdateSchema.safeParse(data);
   if (!validatedFields.success) {
     return {
       success: false,
       errors: formatZodErrors(validatedFields.error),
-      message: "Invalid Fields",
+      message: "Please correct the errors in the form.",
     };
   }
 
@@ -104,108 +104,67 @@ export async function updateOrder(
   }
 }
 
-export async function deleteOrder(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/orders");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    await deleteOrderTransaction(id, Number(user.id));
-    revalidatePath("/dashboard/orders");
-    revalidatePath("/dashboard/orders/trash");
-
-    await logActivity({
-      action: "delete_order",
-      entity_type: "order",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Order deleted successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "delete_order",
-      entity_type: "order",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to delete order." };
-  }
-}
-
-export async function restoreOrder(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/orders");
-
-  if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  try {
-    await restoreOrderTransaction(id, Number(user.id));
-    revalidatePath("/dashboard/orders/trash");
-    revalidatePath("/dashboard/orders");
-
-    await logActivity({
-      action: "restore_order",
-      entity_type: "order",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id },
-    });
-
-    return { success: true, message: "Order restored successfully." };
-  } catch (error) {
-    console.error(error);
-    await logActivity({
-      action: "restore_order",
-      entity_type: "order",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return { success: false, message: "Failed to restore order." };
-  }
-}
-
-export async function permanentlyDeleteOrder(
-  id: number,
+export async function bulkUpdateOrderStatus(
+  data: OrderBulkStatusUpdateInput,
 ): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/orders");
+  const { user } = await assertPermission("update", "/dashboard/orders");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  const validatedFields = orderBulkStatusUpdateSchema.safeParse(data);
+  if (!validatedFields.success) {
+    return {
+      success: false,
+      errors: formatZodErrors(validatedFields.error),
+      message: "Invalid bulk status update input.",
+    };
+  }
+
+  const { ids, fulfillment_status, payment_status } = validatedFields.data;
+
+  if (!fulfillment_status && !payment_status) {
+    return {
+      success: false,
+      message: "Please select a fulfillment or payment status to update.",
+    };
+  }
 
   try {
-    await permanentlyDeleteOrderTransaction(id);
-    revalidatePath("/dashboard/orders/trash");
+    const result = await bulkUpdateOrderStatusTransaction(
+      ids,
+      { fulfillment_status, payment_status },
+      Number(user.id),
+    );
+
+    revalidatePath("/dashboard/orders");
 
     await logActivity({
-      action: "permanently_delete_order",
+      action: "bulk_update_order_status",
       entity_type: "order",
-      entity_id: id,
       user,
       status: "SUCCESS",
-      details: { id },
+      details: {
+        count: result.count,
+        fulfillment_status,
+        payment_status,
+      },
     });
 
-    return { success: true, message: "Order permanently deleted." };
+    return {
+      success: true,
+      message: `Updated status for ${result.count} order(s).`,
+    };
   } catch (error) {
     console.error(error);
     await logActivity({
-      action: "permanently_delete_order",
+      action: "bulk_update_order_status",
       entity_type: "order",
-      entity_id: id,
       user,
       status: "FAILED",
-      details: { id, error: String(error) },
+      details: { ids, error: String(error) },
     });
-    return { success: false, message: "Failed to permanently delete order." };
+    return { success: false, message: "Failed to bulk update orders." };
   }
 }
+
 
 // ─── ORDER REFUNDS ────────────────────────────────────────────────────────────
 

@@ -80,15 +80,19 @@ export default function UserFormModal({
         : await createUser(data);
 
       if (!response.success) {
-        if (response.errors) setFormErrors(response.errors, setError);
-        if (response.message) setGlobalError(response.message);
+        if (response.errors) {
+          setFormErrors(response.errors, setError);
+        }
+        if (response.message) {
+          setGlobalError(response.message);
+        }
         return;
       }
 
       onClose();
       toast(
         response.message ??
-          (isEdit ? "User updated Successfully" : "User created Successfully"),
+          (isEdit ? "User updated successfully" : "User created successfully"),
         "success",
       );
     });
@@ -96,22 +100,47 @@ export default function UserFormModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-          {isEdit ? "Edit User Details" : "Create New User"}
-        </h3>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {isEdit
-            ? "Update account credentials and permission roles."
-            : "Add credentials and assign role permissions to the user."}
-        </p>
-      </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Top Section with Title and Top-Right Action Button */}
+        <div className="flex items-start justify-between gap-4 pb-4 border-b border-dashboard-border">
+          <div>
+            <h3 className="text-lg font-bold text-dashboard-fg">
+              {isEdit ? "Edit User Details" : "Create New User"}
+            </h3>
+            <p className="text-xs text-dashboard-muted mt-0.5">
+              {isEdit
+                ? "Update account credentials and permission roles."
+                : "Add credentials and assign role permissions to the user."}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-dashboard-border hover:bg-dashboard-card-hover text-dashboard-fg transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="px-4 py-1.5 text-xs font-bold rounded-xl bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg shadow-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+            >
+              {isPending
+                ? isEdit
+                  ? "Saving..."
+                  : "Creating..."
+                : isEdit
+                  ? "Save Changes"
+                  : "Create User"}
+            </button>
+          </div>
+        </div>
+
         {globalError && (
           <div
             role="alert"
-            className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 font-medium"
+            className="p-3 rounded-xl bg-dashboard-danger-subtle border border-dashboard-danger text-dashboard-danger text-xs font-medium"
           >
             {globalError}
           </div>
@@ -120,7 +149,7 @@ export default function UserFormModal({
         <div>
           <label
             htmlFor="user-form-name"
-            className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-dashboard-muted mb-1.5"
           >
             Full Name
           </label>
@@ -130,10 +159,10 @@ export default function UserFormModal({
             placeholder={isEdit ? "Full Name" : "John Doe"}
             autoComplete="off"
             {...register("name")}
-            className="w-full px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+            className="w-full px-3.5 py-2 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder:text-dashboard-muted focus:border-dashboard-primary focus:outline-none text-sm transition-colors"
           />
           {errors.name && (
-            <p className="mt-1 text-xs text-red-500 font-medium">
+            <p className="mt-1 text-xs text-dashboard-danger font-medium">
               {errors.name.message as string}
             </p>
           )}
@@ -142,7 +171,7 @@ export default function UserFormModal({
         <div>
           <label
             htmlFor="user-form-email"
-            className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-dashboard-muted mb-1.5"
           >
             Email Address
           </label>
@@ -152,10 +181,10 @@ export default function UserFormModal({
             placeholder={isEdit ? "Email" : "user@example.com"}
             autoComplete="off"
             {...register("email")}
-            className="w-full px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+            className="w-full px-3.5 py-2 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder:text-dashboard-muted focus:border-dashboard-primary focus:outline-none text-sm transition-colors"
           />
           {errors.email && (
-            <p className="mt-1 text-xs text-red-500 font-medium">
+            <p className="mt-1 text-xs text-dashboard-danger font-medium">
               {errors.email.message as string}
             </p>
           )}
@@ -164,7 +193,7 @@ export default function UserFormModal({
         <div>
           <label
             htmlFor="user-form-password"
-            className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-dashboard-muted mb-1.5"
           >
             {isEdit ? "Reset Password" : "Password"}
           </label>
@@ -174,15 +203,15 @@ export default function UserFormModal({
             placeholder="••••••••"
             autoComplete={isEdit ? "new-password" : "new-password"}
             {...register("password")}
-            className="w-full px-3.5 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none placeholder-zinc-400 text-sm"
+            className="w-full px-3.5 py-2 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder:text-dashboard-muted focus:border-dashboard-primary focus:outline-none text-sm transition-colors"
           />
-          <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+          <p className="mt-1 text-[10px] text-dashboard-muted">
             {isEdit
               ? "Leave empty to keep the current password."
-              : "Provide a secure password for this user."}
+              : "Provide a secure password for this user (minimum 8 characters)."}
           </p>
           {errors.password && (
-            <p className="mt-1 text-xs text-red-500 font-medium">
+            <p className="mt-1 text-xs text-dashboard-danger font-medium">
               {errors.password.message as string}
             </p>
           )}
@@ -191,7 +220,7 @@ export default function UserFormModal({
         <div>
           <label
             htmlFor="user-form-role"
-            className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-dashboard-muted mb-1.5"
           >
             {isEdit ? "Role Level" : "Role Assignment"}
           </label>
@@ -199,7 +228,7 @@ export default function UserFormModal({
             id="user-form-role"
             disabled={isSuperadminTarget}
             {...register("role_name")}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-200 bg-zinc-50 dark:bg-zinc-800/40 dark:border-zinc-800 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:bg-white dark:focus:bg-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-3 py-2 rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg focus:border-dashboard-primary focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSuperadminTarget ? (
               <option value="superadmin">superadmin</option>
@@ -214,7 +243,7 @@ export default function UserFormModal({
             )}
           </select>
           {errors.role_name && (
-            <p className="mt-1 text-xs text-red-500 font-medium">
+            <p className="mt-1 text-xs text-dashboard-danger font-medium">
               {errors.role_name.message as string}
             </p>
           )}
@@ -226,42 +255,19 @@ export default function UserFormModal({
             id="user-form-is_active"
             disabled={isSuperadminTarget}
             {...register("is_active")}
-            className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-indigo-600 focus:ring-indigo-500/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-4 w-4 rounded border-dashboard-border text-dashboard-primary focus:ring-dashboard-primary/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <label
             htmlFor="user-form-is_active"
-            className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 cursor-pointer disabled:opacity-50"
+            className="text-sm font-semibold text-dashboard-fg cursor-pointer disabled:opacity-50"
           >
             Account Active
           </label>
           {errors.is_active && (
-            <p className="mt-1 text-xs text-red-500 font-medium">
+            <p className="mt-1 text-xs text-dashboard-danger font-medium">
               {errors.is_active.message as string}
             </p>
           )}
-        </div>
-
-        <div className="flex justify-end gap-3 pt-3 border-t border-zinc-150 dark:border-zinc-800">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/10 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {isPending
-              ? isEdit
-                ? "Updating..."
-                : "Creating..."
-              : isEdit
-                ? "Update Details"
-                : "Create Account"}
-          </button>
         </div>
       </form>
     </Modal>

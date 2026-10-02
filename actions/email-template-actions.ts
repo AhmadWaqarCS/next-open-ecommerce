@@ -247,7 +247,7 @@ export async function sendTestEmailAction(
       return { success: false, message: "Template not found." };
     }
 
-    const siteConfig = await prisma.site_config.findFirst({ where: { deleted_at: null } });
+    const siteConfig = await prisma.site_config.findFirst();
     const storeName = siteConfig?.name || "Next Open E-Commerce";
 
     // Dummy sample variables for preview test send

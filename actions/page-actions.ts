@@ -3,20 +3,16 @@
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
-  SitePageCreateInput,
   SitePageUpdateInput,
-  sitePageCreateSchema,
   sitePageUpdateSchema,
+  sitePageStatusToggleSchema,
+  bulkSetSitePagesStatusSchema,
 } from "@/lib/validations";
 import {
-  createSitePageTransaction,
   updateSitePageTransaction,
-  deleteSitePageTransaction,
   toggleSitePageStatusTransaction,
-  bulkDeleteSitePagesTransaction,
   bulkToggleSitePagesStatusTransaction,
 } from "@/services/page-services";
-import { PROTECTED_SYSTEM_SLUGS } from "@/lib/types";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
   PageFilterParams,
@@ -44,88 +40,6 @@ function revalidatePageTags(slug: string) {
   }
 }
 
-export async function createSitePage(
-  data: SitePageCreateInput,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("create", "/dashboard/pages");
-
-  const validatedFields = sitePageCreateSchema.safeParse(data);
-  if (!validatedFields.success) {
-    return {
-      success: false,
-      errors: formatZodErrors(validatedFields.error),
-      message: "Please correct the errors in the form.",
-    };
-  }
-
-  const {
-    slug,
-    title,
-    content,
-    custom_css,
-    is_active,
-    show_in_header,
-    show_in_footer,
-    sort_order,
-    meta_info,
-    theme_config,
-  } = validatedFields.data;
-
-  try {
-    const newPage = await createSitePageTransaction(
-      {
-        slug,
-        title,
-        content: content || null,
-        custom_css: custom_css || null,
-        is_active,
-        show_in_header,
-        show_in_footer,
-        sort_order,
-        meta_info,
-        theme_config,
-      },
-      Number(user.id),
-    );
-
-    revalidateTag("site-pages", "max");
-    revalidateTag("sitemap", "max");
-    if (show_in_header) revalidateTag("site-header", "max");
-    if (show_in_footer) revalidateTag("site-footer", "max");
-    revalidatePageTags(slug);
-    revalidatePath("/dashboard/pages");
-    revalidatePath(`/${slug}`);
-
-    await logActivity({
-      action: "create_site_page",
-      entity_type: "site_page",
-      entity_id: newPage.id,
-      user,
-      status: "SUCCESS",
-      details: { id: newPage.id, title, slug },
-    });
-
-    return {
-      success: true,
-      message: `Page "${title}" created successfully.`,
-    };
-  } catch (error) {
-    console.error("Error creating site page:", error);
-    await logActivity({
-      action: "create_site_page",
-      entity_type: "site_page",
-      user,
-      status: "FAILED",
-      details: { title, slug, error: String(error) },
-    });
-    return {
-      success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to create site page.",
-    };
-  }
-}
-
 export async function updateSitePage(
   id: number,
   data: SitePageUpdateInput,
@@ -144,7 +58,6 @@ export async function updateSitePage(
   }
 
   const {
-    slug,
     title,
     content,
     custom_css,
@@ -160,7 +73,6 @@ export async function updateSitePage(
     const { existing, updated } = await updateSitePageTransaction(
       id,
       {
-        slug,
         title,
         content: content !== undefined ? content || null : undefined,
         custom_css: custom_css !== undefined ? custom_css || null : undefined,
@@ -195,7 +107,12 @@ export async function updateSitePage(
       entity_id: id,
       user,
       status: "SUCCESS",
-      details: { id, slug: updated.slug, updated_fields: Object.keys(validatedFields.data) },
+      details: {
+        id,
+        slug: updated.slug,
+        title: updated.title,
+        updated_fields: Object.keys(validatedFields.data),
+      },
     });
 
     return {
@@ -226,7 +143,10 @@ export async function toggleSitePageStatus(
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/pages");
 
-  if (id < 1) return { success: false, message: "Invalid page ID." };
+  const validated = sitePageStatusToggleSchema.safeParse({ id, is_active });
+  if (!validated.success) {
+    return { success: false, message: "Invalid status parameters." };
+  }
 
   try {
     const { existing, updated } = await toggleSitePageStatusTransaction(
@@ -245,7 +165,7 @@ export async function toggleSitePageStatus(
     if (updated?.slug) revalidatePath(`/${updated.slug}`);
 
     await logActivity({
-      action: "update_site_page",
+      action: "toggle_site_page_status",
       entity_type: "site_page",
       entity_id: id,
       user,
@@ -260,7 +180,7 @@ export async function toggleSitePageStatus(
   } catch (error) {
     console.error(error);
     await logActivity({
-      action: "update_site_page",
+      action: "toggle_site_page_status",
       entity_type: "site_page",
       entity_id: id,
       user,
@@ -271,102 +191,6 @@ export async function toggleSitePageStatus(
   }
 }
 
-export async function deleteSitePage(id: number): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/pages");
-
-  if (id < 1) return { success: false, message: "Invalid page ID." };
-
-  try {
-    const { existing } = await deleteSitePageTransaction(id);
-
-    revalidateTag("site-pages", "max");
-    revalidateTag("sitemap", "max");
-    if (existing?.slug) revalidatePageTags(existing.slug);
-    if (existing?.show_in_header) revalidateTag("site-header", "max");
-    if (existing?.show_in_footer) revalidateTag("site-footer", "max");
-
-    revalidatePath("/dashboard/pages");
-    if (existing?.slug) revalidatePath(`/${existing.slug}`);
-
-    await logActivity({
-      action: "delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "SUCCESS",
-      details: { id, slug: existing.slug, title: existing.title },
-    });
-
-    return {
-      success: true,
-      message: `Page "${existing.title}" deleted successfully.`,
-    };
-  } catch (error) {
-    console.error("Error deleting site page:", error);
-    await logActivity({
-      action: "delete_site_page",
-      entity_type: "site_page",
-      entity_id: id,
-      user,
-      status: "FAILED",
-      details: { id, error: String(error) },
-    });
-    return {
-      success: false,
-      message:
-        error instanceof Error ? error.message : "Failed to delete page.",
-    };
-  }
-}
-
-export async function bulkDeleteSitePages(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterParams?: PageFilterParams,
-): Promise<ActionResponse> {
-  const { user } = await assertPermission("delete", "/dashboard/pages");
-  const filterWhere =
-    selectAllScope && filterParams
-      ? buildPageWhereInput(filterParams)
-      : undefined;
-
-  try {
-    await bulkDeleteSitePagesTransaction(ids, selectAllScope, filterWhere);
-
-    revalidateTag("site-pages", "max");
-    revalidateTag("sitemap", "max");
-    revalidateTag("site-header", "max");
-    revalidateTag("site-footer", "max");
-    revalidatePath("/dashboard/pages");
-
-    await logActivity({
-      action: "bulk_delete_site_pages",
-      entity_type: "site_page",
-      user,
-      status: "SUCCESS",
-      details: { ids, selectAllScope },
-    });
-
-    return {
-      success: true,
-      message: "Selected custom pages deleted successfully.",
-    };
-  } catch (error) {
-    console.error("Error bulk deleting site pages:", error);
-    await logActivity({
-      action: "bulk_delete_site_pages",
-      entity_type: "site_page",
-      user,
-      status: "FAILED",
-      details: { ids, error: String(error) },
-    });
-    return {
-      success: false,
-      message: "Failed to delete selected pages.",
-    };
-  }
-}
-
 export async function bulkToggleSitePages(
   ids: number[],
   is_active: boolean,
@@ -374,6 +198,16 @@ export async function bulkToggleSitePages(
   filterParams?: PageFilterParams,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/pages");
+
+  const validated = bulkSetSitePagesStatusSchema.safeParse({
+    ids,
+    is_active,
+    selectAllScope,
+  });
+  if (!validated.success) {
+    return { success: false, message: "Invalid bulk status parameters." };
+  }
+
   const filterWhere =
     selectAllScope && filterParams
       ? buildPageWhereInput(filterParams)

@@ -14,12 +14,13 @@ export interface ImageGroupContextType {
     contentType?: string | null,
   ) => string;
   createObjectUrl: (file: File) => string;
-  /** Register a child image input so the group can batch-optimize it */
+  /** Register a child image input so the group can batch-optimize or clear it */
   registerImage: (
     id: string,
     getFile: () => File | null,
     getUrl: () => string,
     onOptimized: (file: File) => void,
+    onClear?: () => void,
   ) => void;
   /** Unregister on unmount */
   unregisterImage: (id: string) => void;
@@ -99,6 +100,7 @@ interface RegisteredImageEntry {
   getFile: () => File | null;
   getUrl: () => string;
   onOptimized: (file: File) => void;
+  onClear?: () => void;
 }
 
 const defaultContext: ImageGroupContextType = {
@@ -124,8 +126,20 @@ export interface ImageInputGroupProps {
   description?: string;
   /** Custom outer container class name */
   className?: string;
+  /** Child layout style: 'stack' | 'wrap' | 'grid' */
+  layout?: "stack" | "wrap" | "grid";
+  /** If true, group is fixed and does not render add images button */
+  fixed?: boolean;
+  /** Callback to add another image component (enables dynamic mode) */
+  onAdd?: () => void;
+  /** Custom label for the add button (default: "Add Image") */
+  addLabel?: string;
+  /** Callback to remove all image components (dynamic mode) */
+  onRemoveAll?: () => void;
+  /** Callback to clear out all image input components (fixed mode) */
+  onClearAll?: () => void;
   /** Inner ImageInput component(s) */
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 // ─── ImageInputGroup Component ────────────────────────────────────────────────
@@ -134,12 +148,19 @@ export function ImageInputGroup({
   title,
   description,
   className = "",
+  layout = "stack",
+  fixed,
+  onAdd,
+  addLabel = "Add Image",
+  onRemoveAll,
+  onClearAll,
   children,
 }: ImageInputGroupProps) {
   const registryRef = useRef<Map<string, RegisteredImageEntry>>(new Map());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalItems, setModalItems] = useState<OptimizationItem[]>([]);
   const [isBuildingItems, setIsBuildingItems] = useState(false);
+  const [, setRerenderCount] = useState(0);
 
   const registerImage = useCallback(
     (
@@ -147,14 +168,17 @@ export function ImageInputGroup({
       getFile: () => File | null,
       getUrl: () => string,
       onOptimized: (file: File) => void,
+      onClear?: () => void,
     ) => {
-      registryRef.current.set(id, { getFile, getUrl, onOptimized });
+      registryRef.current.set(id, { getFile, getUrl, onOptimized, onClear });
+      setRerenderCount((c) => c + 1);
     },
     [],
   );
 
   const unregisterImage = useCallback((id: string) => {
     registryRef.current.delete(id);
+    setRerenderCount((c) => c + 1);
   }, []);
 
   const contextValue: ImageGroupContextType = {
@@ -165,6 +189,18 @@ export function ImageInputGroup({
     unregisterImage,
   };
 
+  // Determine if group is in dynamic mode (has onAdd and fixed is not explicitly true)
+  const isDynamic = !fixed && typeof onAdd === "function";
+
+  // Check if any registered inputs currently have an image
+  let hasAnyImage = false;
+  for (const entry of registryRef.current.values()) {
+    if (entry.getFile() || entry.getUrl()) {
+      hasAnyImage = true;
+      break;
+    }
+  }
+
   const handleOptimizeAll = async () => {
     setIsBuildingItems(true);
     const items: OptimizationItem[] = [];
@@ -174,10 +210,8 @@ export function ImageInputGroup({
       const url = entry.getUrl();
 
       if (file) {
-        // Staged local file: use directly as original
         items.push({ id, label: file.name, originalFile: file });
       } else if (url && !url.startsWith("blob:")) {
-        // Existing URL image: fetch and convert to File
         const fetched = await urlToFile(url, `image-${id}`);
         if (fetched) {
           items.push({ id, label: url.split("/").pop() || url, originalFile: fetched });
@@ -202,59 +236,130 @@ export function ImageInputGroup({
     }
   };
 
-  // Count registered images for conditional rendering of the "Optimize All" button
-  const registrySize = registryRef.current.size;
+  const handleClearOrRemoveAll = () => {
+    if (isDynamic && onRemoveAll) {
+      onRemoveAll();
+      return;
+    }
+
+    if (onClearAll) {
+      onClearAll();
+      return;
+    }
+
+    // Default: iterate registered inputs and clear them
+    for (const entry of registryRef.current.values()) {
+      if (entry.onClear) {
+        entry.onClear();
+      }
+    }
+  };
+
+  const layoutContainerClass =
+    layout === "wrap"
+      ? "flex flex-wrap gap-4"
+      : layout === "grid"
+        ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        : "space-y-4";
 
   return (
     <ImageGroupContext.Provider value={contextValue}>
       <div
-        className={`space-y-4 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 ${className}`}
+        className={`space-y-4 p-5 rounded-2xl border border-dashboard-border bg-dashboard-card shadow-xs ${className}`}
       >
-        {/* Header row — always renders (title/desc optional, Optimize All always shown) */}
-        <div className="flex items-start justify-between gap-3 pb-1">
+        {/* Header row with Title, Description, and Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-1 border-b border-dashboard-border-subtle">
           <div className="space-y-1">
             {title &&
               (typeof title === "string" ? (
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                <h4 className="text-sm font-bold text-dashboard-fg">
                   {title}
                 </h4>
               ) : (
                 title
               ))}
             {description && (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs text-dashboard-muted">
                 {description}
               </p>
             )}
           </div>
 
-          {/* Optimize All Images button */}
-          <button
-            type="button"
-            onClick={handleOptimizeAll}
-            disabled={isBuildingItems}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-400/50 dark:border-emerald-700/60 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer disabled:opacity-50"
-          >
-            {isBuildingItems ? (
-              <>
-                <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+            {/* Add Image Button (Dynamic Mode) */}
+            {isDynamic && (
+              <button
+                type="button"
+                onClick={onAdd}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
-                <span>Loading...</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                </svg>
-                <span>Optimize All Images</span>
-              </>
+                <span>{addLabel}</span>
+              </button>
             )}
-          </button>
+
+            {/* Remove / Clear All Button */}
+            {(hasAnyImage || onRemoveAll || onClearAll) && (
+              <button
+                type="button"
+                onClick={handleClearOrRemoveAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashboard-border bg-dashboard-danger-subtle text-dashboard-danger hover:bg-dashboard-danger hover:text-dashboard-danger-fg text-xs font-semibold transition-all cursor-pointer"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                  />
+                </svg>
+                <span>{isDynamic ? "Remove All" : "Clear All"}</span>
+              </button>
+            )}
+
+            {/* Optimize All Images Button */}
+            <button
+              type="button"
+              onClick={handleOptimizeAll}
+              disabled={isBuildingItems || !hasAnyImage}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashboard-border bg-dashboard-accent-subtle text-dashboard-accent-fg text-xs font-semibold hover:bg-dashboard-accent/20 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isBuildingItems ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                  <span>Optimize All Images</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-4">{children}</div>
+        {/* Children Layout */}
+        <div className={layoutContainerClass}>{children}</div>
       </div>
 
       {/* Batch Optimization Modal */}

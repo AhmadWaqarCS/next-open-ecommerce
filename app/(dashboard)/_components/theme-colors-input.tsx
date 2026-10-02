@@ -40,17 +40,17 @@ export default function ThemeColorsInput({
 
   const containerClasses = borderless
     ? `space-y-4 ${className}`
-    : `rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-4 shadow-xs ${className}`;
+    : `rounded-2xl border border-dashboard-border bg-dashboard-card p-6 space-y-4 shadow-xs ${className}`;
 
   return (
     <div className={containerClasses}>
       {title && (
         <div className="space-y-1">
-          <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+          <h3 className="text-base font-bold text-dashboard-fg">
             {title}
           </h3>
           {description && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-dashboard-muted">
               {description}
             </p>
           )}
@@ -63,9 +63,9 @@ export default function ThemeColorsInput({
           return (
             <div
               key={key}
-              className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/80 dark:border-zinc-800 space-y-1.5"
+              className="p-3.5 rounded-xl bg-dashboard-muted-bg border border-dashboard-border space-y-1.5"
             >
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 truncate">
+              <label className="block text-xs font-semibold text-dashboard-fg truncate">
                 {label}
               </label>
               <div className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export default function ThemeColorsInput({
                   disabled={disabled}
                   onChange={(e) => handleFieldChange(key, e.target.value)}
                   placeholder={defaultVal}
-                  className="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full px-2.5 py-1.5 text-xs font-mono rounded-lg border border-dashboard-border bg-dashboard-card text-dashboard-fg outline-none focus:ring-1 focus:ring-dashboard-primary/50 disabled:opacity-50"
                 />
               </div>
             </div>

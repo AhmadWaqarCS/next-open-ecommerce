@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
-import { getAllStorageOptionsFromDB } from "@/services/storage-services";
-import StorageClient from "./storage-client";
+import { getStoragesDashboardDataInDB } from "@/services/storage-services";
+import StoragesTable from "./storages-table";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Storage Options - Control Panel",
-  description: "Manage system storage mediums and migration configurations.",
+export const metadata: Metadata = {
+  title: "Storage Options",
+  description: "Manage system storage mediums, verify environment keys, and execute data migrations.",
 };
 
 export default function StoragePage() {
@@ -18,8 +19,16 @@ export default function StoragePage() {
 }
 
 async function StoragePageContent() {
-  const { user } = await assertPermission("read", "/dashboard/storages");
-  const options = await getAllStorageOptionsFromDB();
+  const { permissions } = await assertPermission("read", "/dashboard/storages");
+  const { options, activeDriverEnv } = await getStoragesDashboardDataInDB();
 
-  return <StorageClient options={options} userRole={user.role} />;
+  return (
+    <div className="flex-1 flex flex-col">
+      <StoragesTable
+        options={options}
+        permissions={permissions}
+        activeDriverEnv={activeDriverEnv}
+      />
+    </div>
+  );
 }

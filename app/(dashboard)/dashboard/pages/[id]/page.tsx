@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import PageConfigForm from "./page-config-form";
+import SitePageForm from "../_components/site-page-form";
 import { getActiveThemesWithComponentsInDB } from "@/services/theme-services";
 
 export const metadata: Metadata = {
@@ -24,9 +24,7 @@ export default function EditPageConfigPage(props: PageProps) {
   );
 }
 
-async function EditPageConfigPageContent({
-  params,
-}: PageProps) {
+async function EditPageConfigPageContent({ params }: PageProps) {
   const { permissions } = await assertPermission("update", "/dashboard/pages");
   const { id: idStr } = await params;
   const id = Number(idStr);
@@ -47,6 +45,10 @@ async function EditPageConfigPageContent({
         show_in_header: true,
         show_in_footer: true,
         sort_order: true,
+        created_at: true,
+        created_by: true,
+        updated_at: true,
+        updated_by: true,
       },
     }),
     getActiveThemesWithComponentsInDB(),
@@ -56,26 +58,36 @@ async function EditPageConfigPageContent({
 
   return (
     <div className="space-y-6 flex-1 flex flex-col pb-12">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+      {/* Semantic Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-dashboard-muted">
         <Link
           href="/dashboard/pages"
-          className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+          className="hover:text-dashboard-fg transition-colors"
         >
           Pages
         </Link>
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
         </svg>
-        <span className="text-zinc-900 dark:text-zinc-100 font-medium truncate">
+        <span className="text-dashboard-fg font-medium truncate">
           {page.title}
         </span>
-        <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
-          /{page.slug}
+        <span className="font-mono text-xs bg-dashboard-muted-bg text-dashboard-muted border border-dashboard-border px-1.5 py-0.5 rounded-md">
+          {page.slug === "/" ? "/" : `/${page.slug}`}
         </span>
       </div>
 
-      <PageConfigForm
+      <SitePageForm
         page={page as any}
         activeThemes={activeThemes as any}
         permissions={permissions}

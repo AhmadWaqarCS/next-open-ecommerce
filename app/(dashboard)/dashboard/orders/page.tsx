@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import OrderTable from "./order-table";
 import { resolveUserNames, serializeOrders } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { OrderFilterParams, getOrderFilterWhere } from "@/lib/filters/order-filters";
 import { getOrdersDashboardDataInDB } from "@/services/order-services";
 
@@ -74,7 +73,7 @@ async function DashboardOrdersPageContent({
     updated_from: typeof params?.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params?.updated_to === "string" ? params.updated_to : undefined,
   };
-  const whereCondition = await getOrderFilterWhere(filterParams, false);
+  const whereCondition = await getOrderFilterWhere(filterParams);
 
   const { ordersRaw, totalOrders, dashboardUsers, paymentMethodsRaw } =
     await getOrdersDashboardDataInDB(whereCondition, skipCount, pageSize);
@@ -98,14 +97,10 @@ async function DashboardOrdersPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalOrders}
-      />
-
-      <Pagination
-        totalItems={totalOrders}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="orders"
       />
     </div>
   );
 }
+

@@ -1,5 +1,3 @@
-"use cache";
-
 import Link from "next/link";
 import Image from "next/image";
 import { getHeaderData, type HeaderData } from "@/lib/storefront";
@@ -9,7 +7,6 @@ import MobileMenuToggle from "./MobileMenuToggle";
 import CartButton from "./CartButton";
 import CartDrawer from "./CartDrawer";
 import CartProvider from "./CartProvider";
-import { cacheLife, cacheTag } from "next/cache";
 import { Suspense } from "react";
 
 export interface SiteHeaderProps {
@@ -109,9 +106,6 @@ const headerScopedStyles = `
 `;
 
 export default async function SiteHeader() {
-  cacheTag("site-header");
-  cacheLife("max");
-
   const content = await getHeaderData();
   const headerConfig = (content?.headerConfig ?? {}) as Record<string, any>;
 

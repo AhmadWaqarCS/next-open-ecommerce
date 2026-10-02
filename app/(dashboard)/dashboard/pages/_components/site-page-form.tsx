@@ -3,24 +3,26 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import { updateSitePage } from "@/actions/page-actions";
 import MetaInput from "@/app/(dashboard)/_components/meta-input";
-import { sitePageUpdateSchema, SitePageUpdateInput } from "@/lib/validations";
-import { CRUD, site_page, theme, ThemeColorsConfig, PROTECTED_SYSTEM_SLUGS } from "@/lib/types";
 import ThemeColorsInput from "@/app/(dashboard)/_components/theme-colors-input";
+import { sitePageUpdateSchema, SitePageUpdateInput } from "@/lib/validations";
+import { setFormErrors } from "@/lib/client-utils";
+import { CRUD, site_page, theme, ThemeColorsConfig, PROTECTED_SYSTEM_SLUGS } from "@/lib/types";
 
-interface PageConfigFormProps {
+interface SitePageFormProps {
   page: site_page;
-  activeThemes: (theme & { components: any[] })[];
+  activeThemes?: (theme & { components: any[] })[];
   permissions: CRUD;
 }
 
-export default function PageConfigForm({
+export default function SitePageForm({
   page,
   activeThemes = [],
   permissions,
-}: PageConfigFormProps) {
+}: SitePageFormProps) {
   const [isPending, startTransition] = useTransition();
   const [globalError, setGlobalError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -116,13 +118,13 @@ export default function PageConfigForm({
     register,
     handleSubmit,
     setValue,
+    setError,
     watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(sitePageUpdateSchema),
     defaultValues: {
       title: page.title || "",
-      slug: page.slug || "",
       content: page.content || "",
       custom_css: page.custom_css || "",
       is_active: page.is_active ?? true,
@@ -135,7 +137,7 @@ export default function PageConfigForm({
 
   const onSubmit = (data: SitePageUpdateInput) => {
     if (!permissions.update) {
-      toast("You do not have permission to update this page.", "error");
+      toast.error("You do not have permission to update this page.");
       return;
     }
 
@@ -157,7 +159,6 @@ export default function PageConfigForm({
       try {
         const res = await updateSitePage(page.id, {
           title: data.title,
-          slug: isProtectedSystemPage ? undefined : data.slug,
           content: data.content || null,
           custom_css: data.custom_css || null,
           is_active: data.is_active,
@@ -169,59 +170,68 @@ export default function PageConfigForm({
         });
 
         if (res.success) {
-          toast(
-            res.message || "Page configuration saved successfully.",
-            "success",
-          );
+          toast.success(res.message || "Page configuration saved successfully.");
           setGlobalError(null);
         } else {
-          toast(res.message || "Failed to save page configuration.", "error");
+          if (res.errors) {
+            setFormErrors(res.errors, setError);
+          }
+          toast.error(res.message || "Failed to save page configuration.");
           setGlobalError(res.message || "Failed to save.");
         }
       } catch {
-        toast("An unexpected error occurred.", "error");
-        setGlobalError("An unexpected error occurred.");
+        toast.error("An unexpected network error occurred.");
+        setGlobalError("An unexpected network error occurred.");
       }
     });
   };
 
+  const liveRouteHref = page.slug === "/" ? "/" : `/${page.slug}`;
+
   return (
     <div className="space-y-6">
       {globalError && (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm">
+        <div className="p-4 rounded-xl bg-dashboard-danger-subtle border border-dashboard-danger text-dashboard-danger text-sm">
           {globalError}
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Top Action Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs">
+        {/* Top Action Header adhering strictly to CLIENT-SIDE-FORMS.md */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-dashboard-border bg-dashboard-card shadow-xs">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              <h2 className="text-base sm:text-lg font-bold text-dashboard-fg">
                 {page.title}
               </h2>
               {isProtectedSystemPage && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-dashboard-accent-subtle text-dashboard-accent-fg border border-dashboard-border">
                   Core System Page
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-500 font-mono mt-0.5">
-              Storefront route: {page.slug === "/" ? "/" : `/${page.slug}`}
+            <p className="text-xs text-dashboard-muted font-mono mt-0.5">
+              Storefront route: {liveRouteHref}
             </p>
           </div>
 
           <div className="flex items-center gap-3 self-start sm:self-center">
+            <Link
+              href="/dashboard/pages"
+              className="px-4 py-2 rounded-xl border border-dashboard-border text-xs font-semibold text-dashboard-fg hover:bg-dashboard-card-hover transition"
+            >
+              Back to Pages
+            </Link>
+
             <a
-              href={page.slug === "/" ? "/" : `/${page.slug}`}
+              href={liveRouteHref}
               target="_blank"
               rel="noreferrer"
-              className="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl border border-dashboard-border text-xs font-semibold text-dashboard-fg hover:bg-dashboard-card-hover transition flex items-center gap-1.5"
             >
               <span>View live</span>
               <svg
-                className="w-3.5 h-3.5 text-zinc-400"
+                className="w-3.5 h-3.5 text-dashboard-muted"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -238,78 +248,70 @@ export default function PageConfigForm({
             <button
               type="submit"
               disabled={isPending || !permissions.update}
-              className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 disabled:opacity-50 transition cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg font-bold text-xs shadow-xs disabled:opacity-50 transition cursor-pointer"
             >
-              {isPending ? "Saving Page..." : "Save Page Configuration"}
+              {isPending ? "Saving Page..." : "Save Page"}
             </button>
           </div>
         </div>
 
-        {/* Unified Single Form Container */}
-        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs divide-y divide-zinc-100 dark:divide-zinc-800">
+        {/* Unified Card Container */}
+        <div className="rounded-2xl border border-dashboard-border bg-dashboard-card shadow-xs divide-y divide-dashboard-border-subtle">
           {/* Section 1: Page Details & Visibility */}
           <div className="p-6 space-y-4">
             <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-dashboard-fg">
                 Page Details & Visibility
               </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Configure title, storefront route slug, sort order, and menu placements.
+              <p className="text-xs text-dashboard-muted mt-0.5">
+                Configure title, sort order, and navigation menu placements. Storefront slugs are fixed to match routes.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-dashboard-fg mb-1">
                   Page Title *
                 </label>
                 <input
                   {...register("title")}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted outline-none focus:border-dashboard-primary"
                 />
                 {errors.title && (
-                  <p className="text-xs text-rose-500 mt-1">
+                  <p className="text-xs text-dashboard-danger mt-1">
                     {errors.title.message}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Storefront Slug {isProtectedSystemPage && "(Locked)"}
+                <label className="block text-xs font-semibold text-dashboard-muted mb-1">
+                  Storefront Slug (Fixed Route)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-zinc-400 text-xs font-mono select-none">
+                  <span className="absolute left-3 top-2.5 text-dashboard-muted text-xs font-mono select-none">
                     /
                   </span>
                   <input
-                    {...register("slug")}
-                    disabled={isProtectedSystemPage}
-                    className={`w-full pl-6 pr-3 py-2 text-sm font-mono rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none ${
-                      isProtectedSystemPage
-                        ? "bg-zinc-100 dark:bg-zinc-800/60 text-zinc-500 cursor-not-allowed"
-                        : "bg-white dark:bg-zinc-950 focus:ring-2 focus:ring-indigo-500"
-                    }`}
+                    type="text"
+                    disabled
+                    value={page.slug === "/" ? "" : page.slug}
+                    className="w-full pl-6 pr-3 py-2 text-sm font-mono rounded-xl border border-dashboard-border bg-dashboard-muted-bg/50 text-dashboard-muted cursor-not-allowed select-none"
                   />
                 </div>
-                {errors.slug && (
-                  <p className="text-xs text-rose-500 mt-1">
-                    {errors.slug.message}
-                  </p>
-                )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-dashboard-fg mb-1">
                   Sort Order
                 </label>
                 <input
                   type="number"
                   {...register("sort_order")}
-                  className="w-full px-3 py-2 text-sm font-mono rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm font-mono rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted outline-none focus:border-dashboard-primary"
                 />
                 {errors.sort_order && (
-                  <p className="text-xs text-rose-500 mt-1">
+                  <p className="text-xs text-dashboard-danger mt-1">
                     {errors.sort_order.message}
                   </p>
                 )}
@@ -322,11 +324,11 @@ export default function PageConfigForm({
                   type="checkbox"
                   id="page_is_active"
                   {...register("is_active")}
-                  className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+                  className="h-4 w-4 rounded accent-dashboard-primary cursor-pointer"
                 />
                 <label
                   htmlFor="page_is_active"
-                  className="text-xs font-semibold cursor-pointer"
+                  className="text-xs font-semibold text-dashboard-fg cursor-pointer"
                 >
                   Page is Active
                 </label>
@@ -339,11 +341,11 @@ export default function PageConfigForm({
                       type="checkbox"
                       id="show_in_header"
                       {...register("show_in_header")}
-                      className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+                      className="h-4 w-4 rounded accent-dashboard-primary cursor-pointer"
                     />
                     <label
                       htmlFor="show_in_header"
-                      className="text-xs font-semibold cursor-pointer"
+                      className="text-xs font-semibold text-dashboard-fg cursor-pointer"
                     >
                       Show in Header Menu
                     </label>
@@ -354,11 +356,11 @@ export default function PageConfigForm({
                       type="checkbox"
                       id="show_in_footer"
                       {...register("show_in_footer")}
-                      className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
+                      className="h-4 w-4 rounded accent-dashboard-primary cursor-pointer"
                     />
                     <label
                       htmlFor="show_in_footer"
-                      className="text-xs font-semibold cursor-pointer"
+                      className="text-xs font-semibold text-dashboard-fg cursor-pointer"
                     >
                       Show in Footer Menu
                     </label>
@@ -367,23 +369,23 @@ export default function PageConfigForm({
               )}
             </div>
 
-            {/* Optional Content for standard CMS pages */}
+            {/* Optional Content for standard CMS & policy pages */}
             {page.slug !== "/" &&
               page.slug !== "product" &&
               page.slug !== "category" &&
               !page.slug.includes("[slug]") && (
                 <div className="pt-2">
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-dashboard-fg mb-1">
                     HTML / Rich Text Content (Optional)
                   </label>
                   <textarea
                     {...register("content")}
                     rows={8}
                     placeholder="<h2>Page Heading</h2><p>Page body content...</p>"
-                    className="w-full px-3 py-2 text-sm font-mono rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm font-mono rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg placeholder-dashboard-muted outline-none focus:border-dashboard-primary resize-y"
                   />
                   {errors.content && (
-                    <p className="text-xs text-rose-500 mt-1">
+                    <p className="text-xs text-dashboard-danger mt-1">
                       {errors.content.message}
                     </p>
                   )}
@@ -394,27 +396,23 @@ export default function PageConfigForm({
           {/* Section 2: Theme Component Template */}
           <div className="p-6 space-y-4">
             <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-dashboard-fg">
                 Theme Component Template
               </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                Select a custom component built in{" "}
-                <code className="font-mono text-indigo-600 dark:text-indigo-400">
-                  Themes/&lt;Name&gt;/
-                </code>{" "}
-                or use the default storefront template.
+              <p className="text-xs text-dashboard-muted mt-0.5">
+                Select a custom template component from an active theme or use the system default storefront layout.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                <label className="block text-xs font-semibold text-dashboard-fg mb-1">
                   Theme Source
                 </label>
                 <select
                   value={selectedThemeId}
                   onChange={(e) => handleThemeChange(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg outline-none focus:border-dashboard-primary"
                 >
                   <option value="">Default System Template</option>
                   {matchingThemes.map((t) => (
@@ -427,13 +425,13 @@ export default function PageConfigForm({
 
               {selectedThemeId && (
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-xs font-semibold text-dashboard-fg mb-1">
                     Component Variant
                   </label>
                   <select
                     value={selectedComponentId}
                     onChange={(e) => handleComponentChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 outline-none"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg outline-none focus:border-dashboard-primary"
                   >
                     {matchingComponents.map((c: any) => (
                       <option key={c.id} value={c.id}>
@@ -460,21 +458,21 @@ export default function PageConfigForm({
           {/* Section 3: Page Custom CSS */}
           <div className="p-6 space-y-3">
             <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              <h3 className="text-base font-bold text-dashboard-fg">
                 Page Custom CSS
               </h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <p className="text-xs text-dashboard-muted mt-0.5">
                 Custom CSS injected specifically when viewing this page. Overrides site-wide styles.
               </p>
             </div>
             <textarea
               {...register("custom_css")}
               rows={6}
-              placeholder={`/* Page-scoped custom CSS */\n.page-enter {\n  /* custom styles */\n}`}
-              className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-950 text-zinc-100 dark:bg-zinc-950 outline-none resize-y focus:ring-2 focus:ring-indigo-500"
+              placeholder={`/* Page-scoped custom CSS */\n.page-hero {\n  /* custom styles */\n}`}
+              className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg outline-none resize-y focus:border-dashboard-primary"
             />
             {errors.custom_css && (
-              <p className="text-xs text-rose-500 mt-1">
+              <p className="text-xs text-dashboard-danger mt-1">
                 {errors.custom_css.message}
               </p>
             )}
@@ -482,7 +480,7 @@ export default function PageConfigForm({
 
           {/* Section 4: SEO Metadata */}
           <div className="p-6">
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-4">
+            <h3 className="text-base font-bold text-dashboard-fg mb-4">
               Page SEO & OpenGraph Metadata
             </h3>
             <MetaInput

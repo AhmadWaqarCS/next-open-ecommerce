@@ -159,8 +159,6 @@ async function main() {
             title: STORE_NAME,
             description: "Open-source e-commerce platform.",
           },
-          created_by: 0,
-          updated_by: 0,
         },
       });
       console.log(`  ✓ [Config] Singleton site configuration verified`);

@@ -15,6 +15,12 @@ export async function loadThemeComponent<T = React.ComponentType<any>>(
   const cleanTheme = themeName.replace(/^\/+|\/+$/g, "");
 
   if (!cleanTheme || !cleanPath) return null;
+  if (cleanTheme.includes("..") || cleanPath.includes("..")) {
+    console.warn(
+      `[ThemeLoader] Blocked potential directory traversal attempt: ${cleanTheme}/${cleanPath}`,
+    );
+    return null;
+  }
 
   try {
     const mod = await import(`@/Themes/${cleanTheme}/${cleanPath}`);

@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import { saveMediaToStorage, deleteMediaFromStorage, bulkDeleteMediaFromStorage } from "@/services/storage-services";
+import { deleteMediaFromStorage, bulkDeleteMediaFromStorage } from "@/services/storage-services";
 
 export async function createCategoryTransaction(
   data: {
@@ -20,33 +20,48 @@ export async function createCategoryTransaction(
   },
   userId: number,
 ) {
-  // Process image upload if new media payload
-  let finalImageUrl: string | null = null;
-  if (data.image_url) {
-    const now = new Date();
-    const destination = `categories/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const res = await saveMediaToStorage(data.image_url, undefined, destination);
-    finalImageUrl = res ? res.relativePath : data.image_url;
-  }
-
   return await prisma.$transaction(async (tx) => {
+    // 1. Slug uniqueness check
+    const existingSlug = await tx.category.findUnique({
+      where: { slug: data.slug },
+      select: { id: true },
+    });
+    if (existingSlug) {
+      throw new Error("CATEGORY_SLUG_EXISTS");
+    }
+
+    // 2. Parent existence check
+    let parentSlug: string | null = null;
+    if (data.parent_id) {
+      const parent = await tx.category.findUnique({
+        where: { id: data.parent_id },
+        select: { id: true, slug: true, deleted_at: true },
+      });
+      if (!parent || parent.deleted_at !== null) {
+        throw new Error("CATEGORY_PARENT_NOT_FOUND");
+      }
+      parentSlug = parent.slug;
+    }
+
     const category = await tx.category.create({
       data: {
-        ...data,
-        image_url: finalImageUrl,
+        name: data.name,
+        slug: data.slug,
+        description: data.description ?? null,
+        image_url: data.image_url ?? null,
+        image_alt_text: data.image_alt_text ?? null,
+        bg_color: data.bg_color ?? null,
+        show_in_header: data.show_in_header ?? true,
+        show_in_footer: data.show_in_footer ?? true,
+        show_in_home: data.show_in_home ?? true,
+        parent_id: data.parent_id ?? null,
+        sort_order: data.sort_order ?? 0,
+        is_active: data.is_active ?? true,
+        meta_info: data.meta_info ?? {},
         created_by: userId,
         updated_by: userId,
       },
     });
-
-    let parentSlug: string | null = null;
-    if (category.parent_id) {
-      const parent = await tx.category.findUnique({
-        where: { id: category.parent_id },
-        select: { slug: true },
-      });
-      parentSlug = parent?.slug || null;
-    }
 
     return { category, parentSlug };
   });
@@ -71,19 +86,6 @@ export async function updateCategoryTransaction(
   },
   userId: number,
 ) {
-  // Process image upload if new media payload
-  let processedImageUrl: string | null | undefined = undefined;
-  if (data.image_url !== undefined) {
-    if (data.image_url) {
-      const now = new Date();
-      const destination = `categories/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const res = await saveMediaToStorage(data.image_url, undefined, destination);
-      processedImageUrl = res ? res.relativePath : data.image_url;
-    } else {
-      processedImageUrl = null;
-    }
-  }
-
   let oldImageUrl: string | null = null;
 
   const result = await prisma.$transaction(async (tx) => {
@@ -92,6 +94,49 @@ export async function updateCategoryTransaction(
       include: { parent: { select: { slug: true } } },
     });
     if (!existing) throw new Error("Category not found.");
+
+    // 1. Slug uniqueness check
+    if (data.slug !== undefined && data.slug !== existing.slug) {
+      const slugConflict = await tx.category.findFirst({
+        where: { slug: data.slug, NOT: { id } },
+        select: { id: true },
+      });
+      if (slugConflict) {
+        throw new Error("CATEGORY_SLUG_EXISTS");
+      }
+    }
+
+    // 2. Parent & Circular hierarchy checks
+    let newParentSlug: string | null = null;
+    if (data.parent_id !== undefined && data.parent_id !== existing.parent_id) {
+      if (data.parent_id === id) {
+        throw new Error("CATEGORY_SELF_PARENT");
+      }
+
+      if (data.parent_id !== null) {
+        const parent = await tx.category.findUnique({
+          where: { id: data.parent_id },
+          select: { id: true, slug: true, parent_id: true, deleted_at: true },
+        });
+        if (!parent || parent.deleted_at !== null) {
+          throw new Error("CATEGORY_PARENT_NOT_FOUND");
+        }
+        newParentSlug = parent.slug;
+
+        // Circular hierarchy detection: walk upwards from the candidate parent
+        let currentAncestorId: number | null = parent.parent_id;
+        while (currentAncestorId) {
+          if (currentAncestorId === id) {
+            throw new Error("CATEGORY_CIRCULAR_HIERARCHY");
+          }
+          const next = await tx.category.findUnique({
+            where: { id: currentAncestorId },
+            select: { parent_id: true },
+          });
+          currentAncestorId = next?.parent_id ?? null;
+        }
+      }
+    }
 
     const updatePayload: Record<string, any> = {};
 
@@ -109,8 +154,8 @@ export async function updateCategoryTransaction(
     if (data.is_active !== undefined && data.is_active !== existing.is_active) updatePayload.is_active = data.is_active;
     if (data.meta_info !== undefined && JSON.stringify(data.meta_info) !== JSON.stringify(existing.meta_info)) updatePayload.meta_info = data.meta_info;
 
-    if (processedImageUrl !== undefined && processedImageUrl !== existing.image_url) {
-      updatePayload.image_url = processedImageUrl;
+    if (data.image_url !== undefined && data.image_url !== existing.image_url) {
+      updatePayload.image_url = data.image_url;
       if (existing.image_url) oldImageUrl = existing.image_url;
     }
 
@@ -121,15 +166,6 @@ export async function updateCategoryTransaction(
         where: { id },
         data: updatePayload,
       });
-    }
-
-    let newParentSlug: string | null = null;
-    if (data.parent_id && data.parent_id !== existing.parent_id) {
-      const parent = await tx.category.findUnique({
-        where: { id: data.parent_id },
-        select: { slug: true },
-      });
-      newParentSlug = parent?.slug || null;
     }
 
     return { existing, updated, newParentSlug };
@@ -143,6 +179,30 @@ export async function updateCategoryTransaction(
   }
 
   return result;
+}
+
+export async function toggleCategoryStatusTransaction(
+  id: number,
+  is_active: boolean,
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const existing = await tx.category.findUnique({
+      where: { id },
+      include: { parent: { select: { slug: true } } },
+    });
+    if (!existing) throw new Error("Category not found.");
+
+    const updated = await tx.category.update({
+      where: { id },
+      data: {
+        is_active,
+        updated_by: userId,
+      },
+    });
+
+    return { existing, updated };
+  });
 }
 
 export async function deleteCategoryTransaction(id: number, userId: number) {
@@ -186,6 +246,18 @@ export async function permanentlyDeleteCategoryTransaction(id: number) {
       include: { parent: { select: { slug: true } } },
     });
     if (!existing) throw new Error("Category not found.");
+
+    // 1. Guard against orphaned subcategories
+    const childCount = await tx.category.count({ where: { parent_id: id } });
+    if (childCount > 0) {
+      throw new Error(`CATEGORY_HAS_CHILDREN:${childCount}`);
+    }
+
+    // 2. Guard against foreign key constraint violation with products
+    const productCount = await tx.product.count({ where: { category_id: id } });
+    if (productCount > 0) {
+      throw new Error(`CATEGORY_HAS_PRODUCTS:${productCount}`);
+    }
 
     await tx.category.delete({ where: { id } });
 
@@ -273,12 +345,12 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
   selectAllScope: boolean = false,
   filterWhere?: Prisma.categoryWhereInput,
 ) {
-  const { affected } = await prisma.$transaction(async (tx) => {
+  const { affected, skippedCount } = await prisma.$transaction(async (tx) => {
     const whereCondition: Prisma.categoryWhereInput = selectAllScope
       ? (filterWhere ?? { NOT: { deleted_at: null } })
       : { id: { in: ids } };
 
-    const affected = await tx.category.findMany({
+    const candidates = await tx.category.findMany({
       where: whereCondition,
       select: {
         id: true,
@@ -289,12 +361,29 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
         show_in_home: true,
         parent_id: true,
         parent: { select: { slug: true } },
+        _count: {
+          select: {
+            children: true,
+            products: true,
+          },
+        },
       },
     });
 
-    await tx.category.deleteMany({ where: whereCondition });
+    // Only permanently delete categories that have NO subcategories and NO products
+    const eligible = candidates.filter(
+      (c) => c._count.children === 0 && c._count.products === 0,
+    );
+    const skipped = candidates.length - eligible.length;
 
-    return { affected };
+    if (eligible.length > 0) {
+      const eligibleIds = eligible.map((c) => c.id);
+      await tx.category.deleteMany({
+        where: { id: { in: eligibleIds } },
+      });
+    }
+
+    return { affected: eligible, skippedCount: skipped };
   });
 
   // Delete all collected media URLs AFTER DB delete — fire-and-forget
@@ -305,7 +394,7 @@ export async function bulkPermanentlyDeleteCategoriesTransaction(
     );
   }
 
-  return { affected };
+  return { affected, skippedCount };
 }
 
 export async function getCategoriesDashboardDataInDB(
@@ -450,4 +539,3 @@ export async function getCategoryTrashDashboardDataInDB(
     return { categories, totalCategories, dashboardUsers };
   });
 }
-

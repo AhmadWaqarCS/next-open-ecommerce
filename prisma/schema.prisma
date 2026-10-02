@@ -27,6 +27,10 @@ model dashboard_user {
   role_id Int
 
   @@index([role_id])
+  @@index([deleted_at])
+  @@index([is_active])
+  @@index([role_name])
+  @@index([deleted_at, is_active])
   @@map("users")
 }
 
@@ -56,6 +60,9 @@ model role {
   users              dashboard_user[]
   site_feature_roles site_feature_role[]
 
+  @@index([deleted_at])
+  @@index([is_active])
+  @@index([deleted_at, is_active])
   @@map("roles")
 }
 
@@ -113,12 +120,8 @@ model site_config {
 
   meta_info Json @default("{}")
 
-  created_at DateTime  @default(now())
-  created_by Int
-  updated_at DateTime  @updatedAt
-  updated_by Int
-  deleted_at DateTime?
-  deleted_by Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@map("site_config")
 }
@@ -144,8 +147,10 @@ model site_page {
   updated_at DateTime @updatedAt
   updated_by Int
 
+  @@index([is_active])
   @@index([is_active, show_in_header])
   @@index([is_active, show_in_footer])
+  @@index([sort_order])
   @@map("site_pages")
 }
 
@@ -276,6 +281,11 @@ model shipping_method {
   deleted_at DateTime?
   deleted_by Int?
 
+  @@index([deleted_at])
+  @@index([is_active])
+  @@index([deleted_at, is_active])
+  @@index([sort_order])
+  @@index([deleted_at, is_active, sort_order])
   @@map("shipping_methods")
 }
 
@@ -302,6 +312,8 @@ model payment_method {
 
   @@index([provider])
   @@index([is_active])
+  @@index([sort_order])
+  @@index([is_active, sort_order])
   @@map("payment_methods")
 }
 
@@ -330,6 +342,12 @@ model coupon {
   deleted_at DateTime?
   deleted_by Int?
 
+  @@index([deleted_at])
+  @@index([is_active])
+  @@index([deleted_at, is_active])
+  @@index([deleted_at, code])
+  @@index([is_active, starts_at, expires_at])
+  @@index([discount_type])
   @@map("coupons")
 }
 
@@ -533,6 +551,11 @@ model category {
   deleted_by Int?
 
   @@index([parent_id])
+  @@index([deleted_at])
+  @@index([is_active])
+  @@index([deleted_at, is_active])
+  @@index([sort_order])
+  @@index([parent_id, deleted_at])
   @@index([is_active, show_in_header])
   @@index([is_active, show_in_footer])
   @@index([is_active, show_in_home])
@@ -584,6 +607,12 @@ model product {
   @@index([category_id])
   @@index([is_featured])
   @@index([is_active])
+  @@index([deleted_at])
+  @@index([deleted_at, is_active])
+  @@index([deleted_at, category_id])
+  @@index([deleted_at, is_featured])
+  @@index([sort_order])
+  @@index([created_at])
   @@map("products")
 }
 
@@ -604,6 +633,8 @@ model product_image {
   deleted_by Int?
 
   @@index([product_id])
+  @@index([deleted_at])
+  @@index([product_id, sort_order])
   @@map("product_images")
 }
 
@@ -635,6 +666,8 @@ model product_variant {
   order_items order_item[]
 
   @@index([product_id])
+  @@index([deleted_at])
+  @@index([product_id, is_active])
   @@map("product_variants")
 }
 
@@ -787,12 +820,10 @@ model invoice {
 
   sent_emails sent_email[]
 
-  created_at DateTime  @default(now())
+  created_at DateTime @default(now())
   created_by Int
-  updated_at DateTime  @updatedAt
+  updated_at DateTime @updatedAt
   updated_by Int
-  deleted_at DateTime?
-  deleted_by Int?
 
   @@index([order_id])
   @@index([status])

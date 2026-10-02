@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames, serializeShippingMethods } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { buildShippingWhereInput, ShippingFilterParams } from "@/lib/filters/shipping-filters";
 import { getShippingTrashDashboardDataInDB } from "@/services/shipping-services";
 import ShippingTrashTable from "./shipping-trash-table";
@@ -34,6 +33,10 @@ async function DashboardShippingTrashPageContent({
   const { permissions } = await assertPermission("delete", "/dashboard/shipping");
   const params = (await searchParams) || {};
 
+  const currentPage = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.max(1, Number(params.size ?? 10));
+  const skipCount = (currentPage - 1) * pageSize;
+
   const filterParams: ShippingFilterParams = {
     id: typeof params.id === "string" ? params.id : undefined,
     name: typeof params.name === "string" ? params.name : undefined,
@@ -48,10 +51,10 @@ async function DashboardShippingTrashPageContent({
     updated_by: typeof params.updated_by === "string" ? params.updated_by : undefined,
     updated_from: typeof params.updated_from === "string" ? params.updated_from : undefined,
     updated_to: typeof params.updated_to === "string" ? params.updated_to : undefined,
+    deleted_by: typeof params.deleted_by === "string" ? params.deleted_by : undefined,
+    deleted_from: typeof params.deleted_from === "string" ? params.deleted_from : undefined,
+    deleted_to: typeof params.deleted_to === "string" ? params.deleted_to : undefined,
   };
-  const currentPage = Math.max(1, Number(params.page ?? 1));
-  const pageSize = Math.max(1, Number(params.size ?? 10));
-  const skipCount = (currentPage - 1) * pageSize;
 
   const whereCondition = buildShippingWhereInput(filterParams, true);
 
@@ -65,7 +68,7 @@ async function DashboardShippingTrashPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <ShippingTrashTable
         shippingMethods={shippingMethods as any}
         dashboardUsers={dashboardUsers}
@@ -73,13 +76,8 @@ async function DashboardShippingTrashPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalShippingMethods}
-      />
-
-      <Pagination
-        totalItems={totalShippingMethods}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="shipping methods"
       />
     </div>
   );

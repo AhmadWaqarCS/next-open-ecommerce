@@ -446,9 +446,7 @@ export async function fetchDBImageUrlsAction(): Promise<
       }
 
       // 5. Site config logos/favicon
-      const config = await tx.site_config.findFirst({
-        where: { deleted_at: null },
-      });
+      const config = await tx.site_config.findFirst();
       if (config) {
         const fields: Array<{ key: keyof typeof config; label: string }> = [
           { key: "light_logo_url", label: "Light Logo" },

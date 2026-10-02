@@ -38,17 +38,11 @@ export interface OrderFilterParams {
 }
 
 export function buildOrderWhereInput(
-  params: OrderFilterParams,
-  isTrash: boolean = false
+  params: OrderFilterParams
 ): Prisma.orderWhereInput {
-  const where: Prisma.orderWhereInput = {};
-
-  // Soft delete filter
-  if (isTrash) {
-    where.NOT = { deleted_at: null };
-  } else {
-    where.deleted_at = null;
-  }
+  const where: Prisma.orderWhereInput = {
+    deleted_at: null,
+  };
 
   // ID filter
   if (params.id && !isNaN(Number(params.id))) {
@@ -289,8 +283,7 @@ export function buildOrderWhereInput(
 }
 
 export async function getOrderFilterWhere(
-  params: OrderFilterParams,
-  isTrash: boolean = false
+  params: OrderFilterParams
 ): Promise<Prisma.orderWhereInput> {
-  return buildOrderWhereInput(params, isTrash);
+  return buildOrderWhereInput(params);
 }

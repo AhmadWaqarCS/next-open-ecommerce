@@ -82,16 +82,16 @@ async function EditInvoicePageContent({
     <div className="space-y-6 flex-1 flex flex-col">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-dashboard-fg tracking-tight">
             Edit Invoice
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-dashboard-muted">
             Update invoice details for {invoice.invoice_number}
           </p>
         </div>
         <Link
           href="/dashboard/invoices"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-dashboard-muted hover:text-dashboard-fg transition-colors"
         >
           <svg
             className="h-4 w-4"

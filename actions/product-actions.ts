@@ -8,10 +8,14 @@ import {
   ProductUpdateInput,
   productCreateSchema,
   productUpdateSchema,
+  productStatusToggleSchema,
+  productFeaturedToggleSchema,
 } from "@/lib/validations";
 import {
   createProductTransaction,
   updateProductTransaction,
+  toggleProductStatusTransaction,
+  toggleProductFeaturedTransaction,
   deleteProductTransaction,
   restoreProductTransaction,
   permanentlyDeleteProductTransaction,
@@ -117,20 +121,9 @@ export async function uploadProductImage(
 }
 
 export async function createProduct(
-  data: ProductCreateInput & {
-    feature_image_url?: string | null;
-    gallery_images?: ProductGalleryImageInput[];
-    variants?: ProductVariantInput[];
-  },
+  data: ProductCreateInput,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("create", "/dashboard/products");
-
-  if (data.gallery_images && data.gallery_images.length > 10) {
-    return {
-      success: false,
-      message: "Cannot upload more than 10 gallery images per product.",
-    };
-  }
 
   const validatedFields = productCreateSchema.safeParse(data);
   if (!validatedFields.success) {
@@ -141,12 +134,12 @@ export async function createProduct(
     };
   }
 
-  const { feature_image_url } = data;
   const {
     name,
     slug,
     description,
     short_description,
+    feature_image_url,
     feature_image_alt_text,
     price,
     compare_at_price,
@@ -162,10 +155,12 @@ export async function createProduct(
     is_active,
     sort_order,
     meta_info,
+    gallery_images,
+    variants,
   } = validatedFields.data;
 
   try {
-    const { categorySlug } = await createProductTransaction(
+    const result = await createProductTransaction(
       {
         name,
         slug,
@@ -187,12 +182,54 @@ export async function createProduct(
         is_active,
         sort_order,
         meta_info,
-        gallery_images: data.gallery_images,
-        variants: data.variants,
+        gallery_images: gallery_images?.map((img) => ({
+          ...img,
+          alt_text: img.alt_text ?? null,
+        })),
+        variants: variants?.map((v) => ({
+          ...v,
+          sku: v.sku ?? null,
+          price: v.price ?? null,
+          compare_at_price: v.compare_at_price ?? null,
+          image_url: v.image_url ?? null,
+          image_url_alt_text: v.image_url_alt_text ?? null,
+        })),
       },
       Number(user.id),
     );
 
+    if ("error" in result) {
+      if (result.error === "SLUG_ALREADY_EXISTS") {
+        return {
+          success: false,
+          errors: { slug: "A product with this slug already exists." },
+          message: "A product with this slug already exists.",
+        };
+      }
+      if (result.error === "SKU_ALREADY_EXISTS") {
+        return {
+          success: false,
+          errors: { sku: "A product with this SKU already exists." },
+          message: "A product with this SKU already exists.",
+        };
+      }
+      if (result.error === "VARIANT_SKU_DUPLICATE_IN_INPUT") {
+        return {
+          success: false,
+          message: "Duplicate SKU found among product variants.",
+        };
+      }
+      if (result.error === "VARIANT_SKU_ALREADY_EXISTS") {
+        return {
+          success: false,
+          message: `Variant SKU "${(result as any).conflictSku}" is already in use.`,
+        };
+      }
+    }
+
+    const { categorySlug } = result as { product: any; categorySlug: string | null };
+
+    revalidateTag("products", "max");
     revalidateTag("page-products", "max");
     revalidateTag(`product-${slug}`, "max");
     if (is_featured) revalidateTag("featured-products", "max");
@@ -226,22 +263,11 @@ export async function createProduct(
 
 export async function updateProduct(
   id: number,
-  data: ProductUpdateInput & {
-    feature_image_url?: string | null;
-    gallery_images?: ProductGalleryImageInput[];
-    variants?: ProductVariantInput[];
-  },
+  data: ProductUpdateInput,
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/products");
 
   if (id < 1) return { success: false, message: "An Error Occurred" };
-
-  if (data.gallery_images && data.gallery_images.length > 10) {
-    return {
-      success: false,
-      message: "Cannot upload more than 10 gallery images per product.",
-    };
-  }
 
   const validatedFields = productUpdateSchema.safeParse(data);
   if (!validatedFields.success) {
@@ -252,12 +278,12 @@ export async function updateProduct(
     };
   }
 
-  const { feature_image_url } = data;
   const {
     name,
     slug,
     description,
     short_description,
+    feature_image_url,
     feature_image_alt_text,
     price,
     compare_at_price,
@@ -273,45 +299,91 @@ export async function updateProduct(
     is_active,
     sort_order,
     meta_info,
+    gallery_images,
+    variants,
   } = validatedFields.data;
 
   try {
-    const { existing, updatedProduct, newCategorySlug } =
-      await updateProductTransaction(
-        id,
-        {
-          name,
-          slug,
-          description: description !== undefined ? description || null : undefined,
-          short_description:
-            short_description !== undefined ? short_description || null : undefined,
-          feature_image_url:
-            feature_image_url !== undefined ? feature_image_url || null : undefined,
-          feature_image_alt_text:
-            feature_image_alt_text !== undefined
-              ? feature_image_alt_text || null
-              : undefined,
-          price,
-          compare_at_price:
-            compare_at_price !== undefined ? (compare_at_price ?? null) : undefined,
-          cost_price: cost_price !== undefined ? (cost_price ?? null) : undefined,
-          sku: sku !== undefined ? sku || null : undefined,
-          stock_quantity,
-          low_stock_threshold,
-          track_inventory,
-          weight: weight !== undefined ? (weight ?? null) : undefined,
-          dimensions: dimensions !== undefined ? (dimensions ?? null) : undefined,
-          category_id:
-            category_id !== undefined ? (category_id ?? null) : undefined,
-          is_featured,
-          is_active,
-          sort_order,
-          meta_info,
-          gallery_images: data.gallery_images,
-          variants: data.variants,
-        },
-        Number(user.id),
-      );
+    const result = await updateProductTransaction(
+      id,
+      {
+        name,
+        slug,
+        description: description !== undefined ? description || null : undefined,
+        short_description:
+          short_description !== undefined ? short_description || null : undefined,
+        feature_image_url:
+          feature_image_url !== undefined ? feature_image_url || null : undefined,
+        feature_image_alt_text:
+          feature_image_alt_text !== undefined
+            ? feature_image_alt_text || null
+            : undefined,
+        price,
+        compare_at_price:
+          compare_at_price !== undefined ? (compare_at_price ?? null) : undefined,
+        cost_price: cost_price !== undefined ? (cost_price ?? null) : undefined,
+        sku: sku !== undefined ? sku || null : undefined,
+        stock_quantity,
+        low_stock_threshold,
+        track_inventory,
+        weight: weight !== undefined ? (weight ?? null) : undefined,
+        dimensions: dimensions !== undefined ? (dimensions ?? null) : undefined,
+        category_id:
+          category_id !== undefined ? (category_id ?? null) : undefined,
+        is_featured,
+        is_active,
+        sort_order,
+        meta_info,
+        gallery_images: gallery_images?.map((img) => ({
+          ...img,
+          alt_text: img.alt_text ?? null,
+        })),
+        variants: variants?.map((v) => ({
+          ...v,
+          sku: v.sku ?? null,
+          price: v.price ?? null,
+          compare_at_price: v.compare_at_price ?? null,
+          image_url: v.image_url ?? null,
+          image_url_alt_text: v.image_url_alt_text ?? null,
+        })),
+      },
+      Number(user.id),
+    );
+
+    if ("error" in result) {
+      if (result.error === "SLUG_ALREADY_EXISTS") {
+        return {
+          success: false,
+          errors: { slug: "A product with this slug already exists." },
+          message: "A product with this slug already exists.",
+        };
+      }
+      if (result.error === "SKU_ALREADY_EXISTS") {
+        return {
+          success: false,
+          errors: { sku: "A product with this SKU already exists." },
+          message: "A product with this SKU already exists.",
+        };
+      }
+      if (result.error === "VARIANT_SKU_DUPLICATE_IN_INPUT") {
+        return {
+          success: false,
+          message: "Duplicate SKU found among product variants.",
+        };
+      }
+      if (result.error === "VARIANT_SKU_ALREADY_EXISTS") {
+        return {
+          success: false,
+          message: `Variant SKU "${(result as any).conflictSku}" is already in use.`,
+        };
+      }
+    }
+
+    const { existing, updatedProduct, newCategorySlug } = result as {
+      existing: any;
+      updatedProduct: any;
+      newCategorySlug: string | null;
+    };
 
     if (existing?.feature_image_url && feature_image_url !== undefined && feature_image_url !== existing.feature_image_url) {
       const oldUrl = existing.feature_image_url;
@@ -328,12 +400,12 @@ export async function updateProduct(
       }
     }
 
+    revalidateTag("products", "max");
+    revalidateTag("page-products", "max");
     if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
     if (updatedProduct.slug && updatedProduct.slug !== existing?.slug) {
       revalidateTag(`product-${updatedProduct.slug}`, "max");
     }
-
-    revalidateTag("page-products", "max");
 
     const featuredChanged =
       is_featured !== undefined && is_featured !== existing?.is_featured;
@@ -373,6 +445,98 @@ export async function updateProduct(
       details: { id, error: String(error) },
     });
     return { success: false, message: "Failed to update product." };
+  }
+}
+
+export async function toggleProductStatus(
+  id: number,
+  is_active: boolean,
+): Promise<ActionResponse> {
+  const { user } = await assertPermission("update", "/dashboard/products");
+
+  const validated = productStatusToggleSchema.safeParse({ id, is_active });
+  if (!validated.success) {
+    return { success: false, message: "Invalid parameters." };
+  }
+
+  try {
+    const { existing, updated } = await toggleProductStatusTransaction(
+      id,
+      is_active,
+      Number(user.id),
+    );
+
+    revalidateTag("products", "max");
+    revalidateTag("page-products", "max");
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (existing?.is_featured) revalidateTag("featured-products", "max");
+    if (existing?.category?.slug)
+      revalidateTag(`category-${existing.category.slug}`, "max");
+
+    revalidatePath("/dashboard/products");
+
+    await logActivity({
+      action: "toggle_product_status",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, is_active },
+    });
+
+    return {
+      success: true,
+      message: `Product ${is_active ? "activated" : "deactivated"} successfully.`,
+    };
+  } catch (error) {
+    console.error("Error toggling product status:", error);
+    return { success: false, message: "Failed to update product status." };
+  }
+}
+
+export async function toggleProductFeatured(
+  id: number,
+  is_featured: boolean,
+): Promise<ActionResponse> {
+  const { user } = await assertPermission("update", "/dashboard/products");
+
+  const validated = productFeaturedToggleSchema.safeParse({ id, is_featured });
+  if (!validated.success) {
+    return { success: false, message: "Invalid parameters." };
+  }
+
+  try {
+    const { existing, updated } = await toggleProductFeaturedTransaction(
+      id,
+      is_featured,
+      Number(user.id),
+    );
+
+    revalidateTag("products", "max");
+    revalidateTag("page-products", "max");
+    revalidateTag("featured-products", "max");
+    if (existing?.slug) revalidateTag(`product-${existing.slug}`, "max");
+    if (existing?.category?.slug)
+      revalidateTag(`category-${existing.category.slug}`, "max");
+
+    revalidatePath("/dashboard/products");
+
+    await logActivity({
+      action: "toggle_product_featured",
+      entity_type: "product",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, is_featured },
+    });
+
+    return {
+      success: true,
+      message: `Product ${is_featured ? "marked as featured" : "removed from featured"}.`,
+    };
+  } catch (error) {
+    console.error("Error toggling product featured:", error);
+    return { success: false, message: "Failed to update featured status." };
   }
 }
 

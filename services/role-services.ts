@@ -8,11 +8,34 @@ export async function createRoleTransaction(
   },
   userId: number,
 ) {
+  const trimmedName = data.name.trim();
+
+  if (trimmedName.toLowerCase() === "superadmin") {
+    throw new Error("CANNOT_CREATE_SUPERADMIN");
+  }
+
   return await prisma.$transaction(async (tx) => {
-    const features = await tx.site_feature.findMany({ select: { id: true } });
+    // 1. Check for role name collision (case-insensitive)
+    const existing = await tx.role.findFirst({
+      where: {
+        name: { equals: trimmedName, mode: "insensitive" },
+      },
+    });
+
+    if (existing) {
+      throw new Error("ROLE_NAME_EXISTS");
+    }
+
+    // 2. Fetch active site features to initialize default permissions
+    const features = await tx.site_feature.findMany({
+      where: { enabled: true },
+      select: { id: true },
+    });
+
+    // 3. Create the role with all site feature permissions initialized to false
     const role = await tx.role.create({
       data: {
-        name: data.name,
+        name: trimmedName,
         is_active: data.is_active ?? true,
         created_by: userId,
         updated_by: userId,
@@ -31,6 +54,7 @@ export async function createRoleTransaction(
         },
       },
     });
+
     return role;
   });
 }
@@ -47,24 +71,85 @@ export async function updateRoleTransaction(
     const targetRole = await tx.role.findUnique({ where: { id } });
     if (!targetRole) throw new Error("ROLE_NOT_FOUND");
 
-    if (targetRole.name === "superadmin") {
-      if (data.name && data.name !== "superadmin") {
+    const isSuperadmin = targetRole.name.toLowerCase() === "superadmin";
+
+    if (isSuperadmin) {
+      if (data.name && data.name.trim().toLowerCase() !== "superadmin") {
         throw new Error("SUPERADMIN_NAME_IMMUTABLE");
       }
       if (data.is_active === false) {
         throw new Error("SUPERADMIN_ACTIVE_IMMUTABLE");
       }
     } else {
-      if (data.name === "superadmin") {
+      if (data.name && data.name.trim().toLowerCase() === "superadmin") {
         throw new Error("CANNOT_RENAME_TO_SUPERADMIN");
+      }
+    }
+
+    // Check name collision if name is being changed
+    if (data.name !== undefined) {
+      const trimmedName = data.name.trim();
+      if (trimmedName.toLowerCase() !== targetRole.name.toLowerCase()) {
+        const collision = await tx.role.findFirst({
+          where: {
+            id: { not: id },
+            name: { equals: trimmedName, mode: "insensitive" },
+          },
+        });
+        if (collision) {
+          throw new Error("ROLE_NAME_EXISTS");
+        }
+      }
+    }
+
+    // Diff changed fields per SERVICES.md guidelines
+    const updateData: Prisma.roleUpdateInput = {
+      updated_by: userId,
+    };
+
+    if (data.name !== undefined && !isSuperadmin) {
+      const trimmed = data.name.trim();
+      if (trimmed !== targetRole.name) {
+        updateData.name = trimmed;
+      }
+    }
+
+    if (data.is_active !== undefined && !isSuperadmin) {
+      if (data.is_active !== targetRole.is_active) {
+        updateData.is_active = data.is_active;
       }
     }
 
     const updatedRole = await tx.role.update({
       where: { id },
+      data: updateData,
+    });
+
+    return { targetRole, updatedRole };
+  });
+}
+
+export async function toggleRoleStatusTransaction(
+  id: number,
+  is_active: boolean,
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    const targetRole = await tx.role.findUnique({ where: { id } });
+    if (!targetRole) throw new Error("ROLE_NOT_FOUND");
+
+    if (targetRole.name.toLowerCase() === "superadmin" && !is_active) {
+      throw new Error("SUPERADMIN_ACTIVE_IMMUTABLE");
+    }
+
+    if (targetRole.is_active === is_active) {
+      return { targetRole, updatedRole: targetRole };
+    }
+
+    const updatedRole = await tx.role.update({
+      where: { id },
       data: {
-        name: targetRole.name === "superadmin" ? "superadmin" : data.name,
-        is_active: targetRole.name === "superadmin" ? true : data.is_active,
+        is_active,
         updated_by: userId,
       },
     });
@@ -88,7 +173,9 @@ export async function updateRolePermissionsTransaction(
   return await prisma.$transaction(async (tx) => {
     const targetRole = await tx.role.findUnique({ where: { id: roleId } });
     if (!targetRole) throw new Error("ROLE_NOT_FOUND");
-    if (targetRole.name === "superadmin") throw new Error("SUPERADMIN_PERMISSIONS_IMMUTABLE");
+    if (targetRole.name.toLowerCase() === "superadmin") {
+      throw new Error("SUPERADMIN_PERMISSIONS_IMMUTABLE");
+    }
 
     for (const p of permissions) {
       await tx.site_feature_role.upsert({
@@ -115,7 +202,9 @@ export async function deleteRoleTransaction(id: number, userId: number) {
   return await prisma.$transaction(async (tx) => {
     const targetRole = await tx.role.findUnique({ where: { id } });
     if (!targetRole) throw new Error("ROLE_NOT_FOUND");
-    if (targetRole.name === "superadmin") throw new Error("CANNOT_DELETE_SUPERADMIN");
+    if (targetRole.name.toLowerCase() === "superadmin") {
+      throw new Error("CANNOT_DELETE_SUPERADMIN");
+    }
 
     const updatedRole = await tx.role.update({
       where: { id },
@@ -152,7 +241,18 @@ export async function permanentlyDeleteRoleTransaction(id: number) {
   return await prisma.$transaction(async (tx) => {
     const targetRole = await tx.role.findUnique({ where: { id } });
     if (!targetRole) throw new Error("ROLE_NOT_FOUND");
-    if (targetRole.name === "superadmin") throw new Error("CANNOT_DELETE_SUPERADMIN");
+    if (targetRole.name.toLowerCase() === "superadmin") {
+      throw new Error("CANNOT_DELETE_SUPERADMIN");
+    }
+
+    // Check if any users are assigned to this role before permanent deletion
+    const assignedUsersCount = await tx.dashboard_user.count({
+      where: { role_id: id },
+    });
+
+    if (assignedUsersCount > 0) {
+      throw new Error("ROLE_HAS_ASSIGNED_USERS");
+    }
 
     await tx.site_feature_role.deleteMany({ where: { role_id: id } });
     await tx.role.delete({ where: { id } });
@@ -250,22 +350,42 @@ export async function bulkPermanentlyDeleteRolesTransaction(
       whereCondition = { id: { in: ids }, NOT: { name: "superadmin" } };
     }
 
-    const affected = await tx.role.findMany({
+    const candidateRoles = await tx.role.findMany({
       where: whereCondition,
       select: { id: true, name: true },
     });
 
-    const affectedIds = affected.map((r) => r.id);
-    if (affectedIds.length > 0) {
-      await tx.site_feature_role.deleteMany({
-        where: { role_id: { in: affectedIds } },
-      });
-      await tx.role.deleteMany({
-        where: { id: { in: affectedIds } },
-      });
+    const candidateIds = candidateRoles.map((r) => r.id);
+    if (candidateIds.length === 0) {
+      return { affected: [], blockedCount: 0 };
     }
 
-    return { affected };
+    // Check which candidate roles have assigned users
+    const usersWithRoles = await tx.dashboard_user.findMany({
+      where: { role_id: { in: candidateIds } },
+      select: { role_id: true },
+    });
+
+    const blockedRoleIds = new Set(usersWithRoles.map((u) => u.role_id));
+    const deletableRoles = candidateRoles.filter((r) => !blockedRoleIds.has(r.id));
+    const deletableIds = deletableRoles.map((r) => r.id);
+
+    if (deletableIds.length === 0) {
+      throw new Error("ALL_ROLES_HAVE_ASSIGNED_USERS");
+    }
+
+    await tx.site_feature_role.deleteMany({
+      where: { role_id: { in: deletableIds } },
+    });
+
+    await tx.role.deleteMany({
+      where: { id: { in: deletableIds } },
+    });
+
+    return {
+      affected: deletableRoles,
+      blockedCount: blockedRoleIds.size,
+    };
   });
 }
 

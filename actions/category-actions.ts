@@ -1,6 +1,5 @@
 "use server";
 
-import { after } from "next/server";
 import { ActionResponse, formatZodErrors, logActivity } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
 import {
@@ -8,10 +7,12 @@ import {
   CategoryUpdateInput,
   categoryCreateSchema,
   categoryUpdateSchema,
+  categoryStatusToggleSchema,
 } from "@/lib/validations";
 import {
   createCategoryTransaction,
   updateCategoryTransaction,
+  toggleCategoryStatusTransaction,
   deleteCategoryTransaction,
   restoreCategoryTransaction,
   permanentlyDeleteCategoryTransaction,
@@ -19,7 +20,6 @@ import {
   bulkRestoreCategoriesTransaction,
   bulkPermanentlyDeleteCategoriesTransaction,
 } from "@/services/category-services";
-import { deleteMediaFileFromStorage } from "@/services/media-services";
 import { saveMediaToStorage } from "@/services/storage-services";
 import { revalidatePath, revalidateTag } from "next/cache";
 import {
@@ -30,7 +30,15 @@ import {
 export async function uploadCategoryImage(
   formData: FormData,
 ): Promise<ActionResponse<{ relativePath: string }>> {
-  const { user } = await assertPermission("create", "/dashboard/categories");
+  // Authorize if user has either 'create' or 'update' permission on categories
+  let user;
+  try {
+    const auth = await assertPermission("create", "/dashboard/categories");
+    user = auth.user;
+  } catch {
+    const auth = await assertPermission("update", "/dashboard/categories");
+    user = auth.user;
+  }
 
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {
@@ -154,9 +162,11 @@ export async function createCategory(
     if (show_in_header) revalidateTag("site-header", "max");
     if (show_in_footer) revalidateTag("site-footer", "max");
     if (show_in_home) revalidateTag("home-page", "max");
+    revalidateTag(`category-${slug}`, "max");
     if (parentSlug) revalidateTag(`category-${parentSlug}`, "max");
 
     revalidatePath("/dashboard/categories");
+    revalidatePath("/dashboard/categories/trash");
 
     await logActivity({
       action: "create_category",
@@ -168,8 +178,24 @@ export async function createCategory(
     });
 
     return { success: true, message: "Category created successfully." };
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+    console.error("Error creating category:", error);
+
+    if (error.message === "CATEGORY_SLUG_EXISTS") {
+      return {
+        success: false,
+        errors: { slug: "A category with this slug already exists." },
+        message: "A category with this slug already exists.",
+      };
+    }
+    if (error.message === "CATEGORY_PARENT_NOT_FOUND") {
+      return {
+        success: false,
+        errors: { parent_id: "Selected parent category does not exist or has been deleted." },
+        message: "Selected parent category does not exist.",
+      };
+    }
+
     await logActivity({
       action: "create_category",
       entity_type: "category",
@@ -187,7 +213,7 @@ export async function updateCategory(
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("update", "/dashboard/categories");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid category ID." };
 
   const validatedFields = categoryUpdateSchema.safeParse(data);
   if (!validatedFields.success) {
@@ -237,81 +263,14 @@ export async function updateCategory(
         Number(user.id),
       );
 
-    if (existing.image_url && image_url !== undefined && image_url !== existing.image_url) {
-      const oldUrl = existing.image_url;
-      try {
-        after(async () => {
-          await deleteMediaFileFromStorage(oldUrl).catch((err) => {
-            console.warn(`[Category Image Cleanup] Failed to delete old image '${oldUrl}':`, err);
-          });
-        });
-      } catch {
-        deleteMediaFileFromStorage(oldUrl).catch((err) => {
-          console.warn(`[Category Image Cleanup Fallback] Failed to delete old image '${oldUrl}':`, err);
-        });
-      }
-    }
-
-    const categoryListChanged =
-      (name !== undefined && name !== existing.name) ||
-      (slug !== undefined && slug !== existing.slug) ||
-      (image_url !== undefined && image_url !== existing.image_url) ||
-      (bg_color !== undefined && bg_color !== existing.bg_color) ||
-      (sort_order !== undefined && sort_order !== existing.sort_order) ||
-      (is_active !== undefined && is_active !== existing.is_active);
-
-    if (categoryListChanged) {
-      revalidateTag("page-categories", "max");
-    }
-
+    revalidateTag("page-categories", "max");
+    revalidateTag("site-header", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("home-page", "max");
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
     if (updated.slug && updated.slug !== existing.slug) {
       revalidateTag(`category-${updated.slug}`, "max");
     }
-
-    const headerVisibilityChanged =
-      show_in_header !== undefined && show_in_header !== existing.show_in_header;
-    const isHeaderRelevant = existing.show_in_header || updated.show_in_header;
-    const headerFieldsChanged =
-      name !== undefined ||
-      slug !== undefined ||
-      sort_order !== undefined ||
-      parent_id !== undefined ||
-      is_active !== undefined;
-
-    if (headerVisibilityChanged || (isHeaderRelevant && headerFieldsChanged)) {
-      revalidateTag("site-header", "max");
-    }
-
-    const footerVisibilityChanged =
-      show_in_footer !== undefined && show_in_footer !== existing.show_in_footer;
-    const isFooterRelevant = existing.show_in_footer || updated.show_in_footer;
-    const footerFieldsChanged =
-      name !== undefined ||
-      slug !== undefined ||
-      sort_order !== undefined ||
-      parent_id !== undefined ||
-      is_active !== undefined;
-
-    if (footerVisibilityChanged || (isFooterRelevant && footerFieldsChanged)) {
-      revalidateTag("site-footer", "max");
-    }
-
-    const homeVisibilityChanged =
-      show_in_home !== undefined && show_in_home !== existing.show_in_home;
-    const isHomeRelevant = existing.show_in_home || updated.show_in_home;
-    const homeFieldsChanged =
-      name !== undefined ||
-      slug !== undefined ||
-      image_url !== undefined ||
-      bg_color !== undefined ||
-      sort_order !== undefined ||
-      is_active !== undefined;
-
-    if (homeVisibilityChanged || (isHomeRelevant && homeFieldsChanged)) {
-      revalidateTag("home-page", "max");
-    }
-
     if (existing.parent?.slug) {
       revalidateTag(`category-${existing.parent.slug}`, "max");
     }
@@ -320,6 +279,7 @@ export async function updateCategory(
     }
 
     revalidatePath("/dashboard/categories");
+    revalidatePath("/dashboard/categories/trash");
 
     await logActivity({
       action: "update_category",
@@ -331,8 +291,38 @@ export async function updateCategory(
     });
 
     return { success: true, message: "Category updated successfully." };
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+    console.error("Error updating category:", error);
+
+    if (error.message === "CATEGORY_SLUG_EXISTS") {
+      return {
+        success: false,
+        errors: { slug: "A category with this slug already exists." },
+        message: "A category with this slug already exists.",
+      };
+    }
+    if (error.message === "CATEGORY_SELF_PARENT") {
+      return {
+        success: false,
+        errors: { parent_id: "A category cannot be set as its own parent." },
+        message: "A category cannot be its own parent.",
+      };
+    }
+    if (error.message === "CATEGORY_PARENT_NOT_FOUND") {
+      return {
+        success: false,
+        errors: { parent_id: "Selected parent category does not exist or has been deleted." },
+        message: "Selected parent category does not exist.",
+      };
+    }
+    if (error.message === "CATEGORY_CIRCULAR_HIERARCHY") {
+      return {
+        success: false,
+        errors: { parent_id: "Cannot select a subcategory as parent (circular hierarchy detected)." },
+        message: "Circular category hierarchy detected.",
+      };
+    }
+
     await logActivity({
       action: "update_category",
       entity_type: "category",
@@ -345,10 +335,68 @@ export async function updateCategory(
   }
 }
 
+export async function toggleCategoryStatus(
+  id: number,
+  is_active: boolean,
+): Promise<ActionResponse> {
+  const { user } = await assertPermission("update", "/dashboard/categories");
+
+  const parsed = categoryStatusToggleSchema.safeParse({ id, is_active });
+  if (!parsed.success) {
+    return {
+      success: false,
+      errors: formatZodErrors(parsed.error),
+      message: "Invalid parameters for status toggle.",
+    };
+  }
+
+  try {
+    const { existing, updated } = await toggleCategoryStatusTransaction(
+      id,
+      is_active,
+      Number(user.id),
+    );
+
+    revalidateTag("page-categories", "max");
+    revalidateTag("site-header", "max");
+    revalidateTag("site-footer", "max");
+    revalidateTag("home-page", "max");
+    if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
+    if (existing.parent?.slug) revalidateTag(`category-${existing.parent.slug}`, "max");
+
+    revalidatePath("/dashboard/categories");
+
+    await logActivity({
+      action: "toggle_category_status",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "SUCCESS",
+      details: { id, slug: existing.slug, is_active: updated.is_active },
+    });
+
+    return {
+      success: true,
+      message: `Category "${existing.name}" is now ${is_active ? "Active" : "Inactive"}.`,
+    };
+  } catch (error) {
+    console.error("Error toggling category status:", error);
+    await logActivity({
+      action: "toggle_category_status",
+      entity_type: "category",
+      entity_id: id,
+      user,
+      status: "FAILED",
+      details: { id, error: String(error) },
+    });
+    return { success: false, message: "Failed to toggle category status." };
+  }
+}
+
 export async function deleteCategory(id: number): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/categories");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid category ID." };
 
   try {
     const { existing } = await deleteCategoryTransaction(id, Number(user.id));
@@ -372,9 +420,9 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
       details: { id, slug: existing.slug },
     });
 
-    return { success: true, message: "Category deleted successfully." };
+    return { success: true, message: `Category "${existing.name}" moved to trash.` };
   } catch (error) {
-    console.error(error);
+    console.error("Error deleting category:", error);
     await logActivity({
       action: "delete_category",
       entity_type: "category",
@@ -390,7 +438,7 @@ export async function deleteCategory(id: number): Promise<ActionResponse> {
 export async function restoreCategory(id: number): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/categories");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid category ID." };
 
   try {
     const { existing } = await restoreCategoryTransaction(id, Number(user.id));
@@ -414,9 +462,9 @@ export async function restoreCategory(id: number): Promise<ActionResponse> {
       details: { id, slug: existing.slug },
     });
 
-    return { success: true, message: "Category restored successfully." };
+    return { success: true, message: `Category "${existing.name}" restored successfully.` };
   } catch (error) {
-    console.error(error);
+    console.error("Error restoring category:", error);
     await logActivity({
       action: "restore_category",
       entity_type: "category",
@@ -434,11 +482,10 @@ export async function permanentlyDeleteCategory(
 ): Promise<ActionResponse> {
   const { user } = await assertPermission("delete", "/dashboard/categories");
 
-  if (id < 1) return { success: false, message: "An Error Occurred" };
+  if (id < 1) return { success: false, message: "Invalid category ID." };
 
   try {
-    const { existing } =
-      await permanentlyDeleteCategoryTransaction(id);
+    const { existing } = await permanentlyDeleteCategoryTransaction(id);
 
     revalidateTag("page-categories", "max");
     if (existing.slug) revalidateTag(`category-${existing.slug}`, "max");
@@ -458,9 +505,25 @@ export async function permanentlyDeleteCategory(
       details: { id, slug: existing.slug },
     });
 
-    return { success: true, message: "Category permanently deleted." };
-  } catch (error) {
-    console.error(error);
+    return { success: true, message: `Category "${existing.name}" permanently deleted.` };
+  } catch (error: any) {
+    console.error("Error permanently deleting category:", error);
+
+    if (error.message?.startsWith("CATEGORY_HAS_CHILDREN:")) {
+      const count = error.message.split(":")[1];
+      return {
+        success: false,
+        message: `Cannot permanently delete this category because it has ${count} subcategor${Number(count) === 1 ? "y" : "ies"}. Please reassign or delete the subcategories first.`,
+      };
+    }
+    if (error.message?.startsWith("CATEGORY_HAS_PRODUCTS:")) {
+      const count = error.message.split(":")[1];
+      return {
+        success: false,
+        message: `Cannot permanently delete this category because ${count} product(s) are assigned to it. Please reassign those products first.`,
+      };
+    }
+
     await logActivity({
       action: "permanently_delete_category",
       entity_type: "category",
@@ -512,9 +575,9 @@ export async function bulkDeleteCategories(
       details: { ids, count: affected.length },
     });
 
-    return { success: true, message: "Selected categories moved to trash." };
+    return { success: true, message: `${affected.length} category/categories moved to trash.` };
   } catch (error) {
-    console.error(error);
+    console.error("Error in bulkDeleteCategories:", error);
     await logActivity({
       action: "bulk_delete_categories",
       entity_type: "category",
@@ -565,9 +628,9 @@ export async function bulkRestoreCategories(
       details: { ids, count: affected.length },
     });
 
-    return { success: true, message: "Selected categories restored." };
+    return { success: true, message: `${affected.length} category/categories restored from trash.` };
   } catch (error) {
-    console.error(error);
+    console.error("Error in bulkRestoreCategories:", error);
     await logActivity({
       action: "bulk_restore_categories",
       entity_type: "category",
@@ -591,7 +654,7 @@ export async function bulkPermanentlyDeleteCategories(
       : undefined;
 
   try {
-    const { affected } =
+    const { affected, skippedCount } =
       await bulkPermanentlyDeleteCategoriesTransaction(
         ids,
         selectAllScope,
@@ -614,12 +677,17 @@ export async function bulkPermanentlyDeleteCategories(
       entity_type: "category",
       user,
       status: "SUCCESS",
-      details: { ids, count: affected.length },
+      details: { ids, deletedCount: affected.length, skippedCount },
     });
 
-    return { success: true, message: "Selected categories permanently deleted." };
+    let message = `${affected.length} category/categories permanently deleted.`;
+    if (skippedCount > 0) {
+      message += ` ${skippedCount} categories were skipped because they have subcategories or assigned products.`;
+    }
+
+    return { success: true, message };
   } catch (error) {
-    console.error(error);
+    console.error("Error in bulkPermanentlyDeleteCategories:", error);
     await logActivity({
       action: "bulk_permanently_delete_categories",
       entity_type: "category",

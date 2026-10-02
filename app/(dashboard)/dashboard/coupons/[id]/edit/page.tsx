@@ -10,7 +10,7 @@ import { getCouponEditDataInDB } from "@/services/coupon-services";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Edit Coupon",
+  title: "Edit Coupon — Dashboard",
   description: "Edit discount coupon settings",
 };
 
@@ -26,9 +26,7 @@ export default function EditCouponPage(props: PageProps) {
   );
 }
 
-async function EditCouponPageContent({
-  params,
-}: PageProps) {
+async function EditCouponPageContent({ params }: PageProps) {
   await assertPermission("update", "/dashboard/coupons");
   const { id } = await params;
   const couponId = Number(id);
@@ -50,17 +48,17 @@ async function EditCouponPageContent({
       {/* Header Panel */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-dashboard-fg tracking-tight">
             Edit Coupon
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-dashboard-muted">
             Update settings, expiration date, and redemption limits for &quot;{couponData.code}&quot;.
           </p>
         </div>
         <div>
           <Link
             href="/dashboard/coupons"
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/80 dark:text-zinc-400 transition-all shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-dashboard-border bg-dashboard-card hover:bg-dashboard-card-hover text-dashboard-muted hover:text-dashboard-fg transition-all shadow-xs cursor-pointer"
           >
             <svg
               className="h-4 w-4"
@@ -81,7 +79,7 @@ async function EditCouponPageContent({
       </div>
 
       {/* Main Form Card */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-xs">
+      <div className="bg-dashboard-card border border-dashboard-border rounded-2xl p-6 sm:p-8 shadow-xs">
         <CouponForm initialData={couponData as any} />
       </div>
     </div>

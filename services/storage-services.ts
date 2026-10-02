@@ -15,6 +15,7 @@ export interface StorageOptionDTO {
   updated_at: Date;
   env_status: Record<string, boolean>;
   is_env_complete: boolean;
+  metrics?: StorageMetricsDTO;
 }
 
 export interface StorageMetricsDTO {
@@ -480,3 +481,40 @@ export async function getStorageMetrics(storageKey: string): Promise<StorageMetr
     };
   }
 }
+
+/**
+ * Service function to verify environment variables and ping connectivity for a storage option.
+ */
+export async function verifyStorageOptionService(storageKey: string) {
+  return await verifyStorageEnv(storageKey);
+}
+
+/**
+ * Aggregates dashboard data for storage options including metrics and active env override.
+ */
+export async function getStoragesDashboardDataInDB(): Promise<{
+  options: StorageOptionDTO[];
+  activeDriverEnv: string | null;
+}> {
+  const options = await getAllStorageOptionsFromDB();
+  const activeDriverEnv = process.env.ACTIVE_STORAGE_DRIVER?.trim().toLowerCase() || null;
+
+  const optionsWithMetrics = await Promise.all(
+    options.map(async (opt) => {
+      const metrics = opt.is_env_complete
+        ? await getStorageMetrics(opt.key)
+        : { totalFilesCount: 0, totalSizeBytes: 0, formattedTotalSize: "0 Bytes" };
+
+      return {
+        ...opt,
+        metrics,
+      };
+    })
+  );
+
+  return {
+    options: optionsWithMetrics,
+    activeDriverEnv,
+  };
+}
+

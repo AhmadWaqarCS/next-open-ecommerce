@@ -34,9 +34,7 @@ export default function OrderDetailPage(props: PageProps) {
   );
 }
 
-async function OrderDetailPageContent({
-  params,
-}: PageProps) {
+async function OrderDetailPageContent({ params }: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/orders");
   const { id } = await params;
 
@@ -77,37 +75,37 @@ async function OrderDetailPageContent({
     switch (status) {
       case "paid":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-accent-subtle text-dashboard-accent-fg border border-dashboard-accent/30 capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-accent" />
             Paid
           </span>
         );
       case "pending":
       case "cod_pending":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 capitalize">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             {status === "cod_pending" ? "COD Pending" : "Pending"}
           </span>
         );
       case "failed":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-danger-subtle text-dashboard-danger border border-dashboard-danger/20 capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-danger" />
             Failed
           </span>
         );
       case "refunded":
       case "partially_refunded":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 capitalize">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
             {status.replace("_", " ")}
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-muted-bg text-dashboard-muted border border-dashboard-border capitalize">
             {status}
           </span>
         );
@@ -118,49 +116,49 @@ async function OrderDetailPageContent({
     switch (status) {
       case "delivered":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-accent-subtle text-dashboard-accent-fg border border-dashboard-accent/30 capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-accent" />
             Delivered
           </span>
         );
       case "shipped":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-primary/10 text-dashboard-primary border border-dashboard-primary/30 capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-primary" />
             Shipped
           </span>
         );
       case "processing":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 capitalize">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Processing
           </span>
         );
       case "unfulfilled":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-muted-bg text-dashboard-fg border border-dashboard-border capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-muted" />
             Unfulfilled
           </span>
         );
       case "cancelled":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 capitalize">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-danger-subtle text-dashboard-danger border border-dashboard-danger/20 capitalize">
+            <span className="w-1.5 h-1.5 rounded-full bg-dashboard-danger" />
             Cancelled
           </span>
         );
       case "returned":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/40 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 capitalize">
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
             Returned
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 capitalize">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-dashboard-muted-bg text-dashboard-muted border border-dashboard-border capitalize">
             {status}
           </span>
         );
@@ -170,11 +168,11 @@ async function OrderDetailPageContent({
   return (
     <div className="space-y-6 flex-1 flex flex-col pb-10">
       {/* Top Bar Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-dashboard-card p-6 rounded-2xl border border-dashboard-border shadow-xs">
         <div className="space-y-1">
           <Link
             href="/dashboard/orders"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors mb-1"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-dashboard-muted hover:text-dashboard-fg transition-colors mb-1"
           >
             <svg
               className="w-4 h-4"
@@ -192,7 +190,7 @@ async function OrderDetailPageContent({
             <span>Back to Orders</span>
           </Link>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-black font-mono text-zinc-900 dark:text-zinc-50 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold font-mono text-dashboard-fg tracking-tight">
               {order.order_number}
             </h1>
             <div className="flex items-center gap-2">
@@ -200,9 +198,9 @@ async function OrderDetailPageContent({
               {getFulfillmentBadge(order.fulfillment_status)}
             </div>
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs text-dashboard-muted">
             Placed on{" "}
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+            <span className="font-semibold text-dashboard-fg">
               {formatDate(order.placed_at)}
             </span>
           </p>
@@ -214,22 +212,22 @@ async function OrderDetailPageContent({
         {/* Left Column (7 cols) - Items Table & Financial Summary */}
         <div className="lg:col-span-7 space-y-6">
           {/* Purchased Line Items Card */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-4">
-            <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-4">
+            <h3 className="font-bold text-base text-dashboard-fg border-b border-dashboard-border pb-3">
               Order Items ({order.items?.length || 0})
             </h3>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-100 dark:border-zinc-800 text-zinc-400 font-bold uppercase tracking-wider">
+                  <tr className="border-b border-dashboard-border-subtle text-dashboard-muted font-bold uppercase tracking-wider">
                     <th className="pb-3">Product</th>
                     <th className="pb-3 text-right">Price</th>
                     <th className="pb-3 text-center">Qty</th>
                     <th className="pb-3 text-right">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tbody className="divide-y divide-dashboard-border-subtle">
                   {order.items && order.items.length > 0 ? (
                     order.items.map((item) => {
                       const optionsMap =
@@ -241,18 +239,17 @@ async function OrderDetailPageContent({
                         <tr key={item.id} className="group">
                           <td className="py-4 pr-3">
                             <div className="flex items-start gap-3">
-                              <div className="relative w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shrink-0 overflow-hidden flex items-center justify-center">
+                              <div className="relative w-12 h-12 rounded-xl bg-dashboard-muted-bg border border-dashboard-border shrink-0 overflow-hidden flex items-center justify-center">
                                 {item.image_url ? (
                                   <Image
                                     src={item.image_url}
                                     alt={item.product_name}
                                     fill
-                                    // unoptimized
                                     className="object-cover"
                                   />
                                 ) : (
                                   <svg
-                                    className="w-6 h-6 text-zinc-400"
+                                    className="w-6 h-6 text-dashboard-muted"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -267,13 +264,13 @@ async function OrderDetailPageContent({
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <span className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 block">
+                                <span className="font-bold text-sm text-dashboard-fg block">
                                   {item.product_name}
                                 </span>
 
                                 {/* Variant Name */}
                                 {item.variant_name && (
-                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400">
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-dashboard-primary">
                                     <svg
                                       className="w-3.5 h-3.5"
                                       fill="none"
@@ -299,9 +296,9 @@ async function OrderDetailPageContent({
                                         ([optKey, optVal]) => (
                                           <span
                                             key={optKey}
-                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
+                                            className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-dashboard-muted-bg text-dashboard-fg border border-dashboard-border"
                                           >
-                                            <span className="text-zinc-400 mr-1 capitalize">
+                                            <span className="text-dashboard-muted mr-1 capitalize">
                                               {optKey}:
                                             </span>{" "}
                                             {String(optVal)}
@@ -313,20 +310,20 @@ async function OrderDetailPageContent({
 
                                 {/* SKU */}
                                 {item.sku && (
-                                  <span className="text-[11px] font-mono text-zinc-400 block pt-0.5">
+                                  <span className="text-[11px] font-mono text-dashboard-muted block pt-0.5">
                                     SKU: {item.sku}
                                   </span>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td className="py-4 px-3 text-right font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+                          <td className="py-4 px-3 text-right font-semibold text-dashboard-fg whitespace-nowrap">
                             {formatCurrency(item.unit_price, order.currency)}
                           </td>
-                          <td className="py-4 px-3 text-center font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          <td className="py-4 px-3 text-center font-bold text-dashboard-fg whitespace-nowrap">
                             {item.quantity}
                           </td>
-                          <td className="py-4 pl-3 text-right font-extrabold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                          <td className="py-4 pl-3 text-right font-extrabold text-dashboard-fg whitespace-nowrap">
                             {formatCurrency(item.line_total, order.currency)}
                           </td>
                         </tr>
@@ -336,7 +333,7 @@ async function OrderDetailPageContent({
                     <tr>
                       <td
                         colSpan={4}
-                        className="py-4 text-center text-zinc-400"
+                        className="py-4 text-center text-dashboard-muted"
                       >
                         No line items associated with this order.
                       </td>
@@ -348,19 +345,21 @@ async function OrderDetailPageContent({
           </div>
 
           {/* Financial Breakdown Card */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3">
-            <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3">
+            <h3 className="font-bold text-base text-dashboard-fg border-b border-dashboard-border pb-3">
               Order Financial Summary
             </h3>
 
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+              <div className="flex justify-between text-dashboard-muted font-medium">
                 <span>Subtotal</span>
-                <span>{formatCurrency(order.subtotal, order.currency)}</span>
+                <span className="text-dashboard-fg font-semibold">
+                  {formatCurrency(order.subtotal, order.currency)}
+                </span>
               </div>
 
               {Number(order.discount_amount) > 0 && (
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-medium">
+                <div className="flex justify-between text-dashboard-accent-fg font-medium">
                   <span>
                     Discount {order.coupon_code ? `(${order.coupon_code})` : ""}
                   </span>
@@ -370,23 +369,25 @@ async function OrderDetailPageContent({
                 </div>
               )}
 
-              <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+              <div className="flex justify-between text-dashboard-muted font-medium">
                 <span>
                   Shipping ({order.shipping_method_name || "Standard Shipping"})
                 </span>
-                <span>
+                <span className="text-dashboard-fg font-semibold">
                   {formatCurrency(order.shipping_cost, order.currency)}
                 </span>
               </div>
 
-              <div className="flex justify-between text-zinc-600 dark:text-zinc-400 font-medium">
+              <div className="flex justify-between text-dashboard-muted font-medium">
                 <span>Estimated Tax</span>
-                <span>{formatCurrency(order.tax_amount, order.currency)}</span>
+                <span className="text-dashboard-fg font-semibold">
+                  {formatCurrency(order.tax_amount, order.currency)}
+                </span>
               </div>
 
-              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center text-sm font-black text-zinc-900 dark:text-zinc-50">
+              <div className="pt-3 border-t border-dashboard-border flex justify-between items-center text-sm font-bold text-dashboard-fg">
                 <span>Total Amount</span>
-                <span className="text-base text-blue-600 dark:text-blue-400">
+                <span className="text-base font-extrabold text-dashboard-primary">
                   {formatCurrency(order.total, order.currency)}
                 </span>
               </div>
@@ -401,28 +402,28 @@ async function OrderDetailPageContent({
 
           {/* Notes & Instructions Card */}
           {(order.customer_notes || order.admin_notes) && (
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-4">
-              <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+            <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-4">
+              <h3 className="font-bold text-base text-dashboard-fg border-b border-dashboard-border pb-3">
                 Order Notes
               </h3>
 
               {order.customer_notes && (
-                <div className="p-3.5 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 space-y-1">
-                  <span className="text-xs font-bold text-amber-800 dark:text-amber-400 block">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400 block">
                     Customer Instructions
                   </span>
-                  <p className="text-xs text-amber-900 dark:text-amber-300 whitespace-pre-wrap">
+                  <p className="text-xs text-dashboard-fg whitespace-pre-wrap">
                     {order.customer_notes}
                   </p>
                 </div>
               )}
 
               {order.admin_notes && (
-                <div className="p-3.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/30 space-y-1">
-                  <span className="text-xs font-bold text-blue-800 dark:text-blue-400 block">
+                <div className="p-3.5 rounded-xl bg-dashboard-primary/10 border border-dashboard-primary/20 space-y-1">
+                  <span className="text-xs font-bold text-dashboard-primary block">
                     Internal Dashboard Notes
                   </span>
-                  <p className="text-xs text-blue-900 dark:text-blue-300 whitespace-pre-wrap">
+                  <p className="text-xs text-dashboard-fg whitespace-pre-wrap">
                     {order.admin_notes}
                   </p>
                 </div>
@@ -432,30 +433,30 @@ async function OrderDetailPageContent({
 
           {/* External Tracking Link Card if Carrier Available */}
           {(order.carrier_name || order.tracking_number) && (
-            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3">
-              <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+            <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3">
+              <h3 className="font-bold text-base text-dashboard-fg border-b border-dashboard-border pb-3">
                 Shipment Tracking Details
               </h3>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400 font-medium">Carrier</span>
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                  <span className="text-dashboard-muted font-medium">Carrier</span>
+                  <span className="font-bold text-dashboard-fg">
                     {order.carrier_name || "N/A"}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400 font-medium">Tracking #</span>
-                  <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                  <span className="text-dashboard-muted font-medium">Tracking #</span>
+                  <span className="font-mono font-bold text-dashboard-fg">
                     {order.tracking_number || "N/A"}
                   </span>
                 </div>
                 {order.tracking_url && (
-                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="pt-2 border-t border-dashboard-border">
                     <a
                       href={order.tracking_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold hover:underline"
+                      className="inline-flex items-center gap-1.5 text-dashboard-primary font-bold hover:underline"
                     >
                       <span>Open External Tracking Link</span>
                       <svg
@@ -482,16 +483,16 @@ async function OrderDetailPageContent({
 
       {/* Bottom Grid: 4 Equal Cards for Customer Info, Shipping Address, Billing Address & Payment Method */}
       <div className="space-y-4 pt-4">
-        <h2 className="text-lg font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
+        <h2 className="text-lg font-bold text-dashboard-fg tracking-tight">
           Customer & Delivery Details
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Card 1: Customer Profile */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3 flex flex-col justify-between">
-            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3 flex items-center gap-2">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3 flex flex-col justify-between">
+            <h3 className="font-bold text-sm text-dashboard-fg border-b border-dashboard-border pb-3 flex items-center gap-2">
               <svg
-                className="w-4 h-4 text-blue-500"
+                className="w-4 h-4 text-dashboard-primary"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -508,32 +509,32 @@ async function OrderDetailPageContent({
 
             <div className="space-y-2.5 text-xs flex-1">
               <div>
-                <span className="text-zinc-400 font-medium block">
+                <span className="text-dashboard-muted font-medium block">
                   Full Name
                 </span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                <span className="font-bold text-dashboard-fg text-sm">
                   {order.customer_first_name} {order.customer_last_name}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-400 font-medium block">
+                <span className="text-dashboard-muted font-medium block">
                   Email Address
                 </span>
                 <a
                   href={`mailto:${order.customer_email}`}
-                  className="font-mono text-blue-600 dark:text-blue-400 font-semibold hover:underline break-all"
+                  className="font-mono text-dashboard-primary font-semibold hover:underline break-all"
                 >
                   {order.customer_email}
                 </a>
               </div>
               {order.customer_phone && (
                 <div>
-                  <span className="text-zinc-400 font-medium block">
+                  <span className="text-dashboard-muted font-medium block">
                     Phone Number
                   </span>
                   <a
                     href={`tel:${order.customer_phone}`}
-                    className="font-mono text-zinc-800 dark:text-zinc-200 font-semibold hover:underline"
+                    className="font-mono text-dashboard-fg font-semibold hover:underline"
                   >
                     {order.customer_phone}
                   </a>
@@ -541,10 +542,10 @@ async function OrderDetailPageContent({
               )}
               {order.customer_ip && (
                 <div>
-                  <span className="text-zinc-400 font-medium block">
+                  <span className="text-dashboard-muted font-medium block">
                     IP Address
                   </span>
-                  <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                  <span className="font-mono text-dashboard-muted">
                     {order.customer_ip}
                   </span>
                 </div>
@@ -553,10 +554,10 @@ async function OrderDetailPageContent({
           </div>
 
           {/* Card 2: Shipping Address */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3 flex flex-col justify-between">
-            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3 flex items-center gap-2">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3 flex flex-col justify-between">
+            <h3 className="font-bold text-sm text-dashboard-fg border-b border-dashboard-border pb-3 flex items-center gap-2">
               <svg
-                className="w-4 h-4 text-emerald-500"
+                className="w-4 h-4 text-dashboard-accent"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -576,8 +577,8 @@ async function OrderDetailPageContent({
               <span>Shipping Address</span>
             </h3>
 
-            <div className="text-xs text-zinc-700 dark:text-zinc-300 space-y-1 font-medium leading-relaxed flex-1">
-              <p className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+            <div className="text-xs text-dashboard-fg space-y-1 font-medium leading-relaxed flex-1">
+              <p className="font-bold text-dashboard-fg text-sm">
                 {order.customer_first_name} {order.customer_last_name}
               </p>
               <p>{order.shipping_address_line1}</p>
@@ -589,15 +590,15 @@ async function OrderDetailPageContent({
                 {order.shipping_state ? `, ${order.shipping_state}` : ""}{" "}
                 {order.shipping_postal_code}
               </p>
-              <p className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-[11px] pt-1">
+              <p className="font-bold text-dashboard-fg uppercase tracking-wider text-[11px] pt-1">
                 {order.shipping_country}
               </p>
             </div>
           </div>
 
           {/* Card 3: Billing Address */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3 flex flex-col justify-between">
-            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3 flex items-center gap-2">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3 flex flex-col justify-between">
+            <h3 className="font-bold text-sm text-dashboard-fg border-b border-dashboard-border pb-3 flex items-center gap-2">
               <svg
                 className="w-4 h-4 text-purple-500"
                 fill="none"
@@ -614,8 +615,8 @@ async function OrderDetailPageContent({
               <span>Billing Address</span>
             </h3>
 
-            <div className="text-xs text-zinc-700 dark:text-zinc-300 space-y-1 font-medium leading-relaxed flex-1">
-              <p className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+            <div className="text-xs text-dashboard-fg space-y-1 font-medium leading-relaxed flex-1">
+              <p className="font-bold text-dashboard-fg text-sm">
                 {order.customer_first_name} {order.customer_last_name}
               </p>
               <p>{order.billing_address_line1}</p>
@@ -627,15 +628,15 @@ async function OrderDetailPageContent({
                 {order.billing_state ? `, ${order.billing_state}` : ""}{" "}
                 {order.billing_postal_code}
               </p>
-              <p className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-[11px] pt-1">
+              <p className="font-bold text-dashboard-fg uppercase tracking-wider text-[11px] pt-1">
                 {order.billing_country}
               </p>
             </div>
           </div>
 
           {/* Card 4: Payment Method */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-3 flex flex-col justify-between">
-            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-50 border-b border-zinc-100 dark:border-zinc-800 pb-3 flex items-center gap-2">
+          <div className="bg-dashboard-card rounded-2xl border border-dashboard-border p-6 shadow-xs space-y-3 flex flex-col justify-between">
+            <h3 className="font-bold text-sm text-dashboard-fg border-b border-dashboard-border pb-3 flex items-center gap-2">
               <svg
                 className="w-4 h-4 text-amber-500"
                 fill="none"
@@ -654,23 +655,23 @@ async function OrderDetailPageContent({
 
             <div className="space-y-2.5 text-xs flex-1">
               <div>
-                <span className="text-zinc-400 font-medium block">
+                <span className="text-dashboard-muted font-medium block">
                   Method Name
                 </span>
-                <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                <span className="font-bold text-dashboard-fg text-sm">
                   {order.payment_method_name || order.payment_method}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-400 font-medium block mb-1">
+                <span className="text-dashboard-muted font-medium block mb-1">
                   Provider Slug
                 </span>
-                <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                <span className="font-mono text-xs text-dashboard-muted">
                   {order.payment_method}
                 </span>
               </div>
               <div>
-                <span className="text-zinc-400 font-medium block mb-1">
+                <span className="text-dashboard-muted font-medium block mb-1">
                   Payment Status
                 </span>
                 {getPaymentBadge(order.payment_status)}

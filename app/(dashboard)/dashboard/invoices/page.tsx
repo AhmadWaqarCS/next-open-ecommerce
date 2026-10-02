@@ -3,9 +3,11 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import InvoiceTable from "./invoice-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import { getInvoicesDashboardDataInDB } from "@/services/invoice-services";
-
+import {
+  buildInvoiceWhereInput,
+  InvoiceFilterParams,
+} from "@/lib/filters/invoice-filters";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -35,45 +37,15 @@ async function DashboardInvoicesPageContent({
   const pageSize = Math.max(1, Number(params?.size ?? 10));
   const skipCount = (currentPage - 1) * pageSize;
 
-  const where: any = { deleted_at: null };
-  if (
-    typeof params?.invoice_number === "string" &&
-    params.invoice_number.trim()
-  ) {
-    where.invoice_number = {
-      contains: params.invoice_number.trim(),
-      mode: "insensitive",
-    };
-  }
-  if (
-    typeof params?.customer_email === "string" &&
-    params.customer_email.trim()
-  ) {
-    where.customer_email = {
-      contains: params.customer_email.trim(),
-      mode: "insensitive",
-    };
-  }
-  if (
-    typeof params?.customer_name === "string" &&
-    params.customer_name.trim()
-  ) {
-    where.customer_name = {
-      contains: params.customer_name.trim(),
-      mode: "insensitive",
-    };
-  }
-  if (typeof params?.status === "string" && params.status.trim()) {
-    where.status = params.status.trim();
-  }
+  const where = buildInvoiceWhereInput((params as InvoiceFilterParams) || {});
 
   const { invoicesRaw, totalInvoices, dashboardUsers } =
     await getInvoicesDashboardDataInDB(where, skipCount, pageSize);
 
-  const userIds = invoicesRaw.flatMap((inv) => [
-    inv.created_by,
-    inv.updated_by,
-  ]);
+  const userIds = [
+    ...invoicesRaw.flatMap((inv) => [inv.created_by, inv.updated_by]),
+    ...dashboardUsers.map((u) => u.id),
+  ];
   const userNames = await resolveUserNames(userIds);
 
   const serializedInvoices = invoicesRaw.map((inv) => ({
@@ -98,17 +70,11 @@ async function DashboardInvoicesPageContent({
     <div className="space-y-6 flex-1 flex flex-col">
       <InvoiceTable
         invoices={serializedInvoices}
-        filterParams={params as any}
         permissions={permissions}
         userNames={userNames}
         totalCount={totalInvoices}
-      />
-
-      <Pagination
-        totalItems={totalInvoices}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="invoices"
       />
     </div>
   );

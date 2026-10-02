@@ -12,7 +12,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const { siteConfig, categories, products, pages } = await prisma.$transaction(async (tx) => {
       const siteConfig = await tx.site_config.findFirst({
-        where: { deleted_at: null },
         select: { site_url: true },
       });
       const categories = await tx.category.findMany({

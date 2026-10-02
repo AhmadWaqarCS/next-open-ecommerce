@@ -3,7 +3,6 @@ import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import CategoryTable from "./category-table";
 import { resolveUserNames } from "@/lib/action-utils";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   CategoryFilterParams,
   getCategoryFilterWhere,
@@ -94,7 +93,7 @@ async function DashboardCategoriesPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <CategoryTable
         categories={categories as any}
         parentCategories={allCategories}
@@ -103,15 +102,9 @@ async function DashboardCategoriesPageContent({
         permissions={permissions}
         userNames={userNames}
         totalCount={totalCategories}
-      />
-
-      <Pagination
-        totalItems={totalCategories}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="categories"
       />
     </div>
   );
 }
-

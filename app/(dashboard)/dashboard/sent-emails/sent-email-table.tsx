@@ -4,14 +4,11 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { CRUD } from "@/lib/types";
 import DataTable, { ColumnDef } from "@/app/(dashboard)/_components/data-table";
-import GlobalFilterBar, {
-  CustomFilterConfig,
-} from "@/app/(dashboard)/_components/global-filter-bar";
 import Modal from "@/app/(dashboard)/_components/modal";
 import { useToast } from "@/app/(dashboard)/_components/toast-context";
 import { resendEmailAction } from "@/actions/sent-email-actions";
 
-interface SentEmail {
+export interface SentEmail {
   id: number;
   type: string;
   sender_email: string;
@@ -28,19 +25,22 @@ interface SentEmail {
 
 interface SentEmailTableProps {
   emails: SentEmail[];
-  filterParams?: Record<string, any>;
   permissions: CRUD;
-  totalCount?: number;
+  totalCount: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 export default function SentEmailTable({
   emails,
-  filterParams = {},
   permissions,
   totalCount,
+  currentPage,
+  pageSize,
 }: SentEmailTableProps) {
   const [isPending, startTransition] = useTransition();
-  const [selectedResendEmail, setSelectedResendEmail] = useState<SentEmail | null>(null);
+  const [selectedResendEmail, setSelectedResendEmail] =
+    useState<SentEmail | null>(null);
   const { toast } = useToast();
 
   const formatDate = (date?: Date | string | null) => {
@@ -54,25 +54,37 @@ export default function SentEmailTable({
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "successful":
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case "marketing":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30 uppercase">
-            Successful
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+            Marketing
           </span>
         );
-      case "failed":
+      case "newsletter":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/30 uppercase">
-            Failed
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+            Newsletter
           </span>
         );
-      case "pending":
+      case "order":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-dashboard-accent-subtle text-dashboard-accent-fg border border-dashboard-accent/20">
+            Order
+          </span>
+        );
+      case "support":
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            Support
+          </span>
+        );
+      case "invoice":
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 uppercase">
-            Pending
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-dashboard-primary/10 text-dashboard-primary border border-dashboard-primary/20">
+            Invoice
           </span>
         );
     }
@@ -80,14 +92,14 @@ export default function SentEmailTable({
 
   const handleConfirmResend = () => {
     if (!selectedResendEmail) return;
-    const email = selectedResendEmail;
+    const emailToResend = selectedResendEmail;
     startTransition(async () => {
-      const res = await resendEmailAction(email.id);
+      const res = await resendEmailAction(emailToResend.id);
       setSelectedResendEmail(null);
       if (res.success) {
-        toast(res.message || "Email resent successfully.", "success");
+        toast.success(res.message || "Email resent successfully.");
       } else {
-        toast(res.message || "Failed to resend email.", "error");
+        toast.error(res.message || "Failed to resend email.");
       }
     });
   };
@@ -97,11 +109,11 @@ export default function SentEmailTable({
       header: "Recipient",
       render: (item) => (
         <div>
-          <span className="font-semibold text-zinc-900 dark:text-zinc-100 block text-sm">
+          <span className="font-bold text-dashboard-fg block text-sm">
             {item.recipient_name || item.recipient_email}
           </span>
           {item.recipient_name && (
-            <span className="text-xs text-zinc-500 block">
+            <span className="text-xs text-dashboard-muted block font-mono">
               {item.recipient_email}
             </span>
           )}
@@ -111,140 +123,160 @@ export default function SentEmailTable({
     {
       header: "Subject & Type",
       render: (item) => (
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           <Link
             href={`/dashboard/sent-emails/${item.id}`}
-            className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline block text-sm"
+            className="font-bold text-dashboard-fg hover:text-dashboard-primary transition-colors block text-sm"
           >
             {item.subject}
           </Link>
-          <div className="flex items-center gap-2">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 uppercase">
-              {item.type}
-            </span>
-            {item.order_number && (
-              <span className="text-xs text-zinc-500 font-mono">
-                Order #{item.order_number}
-              </span>
-            )}
-          </div>
+          <div>{getTypeBadge(item.type)}</div>
         </div>
       ),
     },
     {
-      header: "Status",
-      render: (item) => getStatusBadge(item.status),
+      header: "References",
+      render: (item) => (
+        <div className="space-y-0.5 text-xs">
+          {item.order_number && (
+            <span className="text-dashboard-muted block font-mono">
+              Order #{item.order_number}
+            </span>
+          )}
+          {item.invoice_id ? (
+            <Link
+              href={`/dashboard/invoices/${item.invoice_id}`}
+              className="text-dashboard-primary hover:underline font-mono block font-semibold"
+            >
+              Invoice #{item.invoice_id}
+            </Link>
+          ) : null}
+          {!item.order_number && !item.invoice_id && (
+            <span className="text-dashboard-muted italic">—</span>
+          )}
+        </div>
+      ),
     },
     {
       header: "Sent Time",
       render: (item) => (
-        <span className="text-xs text-zinc-600 dark:text-zinc-400">
+        <span className="text-xs text-dashboard-muted font-medium">
           {formatDate(item.sent_at)}
         </span>
       ),
     },
   ];
 
-  const filterConfigs: CustomFilterConfig[] = [
-    { key: "recipient_email", label: "Recipient Email", type: "text" },
-    { key: "subject", label: "Subject", type: "text" },
-    { key: "order_number", label: "Order #", type: "text" },
-    {
-      key: "status",
-      label: "Status",
-      type: "select",
-      options: [
-        { label: "Successful", value: "successful" },
-        { label: "Failed", value: "failed" },
-        { label: "Pending", value: "pending" },
-      ],
-    },
-    {
-      key: "type",
-      label: "Type",
-      type: "select",
-      options: [
-        { label: "Invoice", value: "invoice" },
-        { label: "Order Notification", value: "order_notification" },
-        { label: "Newsletter", value: "newsletter" },
-        { label: "System", value: "system" },
-      ],
-    },
-  ];
-
   return (
     <>
-      <DataTable
+      <DataTable<SentEmail>
         title="Sent Email Logs"
-        description="Monitor and audit all outbound email dispatches, status results, and failures"
-        filterBar={<GlobalFilterBar customFilters={filterConfigs} hideAuditFilters={true} />}
+        description="Audit and inspect outbound emails dispatched via Nodemailer"
         permissions={permissions}
         data={emails}
-        totalCount={totalCount}
         columns={columns}
-        renderActions={(item) => (
-          <div className="flex items-center justify-end gap-2">
-            <Link
-              href={`/dashboard/sent-emails/${item.id}`}
-              className="px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded transition-colors"
+        getRowHref={(item) => `/dashboard/sent-emails/${item.id}`}
+        filterConfig={{
+          searchKey: "search",
+          searchPlaceholder: "Search emails by subject, recipient, order...",
+          hideAuditFilters: true,
+          hideIdFilter: true,
+          customFilters: [
+            {
+              key: "type",
+              label: "Type",
+              type: "select",
+              isPrimary: true,
+              options: [
+                { label: "All Types", value: "" },
+                { label: "Invoice", value: "invoice" },
+                { label: "Order", value: "order" },
+                { label: "Marketing", value: "marketing" },
+                { label: "Newsletter", value: "newsletter" },
+                { label: "Support", value: "support" },
+              ],
+            },
+            { key: "recipient_email", label: "Recipient Email", type: "text" },
+            { key: "order_number", label: "Order #", type: "text" },
+          ],
+        }}
+        paginationConfig={{
+          totalItems: totalCount,
+          currentPage,
+          pageSize,
+          itemName: "sent emails",
+        }}
+        actionConfig={{
+          renderActions: (item) => (
+            <div
+              className="flex items-center justify-end gap-2"
+              onClick={(e) => e.stopPropagation()}
             >
-              View Body
-            </Link>
-            <button
-              onClick={() => setSelectedResendEmail(item)}
-              disabled={isPending}
-              className="px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded transition-colors disabled:opacity-50 cursor-pointer"
-              title="Resend this email"
-            >
-              Resend
-            </button>
-          </div>
-        )}
+              <Link
+                href={`/dashboard/sent-emails/${item.id}`}
+                className="px-2.5 py-1 text-xs font-semibold text-dashboard-fg bg-dashboard-card hover:bg-dashboard-card-hover border border-dashboard-border rounded-lg transition-colors"
+              >
+                View Body
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSelectedResendEmail(item)}
+                disabled={isPending}
+                className="px-2.5 py-1 text-xs font-semibold text-dashboard-accent-fg bg-dashboard-accent hover:bg-dashboard-accent/80 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                title="Resend this email"
+              >
+                Resend
+              </button>
+            </div>
+          ),
+        }}
         emptyState={{
           title: "No Sent Email Logs Found",
           description: "No outbound email records match your criteria.",
         }}
       />
 
-      {/* Resend Email Modal */}
+      {/* Resend Email Confirmation Modal */}
       <Modal
-        isOpen={!!selectedResendEmail}
+        isOpen={Boolean(selectedResendEmail)}
         onClose={() => setSelectedResendEmail(null)}
       >
-        <div className="mb-4">
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-            Resend Outbound Email
-          </h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Re-dispatch this email via Nodemailer integration.
-          </p>
-        </div>
-
         <div className="space-y-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Resend &quot;
-            <span className="font-bold text-zinc-800 dark:text-zinc-100">
+          <div>
+            <h3 className="text-lg font-bold text-dashboard-fg">
+              Resend Outbound Email
+            </h3>
+            <p className="text-xs text-dashboard-muted">
+              Re-dispatch this email via Nodemailer integration.
+            </p>
+          </div>
+
+          <p className="text-sm text-dashboard-fg leading-relaxed">
+            Resend &ldquo;
+            <span className="font-bold text-dashboard-fg">
               {selectedResendEmail?.subject}
             </span>
-            &quot; to{" "}
-            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+            &rdquo; to{" "}
+            <span className="font-bold text-dashboard-primary font-mono">
               {selectedResendEmail?.recipient_email}
             </span>
             ?
           </p>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex justify-end gap-3 pt-3 border-t border-dashboard-border">
             <button
               type="button"
               onClick={() => setSelectedResendEmail(null)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+              disabled={isPending}
+              className="px-4 py-2 text-sm font-semibold rounded-xl hover:bg-dashboard-card-hover text-dashboard-muted hover:text-dashboard-fg transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleConfirmResend}
               disabled={isPending}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg transition-colors disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 text-sm font-semibold rounded-xl bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
             >
               {isPending ? "Resending..." : "Yes, Resend Email"}
             </button>

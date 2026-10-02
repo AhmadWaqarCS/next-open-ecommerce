@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { resolveUserNames } from "@/lib/action-utils";
 import { assertPermission } from "@/lib/guards";
-import Pagination from "@/app/(dashboard)/_components/pagination";
 import {
   buildThemeWhereInput,
   ThemeFilterParams,
@@ -31,9 +30,7 @@ export default function DashboardThemesPage(props: PageProps) {
   );
 }
 
-async function DashboardThemesPageContent({
-  searchParams,
-}: PageProps) {
+async function DashboardThemesPageContent({ searchParams }: PageProps) {
   const { permissions } = await assertPermission("read", "/dashboard/themes");
   const params = (await searchParams) || {};
 
@@ -43,16 +40,22 @@ async function DashboardThemesPageContent({
 
   const filterParams: ThemeFilterParams = {
     id: typeof params.id === "string" ? params.id : undefined,
+    search: typeof params.search === "string" ? params.search : undefined,
     name: typeof params.name === "string" ? params.name : undefined,
     slug: typeof params.slug === "string" ? params.slug : undefined,
-    is_active:
-      typeof params.is_active === "string" ? params.is_active : undefined,
+    is_active: typeof params.is_active === "string" ? params.is_active : undefined,
+    created_by: typeof params.created_by === "string" ? params.created_by : undefined,
+    created_from: typeof params.created_from === "string" ? params.created_from : undefined,
+    created_to: typeof params.created_to === "string" ? params.created_to : undefined,
   };
 
   const where = buildThemeWhereInput(filterParams);
 
-  const { themes, totalThemes, dashboardUsers } =
-    await getThemesDashboardDataInDB(where, skipCount, pageSize);
+  const { themes, totalThemes } = await getThemesDashboardDataInDB(
+    where,
+    skipCount,
+    pageSize,
+  );
 
   const userIds = themes.flatMap((t) =>
     [t.created_by, t.updated_by].filter((id): id is number => id !== null && id > 0),
@@ -60,19 +63,14 @@ async function DashboardThemesPageContent({
   const userNames = await resolveUserNames(userIds);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col">
       <ThemesTable
         themes={themes as any}
         permissions={permissions}
         userNames={userNames}
         totalCount={totalThemes}
-      />
-
-      <Pagination
-        totalItems={totalThemes}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="themes"
       />
     </div>
   );

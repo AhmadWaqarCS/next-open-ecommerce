@@ -22,7 +22,7 @@ export default function SettingsPage() {
 
 async function SettingsPageContent() {
   const { permissions } = await assertPermission(
-    "update",
+    "read",
     "/dashboard/settings",
   );
 
@@ -32,23 +32,17 @@ async function SettingsPageContent() {
   ]);
 
   return (
-    <div className="space-y-6 flex-1 flex flex-col pb-12">
-      <div>
-        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
-          Site Settings
-        </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Configure global store parameters, theme components, branding, and checkout options.
-        </p>
-      </div>
-
+    <div className="flex-1 flex flex-col pb-12">
       {!siteConfig ? (
-        <div className="flex flex-col items-center justify-center p-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-          <h2 className="text-lg font-bold text-red-600 dark:text-red-400">
+        <div className="flex flex-col items-center justify-center p-12 bg-dashboard-card border border-dashboard-border rounded-2xl text-center">
+          <div className="w-12 h-12 rounded-2xl bg-dashboard-danger-subtle text-dashboard-danger flex items-center justify-center text-xl font-bold mb-4">
+            ⚠️
+          </div>
+          <h2 className="text-lg font-bold text-dashboard-danger">
             Site Configuration Not Found
           </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-            Please run the database seed script to initialize the default site configuration.
+          <p className="text-sm text-dashboard-muted mt-2 max-w-md">
+            Please run the database seed script to initialize the default site configuration record.
           </p>
         </div>
       ) : (
@@ -56,7 +50,7 @@ async function SettingsPageContent() {
           initialData={{
             ...siteConfig,
             tax_rate:
-              siteConfig.tax_rate !== null
+              siteConfig.tax_rate !== null && siteConfig.tax_rate !== undefined
                 ? Number(siteConfig.tax_rate)
                 : undefined,
             social_links: (siteConfig.social_links ?? {}) as Record<

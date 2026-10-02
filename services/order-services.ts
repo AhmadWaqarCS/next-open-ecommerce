@@ -20,6 +20,7 @@ export interface ProcessCheckoutInput {
   customer_phone?: string | null;
   customer_ip?: string | null;
   customer_user_agent?: string | null;
+  send_marketing_emails?: boolean;
 
   billing_address_line1: string;
   billing_address_line2?: string | null;
@@ -126,7 +127,6 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
     }
 
     const siteConfigRow = await tx.site_config.findFirst({
-      where: { deleted_at: null },
       select: {
         currency: true,
         tax_rate: true,
@@ -299,6 +299,12 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
       const existingLocs = (existingContact.locations as string[]) || [];
       const updatedLocations = Array.from(new Set([...existingLocs, locationString]));
 
+      // Only resubscribe an unsubscribed customer if send_marketing_emails is explicitly true
+      const shouldResubscribe = !!input.send_marketing_emails;
+      const isUnsubscribed = existingContact.is_unsubscribed
+        ? (shouldResubscribe ? false : true)
+        : false;
+
       await tx.customer_contact.update({
         where: { id: existingContact.id },
         data: {
@@ -306,8 +312,8 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
           last_name: input.customer_last_name || existingContact.last_name,
           phone: input.customer_phone ?? existingContact.phone,
           is_customer: true,
-          is_unsubscribed: false,
-          unsubscribed_at: null,
+          is_unsubscribed: isUnsubscribed,
+          unsubscribed_at: isUnsubscribed ? existingContact.unsubscribed_at : null,
           total_spent: existingContact.total_spent.add(total),
           total_orders: { increment: 1 },
           total_quantity: existingContact.total_quantity + itemQuantity,
@@ -315,6 +321,8 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
         },
       });
     } else {
+      // For brand-new contacts, subscription to marketing depends on the opt-in checkbox
+      const isUnsubscribed = !input.send_marketing_emails;
       await tx.customer_contact.create({
         data: {
           email: normalizedEmail,
@@ -323,7 +331,8 @@ export async function processCheckoutTransaction(input: ProcessCheckoutInput) {
           phone: input.customer_phone ?? null,
           is_customer: true,
           is_newsletter: false,
-          is_unsubscribed: false,
+          is_unsubscribed: isUnsubscribed,
+          unsubscribed_at: isUnsubscribed ? new Date() : null,
           total_spent: total,
           total_orders: 1,
           total_quantity: itemQuantity,
@@ -361,119 +370,142 @@ export async function updateOrderTransaction(
       throw new Error("ORDER_CANCELLED_CANNOT_BE_EDITED");
     }
 
-    const updated = await tx.order.update({
-      where: { id },
-      data: { ...data, updated_by: userId },
-    });
-
-    return { existing, updated };
-  });
-}
-
-export async function deleteOrderTransaction(id: number, userId: number) {
-  return await prisma.$transaction(async (tx) => {
-    const existing = await tx.order.findUnique({ where: { id } });
-    if (!existing) throw new Error("Order not found.");
-
-    const updated = await tx.order.update({
-      where: { id },
-      data: { updated_by: userId, deleted_at: new Date(), deleted_by: userId },
-    });
-
-    return { existing, updated };
-  });
-}
-
-export async function restoreOrderTransaction(id: number, userId: number) {
-  return await prisma.$transaction(async (tx) => {
-    const existing = await tx.order.findUnique({ where: { id } });
-    if (!existing) throw new Error("Order not found.");
-
-    const updated = await tx.order.update({
-      where: { id },
-      data: { updated_by: userId, deleted_at: null, deleted_by: null },
-    });
-
-    return { existing, updated };
-  });
-}
-
-export async function permanentlyDeleteOrderTransaction(id: number) {
-  return await prisma.$transaction(async (tx) => {
-    const existing = await tx.order.findUnique({ where: { id } });
-    if (!existing) throw new Error("Order not found.");
-
-    await tx.order_item.deleteMany({ where: { order_id: id } });
-    await tx.payment_transaction.deleteMany({ where: { order_id: id } });
-    await tx.order_refund.deleteMany({ where: { order_id: id } });
-    await tx.order.delete({ where: { id } });
-
-    return { existing };
-  });
-}
-
-export async function bulkDeleteOrdersTransaction(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterWhere?: Prisma.orderWhereInput,
-  userId: number = 0,
-) {
-  return await prisma.$transaction(async (tx) => {
-    const whereCondition: Prisma.orderWhereInput = selectAllScope
-      ? (filterWhere ?? { deleted_at: null })
-      : { id: { in: ids } };
-
-    return await tx.order.updateMany({
-      where: whereCondition,
-      data: { updated_by: userId, deleted_at: new Date(), deleted_by: userId },
-    });
-  });
-}
-
-export async function bulkRestoreOrdersTransaction(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterWhere?: Prisma.orderWhereInput,
-  userId: number = 0,
-) {
-  return await prisma.$transaction(async (tx) => {
-    const whereCondition: Prisma.orderWhereInput = selectAllScope
-      ? (filterWhere ?? { NOT: { deleted_at: null } })
-      : { id: { in: ids } };
-
-    return await tx.order.updateMany({
-      where: whereCondition,
-      data: { updated_by: userId, deleted_at: null, deleted_by: null },
-    });
-  });
-}
-
-export async function bulkPermanentlyDeleteOrdersTransaction(
-  ids: number[],
-  selectAllScope: boolean = false,
-  filterWhere?: Prisma.orderWhereInput,
-) {
-  return await prisma.$transaction(async (tx) => {
-    const whereCondition: Prisma.orderWhereInput = selectAllScope
-      ? (filterWhere ?? { NOT: { deleted_at: null } })
-      : { id: { in: ids } };
-
-    const affected = await tx.order.findMany({
-      where: whereCondition,
-      select: { id: true },
-    });
-    const affectedIds = affected.map((o) => o.id);
-
-    if (affectedIds.length > 0) {
-      await tx.order_item.deleteMany({ where: { order_id: { in: affectedIds } } });
-      await tx.payment_transaction.deleteMany({ where: { order_id: { in: affectedIds } } });
-      await tx.order_refund.deleteMany({ where: { order_id: { in: affectedIds } } });
-      await tx.order.deleteMany({ where: { id: { in: affectedIds } } });
+    // Auto-populate milestone timestamps if statuses transition
+    let autoPaidAt: Date | undefined = undefined;
+    if (data.payment_status === "paid" && !existing.paid_at && !data.paid_at) {
+      autoPaidAt = new Date();
     }
 
-    return { affected };
+    let autoShippedAt: Date | undefined = undefined;
+    if (
+      data.fulfillment_status === "shipped" &&
+      !existing.shipped_at &&
+      !data.shipped_at
+    ) {
+      autoShippedAt = new Date();
+    }
+
+    let autoDeliveredAt: Date | undefined = undefined;
+    if (
+      data.fulfillment_status === "delivered" &&
+      !existing.delivered_at &&
+      !data.delivered_at
+    ) {
+      autoDeliveredAt = new Date();
+    }
+
+    let autoCancelledAt: Date | undefined = undefined;
+    if (
+      data.fulfillment_status === "cancelled" &&
+      !existing.cancelled_at &&
+      !data.cancelled_at
+    ) {
+      autoCancelledAt = new Date();
+    }
+
+    // Diff update data payload
+    const updatePayload: Prisma.orderUpdateInput = {
+      updated_by: userId,
+    };
+
+    if (data.payment_status !== undefined && data.payment_status !== existing.payment_status) {
+      updatePayload.payment_status = data.payment_status;
+    }
+    if (data.fulfillment_status !== undefined && data.fulfillment_status !== existing.fulfillment_status) {
+      updatePayload.fulfillment_status = data.fulfillment_status;
+    }
+    if (data.tracking_number !== undefined && data.tracking_number !== existing.tracking_number) {
+      updatePayload.tracking_number = data.tracking_number;
+    }
+    if (data.tracking_url !== undefined && data.tracking_url !== existing.tracking_url) {
+      updatePayload.tracking_url = data.tracking_url;
+    }
+    if (data.carrier_name !== undefined && data.carrier_name !== existing.carrier_name) {
+      updatePayload.carrier_name = data.carrier_name;
+    }
+    if (data.admin_notes !== undefined && data.admin_notes !== existing.admin_notes) {
+      updatePayload.admin_notes = data.admin_notes;
+    }
+    if (data.customer_notes !== undefined && data.customer_notes !== existing.customer_notes) {
+      updatePayload.customer_notes = data.customer_notes;
+    }
+
+    if (data.paid_at !== undefined) {
+      updatePayload.paid_at = data.paid_at;
+    } else if (autoPaidAt) {
+      updatePayload.paid_at = autoPaidAt;
+    }
+
+    if (data.shipped_at !== undefined) {
+      updatePayload.shipped_at = data.shipped_at;
+    } else if (autoShippedAt) {
+      updatePayload.shipped_at = autoShippedAt;
+    }
+
+    if (data.delivered_at !== undefined) {
+      updatePayload.delivered_at = data.delivered_at;
+    } else if (autoDeliveredAt) {
+      updatePayload.delivered_at = autoDeliveredAt;
+    }
+
+    if (data.cancelled_at !== undefined) {
+      updatePayload.cancelled_at = data.cancelled_at;
+    } else if (autoCancelledAt) {
+      updatePayload.cancelled_at = autoCancelledAt;
+    }
+
+    const updated = await tx.order.update({
+      where: { id },
+      data: updatePayload,
+    });
+
+    return { existing, updated };
   });
 }
+
+export async function bulkUpdateOrderStatusTransaction(
+  ids: number[],
+  data: {
+    fulfillment_status?: string;
+    payment_status?: string;
+  },
+  userId: number,
+) {
+  return await prisma.$transaction(async (tx) => {
+    // Only update non-cancelled orders
+    const updateData: Prisma.orderUpdateManyMutationInput = {
+      updated_by: userId,
+    };
+
+    const now = new Date();
+
+    if (data.fulfillment_status) {
+      updateData.fulfillment_status = data.fulfillment_status;
+      if (data.fulfillment_status === "shipped") {
+        updateData.shipped_at = now;
+      } else if (data.fulfillment_status === "delivered") {
+        updateData.delivered_at = now;
+      }
+    }
+
+    if (data.payment_status) {
+      updateData.payment_status = data.payment_status;
+      if (data.payment_status === "paid") {
+        updateData.paid_at = now;
+      }
+    }
+
+    return await tx.order.updateMany({
+      where: {
+        id: { in: ids },
+        cancelled_at: null,
+        fulfillment_status: { not: "cancelled" },
+      },
+      data: updateData,
+    });
+  });
+}
+
 
 export async function getOrdersDashboardDataInDB(
   whereCondition: Prisma.orderWhereInput,

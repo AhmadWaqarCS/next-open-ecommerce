@@ -150,6 +150,7 @@ export default function CheckoutForm({
       shipping_method_id: defaultShipping?.id,
       shipping_method_name: defaultShipping?.name ?? "",
       shipping_cost: defaultShipping?.price ?? 0,
+      send_marketing_emails: false,
       items: [],
     },
   });
@@ -470,6 +471,19 @@ export default function CheckoutForm({
                   />
                 </FormField>
               )}
+              <div className="sm:col-span-2 pt-1">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    id="send_marketing_emails"
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-zinc-300 accent-zinc-900 cursor-pointer"
+                    {...register("send_marketing_emails")}
+                  />
+                  <span className="text-sm text-zinc-700 select-none">
+                    Email me with news, exclusive offers, and order updates
+                  </span>
+                </label>
+              </div>
             </div>
           </section>
 

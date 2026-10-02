@@ -2,15 +2,18 @@ import { Suspense } from "react";
 import DashboardLoading from "@/app/(dashboard)/dashboard/loading";
 import { assertPermission } from "@/lib/guards";
 import SentEmailTable from "./sent-email-table";
-import Pagination from "@/app/(dashboard)/_components/pagination";
-import { getSentEmailsDashboardDataInDB } from "@/services/email-services";
+import { getSentEmailsDashboardDataInDB } from "@/services/sent-email-services";
+import {
+  buildSentEmailWhereInput,
+  SentEmailFilterParams,
+} from "@/lib/filters/sent-email-filters";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Sent Email Logs",
   description:
-    "Track and audit outgoing email dispatches and delivery statuses",
+    "Track, inspect, and audit outgoing email dispatches sent via Nodemailer",
 };
 
 interface PageProps {
@@ -25,9 +28,7 @@ export default function DashboardSentEmailsPage(props: PageProps) {
   );
 }
 
-async function DashboardSentEmailsPageContent({
-  searchParams,
-}: PageProps) {
+async function DashboardSentEmailsPageContent({ searchParams }: PageProps) {
   const { permissions } = await assertPermission(
     "read",
     "/dashboard/sent-emails",
@@ -38,35 +39,35 @@ async function DashboardSentEmailsPageContent({
   const pageSize = Math.max(1, Number(params?.size ?? 10));
   const skipCount = (currentPage - 1) * pageSize;
 
-  const where: any = {};
+  const filterParams: SentEmailFilterParams = {
+    search: typeof params?.search === "string" ? params.search : undefined,
+    subject: typeof params?.subject === "string" ? params.subject : undefined,
+    recipient_email:
+      typeof params?.recipient_email === "string"
+        ? params.recipient_email
+        : undefined,
+    sender_email:
+      typeof params?.sender_email === "string"
+        ? params.sender_email
+        : undefined,
+    order_number:
+      typeof params?.order_number === "string"
+        ? params.order_number
+        : undefined,
+    type: typeof params?.type === "string" ? params.type : undefined,
+    status: typeof params?.status === "string" ? params.status : undefined,
+    sent_from:
+      typeof params?.sent_from === "string" ? params.sent_from : undefined,
+    sent_to: typeof params?.sent_to === "string" ? params.sent_to : undefined,
+  };
 
-  if (
-    typeof params?.recipient_email === "string" &&
-    params.recipient_email.trim()
-  ) {
-    where.recipient_email = {
-      contains: params.recipient_email.trim(),
-      mode: "insensitive",
-    };
-  }
-  if (typeof params?.subject === "string" && params.subject.trim()) {
-    where.subject = { contains: params.subject.trim(), mode: "insensitive" };
-  }
-  if (typeof params?.order_number === "string" && params.order_number.trim()) {
-    where.order_number = {
-      contains: params.order_number.trim(),
-      mode: "insensitive",
-    };
-  }
-  if (typeof params?.status === "string" && params.status.trim()) {
-    where.status = params.status.trim();
-  }
-  if (typeof params?.type === "string" && params.type.trim()) {
-    where.type = params.type.trim();
-  }
+  const where = buildSentEmailWhereInput(filterParams);
 
-  const { emailsRaw, totalEmails } =
-    await getSentEmailsDashboardDataInDB(where, skipCount, pageSize);
+  const { emailsRaw, totalEmails } = await getSentEmailsDashboardDataInDB(
+    where,
+    skipCount,
+    pageSize,
+  );
 
   const serializedEmails = emailsRaw.map((email) => ({
     id: email.id,
@@ -87,16 +88,10 @@ async function DashboardSentEmailsPageContent({
     <div className="space-y-6 flex-1 flex flex-col">
       <SentEmailTable
         emails={serializedEmails}
-        filterParams={params as any}
         permissions={permissions}
         totalCount={totalEmails}
-      />
-
-      <Pagination
-        totalItems={totalEmails}
         currentPage={currentPage}
         pageSize={pageSize}
-        itemName="email logs"
       />
     </div>
   );

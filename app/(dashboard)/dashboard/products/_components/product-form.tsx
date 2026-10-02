@@ -151,6 +151,7 @@ export default function ProductForm({
       slug: initialData?.slug ?? "",
       description: initialData?.description ?? "",
       short_description: initialData?.short_description ?? "",
+      feature_image_url: initialData?.feature_image_url ?? "",
       feature_image_alt_text: initialData?.feature_image_alt_text ?? "",
       price: initialData?.price ? parseFloat(initialData.price) : 0,
       compare_at_price: initialData?.compare_at_price
@@ -209,15 +210,14 @@ export default function ProductForm({
     const remainingSlots = 10 - currentCount;
 
     if (remainingSlots <= 0) {
-      toast("Maximum limit of 10 gallery images reached.", "error");
+      toast.error("Maximum limit of 10 gallery images reached.");
       return;
     }
 
     const filesArray = Array.from(files);
     if (filesArray.length > remainingSlots) {
-      toast(
+      toast.info(
         `Only the first ${remainingSlots} image(s) were added (maximum limit is 10 images).`,
-        "info",
       );
     }
 
@@ -237,11 +237,11 @@ export default function ProductForm({
     setGalleryItems((prev) => [...prev, ...newItems]);
   };
 
-  const [itemSizes, setItemSizes] = useState<Record<string, number>>({});
+  const [itemSizes] = useState<Record<string, number>>({});
 
   const handleAddExternalImageSlot = () => {
     if (galleryItems.length >= 10) {
-      toast("Maximum limit of 10 gallery images reached.", "info");
+      toast.info("Maximum limit of 10 gallery images reached.");
       return;
     }
     setGalleryItems((prev) => [
@@ -267,6 +267,11 @@ export default function ProductForm({
       const filtered = prev.filter((_, idx) => idx !== index);
       return filtered.map((item, idx) => ({ ...item, sort_order: idx }));
     });
+  };
+
+  // Clear all gallery items
+  const handleClearAllGalleryItems = () => {
+    setGalleryItems([]);
   };
 
   // Smooth Live-Reorder Drag and Drop Handlers
@@ -333,56 +338,68 @@ export default function ProductForm({
       .filter((g) => g.values.length > 0);
 
     if (validGroups.length === 0) {
-      toast("Please enter option values (e.g. S, M, L or Red, Blue).", "error");
+      toast.error("Please enter option values (e.g. S, M, L or Red, Blue).");
       return;
     }
 
-    const cartesian = (arrays: string[][]): string[][] =>
-      arrays.reduce<string[][]>(
-        (acc, curr) => acc.flatMap((d) => curr.map((e) => [...d, e])),
-        [[]],
+    const cartesian = (arrays: string[][]): string[][] => {
+      return arrays.reduce(
+        (a, b) => a.flatMap((d) => b.map((e) => [...d, e])),
+        [[]] as string[][],
       );
+    };
 
-    const groupValues = validGroups.map((g) => g.values);
-    const combinations = cartesian(groupValues);
+    const valueArrays = validGroups.map((g) => g.values);
+    const combinations = cartesian(valueArrays);
+
+    const basePrice = watch("price") || 0;
+    const baseCompare = watch("compare_at_price") || "";
+    const baseSku = (watch("sku") || "PROD").toUpperCase();
 
     const generated: VariantItem[] = combinations.map((combo, idx) => {
-      const name = combo.join(" / ");
-      const optionsBag: Record<string, string> = {};
+      const optionsRecord: Record<string, string> = {};
       validGroups.forEach((g, gIdx) => {
-        optionsBag[g.name] = combo[gIdx];
+        optionsRecord[g.name] = combo[gIdx];
       });
 
+      const variantName = combo.join(" / ");
+      const autoSku = `${baseSku}-${combo
+        .map((c) => c.substring(0, 3).toUpperCase())
+        .join("-")}`;
+
       return {
-        name,
-        sku: "",
-        price: "",
-        compare_at_price: "",
+        name: variantName,
+        sku: autoSku,
+        price: basePrice > 0 ? String(basePrice) : "",
+        compare_at_price: baseCompare ? String(baseCompare) : "",
         stock_quantity: 0,
-        options: optionsBag,
+        options: optionsRecord,
         image_url: "",
+        image_url_alt_text: "",
         is_active: true,
         sort_order: idx,
       };
     });
 
     setVariantItems(generated);
-    toast(`Generated ${generated.length} variant combinations.`, "success");
+    toast.success(`Generated ${generated.length} variant combinations.`);
   };
 
   const addCustomVariant = () => {
+    const nextIdx = variantItems.length;
     setVariantItems((prev) => [
       ...prev,
       {
-        name: `Variant #${prev.length + 1}`,
+        name: `Custom Variant #${nextIdx + 1}`,
         sku: "",
         price: "",
         compare_at_price: "",
         stock_quantity: 0,
         options: {},
         image_url: "",
+        image_url_alt_text: "",
         is_active: true,
-        sort_order: prev.length,
+        sort_order: nextIdx,
       },
     ]);
   };
@@ -411,7 +428,7 @@ export default function ProductForm({
           formData.append("file", item.file);
           const uploadRes = await uploadProductImage(formData);
           if (!uploadRes.success || !uploadRes.data?.relativePath) {
-            toast(`Failed to upload image: ${item.file.name}`, "error");
+            toast.error(`Failed to upload image: ${item.file.name}`);
             setGlobalError(`Failed to upload image: ${item.file.name}`);
             setIsUploading(false);
             return;
@@ -442,7 +459,7 @@ export default function ProductForm({
           formData.append("file", v.file);
           const uploadRes = await uploadProductImage(formData);
           if (!uploadRes.success || !uploadRes.data?.relativePath) {
-            toast(`Failed to upload variant image for: ${v.name}`, "error");
+            toast.error(`Failed to upload variant image for: ${v.name}`);
             setGlobalError(`Failed to upload variant image for: ${v.name}`);
             setIsUploading(false);
             return;
@@ -500,12 +517,12 @@ export default function ProductForm({
         } else if (response.message) {
           setGlobalError(response.message);
         }
+        toast.error(response.message ?? "Failed to save product.");
         return;
       }
 
-      toast(
+      toast.success(
         response.message ?? (isEdit ? "Product updated." : "Product created."),
-        "success",
       );
       router.push("/dashboard/products");
     });
@@ -564,126 +581,42 @@ export default function ProductForm({
       {globalError && (
         <div
           role="alert"
-          className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 font-medium"
+          className="p-4 rounded-xl bg-dashboard-danger-subtle border border-dashboard-danger/20 text-dashboard-danger text-sm font-medium"
         >
           {globalError}
         </div>
       )}
 
-      {/* Header Controls & Tabs */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 gap-4">
-        <nav
-          className="-mb-px flex space-x-2 sm:space-x-6 overflow-x-auto"
-          aria-label="Tabs"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveTab("details")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "details"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>General Details</span>
-            {hasErrorsInTab("details") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("pricing")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "pricing"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Pricing &amp; Inventory</span>
-            {hasErrorsInTab("pricing") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("variations")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "variations"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Product Variations</span>
-            {variantItems.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-mono text-[10px]">
-                {variantItems.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("gallery")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "gallery"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Media &amp; Gallery</span>
-            {hasErrorsInTab("gallery") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("shipping")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "shipping"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Physical Attributes</span>
-            {hasErrorsInTab("shipping") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("seo")}
-            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "seo"
-                ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400"
-                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-zinc-200"
-            }`}
-          >
-            <span>Meta &amp; SEO</span>
-            {hasErrorsInTab("seo") && (
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-            )}
-          </button>
-        </nav>
+      {/* Top Header Section: Title, Description, and Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-dashboard-border pb-5 gap-4">
+        <div>
+          <h2 className="text-xl font-extrabold text-dashboard-fg tracking-tight">
+            {isEdit
+              ? `Edit Product: ${initialData?.name}`
+              : "Create New Product"}
+          </h2>
+          <p className="text-sm text-dashboard-muted">
+            {isEdit
+              ? "Update product details, pricing, gallery images, variants, and SEO."
+              : "Fill in product specifications, pricing, inventory, and showcase media."}
+          </p>
+        </div>
 
         <div className="flex items-center gap-3 shrink-0">
           <Link
             href="/dashboard/products"
-            className="px-4 py-2 text-sm font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all cursor-pointer"
+            className="px-4 py-2 text-sm font-semibold rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg hover:bg-dashboard-card-hover transition-all cursor-pointer"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isPending || isUploading}
-            className="px-5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+            className="px-5 py-2 text-sm font-semibold rounded-xl bg-dashboard-primary text-dashboard-primary-fg hover:bg-dashboard-primary-hover transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
           >
             {(isPending || isUploading) && (
               <svg
-                className="animate-spin -ml-1 mr-1 h-4 w-4 text-white"
+                className="animate-spin -ml-1 mr-1 h-4 w-4 text-dashboard-primary-fg"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -715,6 +648,106 @@ export default function ProductForm({
         </div>
       </div>
 
+      {/* Tabs Navigation */}
+      <div className="border-b border-dashboard-border pb-px">
+        <nav
+          className="-mb-px flex space-x-2 sm:space-x-6 overflow-x-auto"
+          aria-label="Tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab("details")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "details"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>General Details</span>
+            {hasErrorsInTab("details") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("pricing")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "pricing"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Pricing &amp; Inventory</span>
+            {hasErrorsInTab("pricing") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("variations")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "variations"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Product Variations</span>
+            {variantItems.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-dashboard-accent-subtle text-dashboard-accent-fg font-mono text-[10px]">
+                {variantItems.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("gallery")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "gallery"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Media &amp; Gallery</span>
+            {hasErrorsInTab("gallery") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("shipping")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "shipping"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Physical Attributes</span>
+            {hasErrorsInTab("shipping") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("seo")}
+            className={`whitespace-nowrap py-2.5 px-3 border-b-2 font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "seo"
+                ? "border-dashboard-primary text-dashboard-primary font-bold"
+                : "border-transparent text-dashboard-muted hover:text-dashboard-fg hover:border-dashboard-border"
+            }`}
+          >
+            <span>Meta &amp; SEO</span>
+            {hasErrorsInTab("seo") && (
+              <span className="w-2 h-2 rounded-full bg-dashboard-danger" />
+            )}
+          </button>
+        </nav>
+      </div>
+
       {/* TAB 1: GENERAL DETAILS */}
       {activeTab === "details" && (
         <div className="space-y-4 animate-in fade-in duration-150">
@@ -723,19 +756,19 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-name"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
-                Product Name <span className="text-red-500">*</span>
+                Product Name <span className="text-dashboard-danger">*</span>
               </label>
               <input
                 id="prod-name"
                 type="text"
                 placeholder="e.g. Wireless Noise-Canceling Headphones"
                 {...register("name")}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.name.message}
                 </p>
               )}
@@ -745,9 +778,9 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-slug"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
-                Slug <span className="text-red-500">*</span>
+                Slug <span className="text-dashboard-danger">*</span>
               </label>
               <input
                 id="prod-slug"
@@ -758,10 +791,10 @@ export default function ProductForm({
                   setIsSlugManuallyEdited(true);
                   slugRegister.onChange(e);
                 }}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.slug && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.slug.message}
                 </p>
               )}
@@ -772,7 +805,7 @@ export default function ProductForm({
           <div>
             <label
               htmlFor="prod-category_id"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              className="block text-sm font-semibold text-dashboard-fg mb-1"
             >
               Category
             </label>
@@ -782,7 +815,7 @@ export default function ProductForm({
                 setValueAs: (v) =>
                   v === "" || v === undefined ? undefined : Number(v),
               })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
             >
               <option value="">— Uncategorized —</option>
               {categories.map((cat) => (
@@ -792,7 +825,7 @@ export default function ProductForm({
               ))}
             </select>
             {errors.category_id && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
+              <p className="mt-1 text-xs text-dashboard-danger font-medium">
                 {errors.category_id.message}
               </p>
             )}
@@ -802,7 +835,7 @@ export default function ProductForm({
           <div>
             <label
               htmlFor="prod-short_description"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              className="block text-sm font-semibold text-dashboard-fg mb-1"
             >
               Short Description (Subtitle / Summary)
             </label>
@@ -811,10 +844,10 @@ export default function ProductForm({
               type="text"
               placeholder="High-fidelity audio with active noise cancellation..."
               {...register("short_description")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
             />
             {errors.short_description && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
+              <p className="mt-1 text-xs text-dashboard-danger font-medium">
                 {errors.short_description.message}
               </p>
             )}
@@ -824,7 +857,7 @@ export default function ProductForm({
           <div>
             <label
               htmlFor="prod-description"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              className="block text-sm font-semibold text-dashboard-fg mb-1"
             >
               Full Description
             </label>
@@ -833,10 +866,10 @@ export default function ProductForm({
               rows={5}
               placeholder="Detailed product features, specifications, and overview..."
               {...register("description")}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm"
             />
             {errors.description && (
-              <p className="mt-1 text-xs text-red-500 font-medium">
+              <p className="mt-1 text-xs text-dashboard-danger font-medium">
                 {errors.description.message}
               </p>
             )}
@@ -848,9 +881,9 @@ export default function ProductForm({
               <input
                 type="checkbox"
                 {...register("is_active")}
-                className="w-4 h-4 rounded-sm text-indigo-600 border-zinc-300 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Active Product (Visible on storefront)
               </span>
             </label>
@@ -859,9 +892,9 @@ export default function ProductForm({
               <input
                 type="checkbox"
                 {...register("is_featured")}
-                className="w-4 h-4 rounded-sm text-indigo-600 border-zinc-300 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Featured Product (Hero / Featured Showcase)
               </span>
             </label>
@@ -877,9 +910,9 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-price"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
-                Price ($) <span className="text-red-500">*</span>
+                Price ($) <span className="text-dashboard-danger">*</span>
               </label>
               <input
                 id="prod-price"
@@ -888,10 +921,10 @@ export default function ProductForm({
                 min="0"
                 placeholder="199.99"
                 {...register("price", { valueAsNumber: true })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.price && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.price.message}
                 </p>
               )}
@@ -901,7 +934,7 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-compare_at_price"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Compare-at Price ($)
               </label>
@@ -914,14 +947,14 @@ export default function ProductForm({
                 {...register("compare_at_price", {
                   setValueAs: (v) => (v === "" ? undefined : Number(v)),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.compare_at_price ? (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.compare_at_price.message}
                 </p>
               ) : (
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 text-xs text-dashboard-muted">
                   Original / strike-through price
                 </p>
               )}
@@ -931,7 +964,7 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-cost_price"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Cost Price ($)
               </label>
@@ -944,26 +977,26 @@ export default function ProductForm({
                 {...register("cost_price", {
                   setValueAs: (v) => (v === "" ? undefined : Number(v)),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.cost_price ? (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.cost_price.message}
                 </p>
               ) : (
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 text-xs text-dashboard-muted">
                   Internal cost for profit calculations
                 </p>
               )}
             </div>
           </div>
 
-          <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="border-t border-dashboard-border pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* SKU */}
             <div>
               <label
                 htmlFor="prod-sku"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 SKU (Stock Keeping Unit)
               </label>
@@ -972,10 +1005,10 @@ export default function ProductForm({
                 type="text"
                 placeholder="PROD-HEAD-001"
                 {...register("sku")}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.sku && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.sku.message}
                 </p>
               )}
@@ -985,7 +1018,7 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-stock_quantity"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Stock Quantity
               </label>
@@ -994,10 +1027,10 @@ export default function ProductForm({
                 type="number"
                 min="0"
                 {...register("stock_quantity", { valueAsNumber: true })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.stock_quantity && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.stock_quantity.message}
                 </p>
               )}
@@ -1007,7 +1040,7 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-low_stock_threshold"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Low Stock Threshold
               </label>
@@ -1016,10 +1049,10 @@ export default function ProductForm({
                 type="number"
                 min="0"
                 {...register("low_stock_threshold", { valueAsNumber: true })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg placeholder-dashboard-muted focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
               {errors.low_stock_threshold && (
-                <p className="mt-1 text-xs text-red-500 font-medium">
+                <p className="mt-1 text-xs text-dashboard-danger font-medium">
                   {errors.low_stock_threshold.message}
                 </p>
               )}
@@ -1031,9 +1064,9 @@ export default function ProductForm({
               <input
                 type="checkbox"
                 {...register("track_inventory")}
-                className="w-4 h-4 rounded-sm text-indigo-600 border-zinc-300 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-800"
+                className="w-4 h-4 rounded-sm text-dashboard-primary border-dashboard-border focus:ring-dashboard-primary"
               />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+              <span className="text-sm font-semibold text-dashboard-fg">
                 Track Inventory for this product
               </span>
             </label>
@@ -1041,14 +1074,14 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-sort_order"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-dashboard-fg"
               >
                 <span>Display Sort Order:</span>
                 <input
                   id="prod-sort_order"
                   type="number"
                   {...register("sort_order", { valueAsNumber: true })}
-                  className="w-20 px-2 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm font-mono text-center"
+                  className="w-20 px-2 py-1 rounded-lg border border-dashboard-border bg-dashboard-card text-dashboard-fg text-sm font-mono text-center"
                 />
               </label>
             </div>
@@ -1056,16 +1089,16 @@ export default function ProductForm({
         </div>
       )}
 
-      {/* TAB: PRODUCT VARIATIONS */}
+      {/* TAB 3: PRODUCT VARIATIONS */}
       {activeTab === "variations" && (
         <div className="space-y-6 animate-in fade-in duration-150">
           {/* SECTION 1: Automatic Variant Generator */}
-          <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-4">
+          <div className="bg-dashboard-card p-5 rounded-2xl border border-dashboard-border space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <h3 className="text-base font-bold text-dashboard-fg flex items-center gap-2">
                   <svg
-                    className="w-5 h-5 text-indigo-500"
+                    className="w-5 h-5 text-dashboard-primary"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1079,7 +1112,7 @@ export default function ProductForm({
                   </svg>
                   <span>Automatic Variant Generator</span>
                 </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                <p className="text-xs text-dashboard-muted mt-1">
                   Define option attributes (e.g. Size, Color) separated by
                   commas to generate all variant combinations automatically.
                 </p>
@@ -1094,14 +1127,14 @@ export default function ProductForm({
                       { id: Date.now(), name: "", values: "" },
                     ])
                   }
-                  className="px-3.5 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-all cursor-pointer shadow-xs"
+                  className="px-3.5 py-2 bg-dashboard-card border border-dashboard-border hover:bg-dashboard-card-hover rounded-xl text-xs font-semibold text-dashboard-fg transition-all cursor-pointer shadow-xs"
                 >
                   + Add Attribute
                 </button>
                 <button
                   type="button"
                   onClick={generateVariantCombinations}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-4 py-2 bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <svg
                     className="w-3.5 h-3.5"
@@ -1126,11 +1159,11 @@ export default function ProductForm({
               {optionGroups.map((group, gIdx) => (
                 <div
                   key={group.id}
-                  className="p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3"
+                  className="p-3.5 bg-dashboard-muted-bg border border-dashboard-border rounded-xl space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                    <span className="text-xs font-bold text-dashboard-fg flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-dashboard-primary" />
                       Option #{gIdx + 1}
                     </span>
                     <button
@@ -1140,7 +1173,7 @@ export default function ProductForm({
                           prev.filter((_, idx) => idx !== gIdx),
                         )
                       }
-                      className="text-[11px] font-semibold text-red-500 hover:text-red-700 cursor-pointer"
+                      className="text-[11px] font-semibold text-dashboard-danger hover:underline cursor-pointer"
                     >
                       Remove
                     </button>
@@ -1148,7 +1181,7 @@ export default function ProductForm({
 
                   <div className="space-y-2">
                     <div>
-                      <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                      <label className="block text-[11px] font-semibold text-dashboard-muted mb-1">
                         Attribute Name
                       </label>
                       <input
@@ -1160,12 +1193,12 @@ export default function ProductForm({
                           updated[gIdx].name = e.target.value;
                           setOptionGroups(updated);
                         }}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 focus:outline-hidden font-medium"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden font-medium"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                      <label className="block text-[11px] font-semibold text-dashboard-muted mb-1">
                         Attribute Values (comma-separated)
                       </label>
                       <input
@@ -1177,7 +1210,7 @@ export default function ProductForm({
                           updated[gIdx].values = e.target.value;
                           setOptionGroups(updated);
                         }}
-                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 focus:outline-hidden font-medium"
+                        className="w-full px-3 py-1.5 text-xs rounded-lg border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden font-medium"
                       />
                     </div>
                   </div>
@@ -1190,10 +1223,10 @@ export default function ProductForm({
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <h4 className="text-sm font-bold text-dashboard-fg flex items-center gap-2">
                   <span>Product Variants ({variantItems.length})</span>
                 </h4>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="text-xs text-dashboard-muted">
                   Configure price overrides, stock levels, and SKUs for each
                   variation.
                 </p>
@@ -1202,7 +1235,7 @@ export default function ProductForm({
               <button
                 type="button"
                 onClick={addCustomVariant}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                className="px-3.5 py-2 bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 shrink-0"
               >
                 <svg
                   className="w-4 h-4"
@@ -1222,19 +1255,19 @@ export default function ProductForm({
             </div>
 
             {variantItems.length === 0 ? (
-              <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center bg-white dark:bg-zinc-900">
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium mb-1">
+              <div className="border-2 border-dashed border-dashboard-border rounded-xl p-8 text-center bg-dashboard-card">
+                <p className="text-sm text-dashboard-muted font-medium mb-1">
                   No variants configured for this product.
                 </p>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-dashboard-muted">
                   Use the Automatic Generator above or click &quot;Add Custom
                   Variant&quot;.
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-                <table className="w-full text-left text-xs text-zinc-600 dark:text-zinc-400">
-                  <thead className="bg-zinc-50 dark:bg-zinc-800/60 uppercase font-bold text-[10px] text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="overflow-x-auto rounded-xl border border-dashboard-border bg-dashboard-card">
+                <table className="w-full text-left text-xs text-dashboard-muted">
+                  <thead className="bg-dashboard-table-header uppercase font-bold text-[10px] text-dashboard-muted border-b border-dashboard-border">
                     <tr>
                       <th className="px-4 py-3">Variant Name</th>
                       <th className="px-4 py-3">SKU</th>
@@ -1245,11 +1278,11 @@ export default function ProductForm({
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 font-medium">
+                  <tbody className="divide-y divide-dashboard-border-subtle font-medium">
                     {variantItems.map((vItem, vIdx) => (
                       <tr
                         key={vIdx}
-                        className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30"
+                        className="hover:bg-dashboard-card-hover transition-colors"
                       >
                         <td className="px-4 py-2.5">
                           <input
@@ -1258,8 +1291,7 @@ export default function ProductForm({
                             onChange={(e) =>
                               updateVariantItem(vIdx, { name: e.target.value })
                             }
-                            placeholder="e.g. Red / XL"
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold text-xs"
+                            className="w-full px-2 py-1 text-xs rounded-lg border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg focus:outline-hidden font-bold"
                           />
                         </td>
                         <td className="px-4 py-2.5">
@@ -1269,8 +1301,8 @@ export default function ProductForm({
                             onChange={(e) =>
                               updateVariantItem(vIdx, { sku: e.target.value })
                             }
-                            placeholder="SKU"
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono text-xs"
+                            placeholder="Variant SKU"
+                            className="w-28 px-2 py-1 text-xs rounded-lg border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg font-mono focus:outline-hidden"
                           />
                         </td>
                         <td className="px-4 py-2.5">
@@ -1278,12 +1310,12 @@ export default function ProductForm({
                             type="number"
                             step="0.01"
                             min="0"
+                            placeholder="Override"
                             value={vItem.price}
                             onChange={(e) =>
                               updateVariantItem(vIdx, { price: e.target.value })
                             }
-                            placeholder="Override"
-                            className="w-24 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono text-xs"
+                            className="w-20 px-2 py-1 text-xs rounded-lg border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg font-mono focus:outline-hidden"
                           />
                         </td>
                         <td className="px-4 py-2.5">
@@ -1291,14 +1323,14 @@ export default function ProductForm({
                             type="number"
                             step="0.01"
                             min="0"
+                            placeholder="Optional"
                             value={vItem.compare_at_price}
                             onChange={(e) =>
                               updateVariantItem(vIdx, {
                                 compare_at_price: e.target.value,
                               })
                             }
-                            placeholder="Strike"
-                            className="w-24 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono text-xs"
+                            className="w-20 px-2 py-1 text-xs rounded-lg border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg font-mono focus:outline-hidden"
                           />
                         </td>
                         <td className="px-4 py-2.5">
@@ -1311,39 +1343,38 @@ export default function ProductForm({
                                 stock_quantity: Number(e.target.value),
                               })
                             }
-                            className="w-20 px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-mono text-xs text-center"
+                            className="w-16 px-2 py-1 text-xs rounded-lg border border-dashboard-border bg-dashboard-muted-bg text-dashboard-fg font-mono focus:outline-hidden"
                           />
                         </td>
                         <td className="px-4 py-2.5">
-                          <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={vItem.is_active}
-                              onChange={(e) =>
-                                updateVariantItem(vIdx, {
-                                  is_active: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 text-indigo-600 rounded-sm border-zinc-300"
-                            />
-                            <span className="text-[11px] font-semibold">
-                              Active
-                            </span>
-                          </label>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateVariantItem(vIdx, {
+                                is_active: !vItem.is_active,
+                              })
+                            }
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${
+                              vItem.is_active
+                                ? "bg-dashboard-accent-subtle text-dashboard-accent-fg"
+                                : "bg-dashboard-muted-bg text-dashboard-muted"
+                            }`}
+                          >
+                            {vItem.is_active ? "Active" : "Inactive"}
+                          </button>
                         </td>
                         <td className="px-4 py-2.5 text-right">
                           <button
                             type="button"
                             onClick={() => removeVariantItem(vIdx)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg cursor-pointer transition-colors"
-                            title="Remove variant"
+                            className="p-1.5 text-dashboard-muted hover:text-dashboard-danger hover:bg-dashboard-danger-subtle rounded-lg transition-colors cursor-pointer"
+                            title="Delete Variant"
                           >
                             <svg
                               className="w-4 h-4"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
-                              strokeWidth={2}
                             >
                               <path
                                 strokeLinecap="round"
@@ -1361,11 +1392,13 @@ export default function ProductForm({
             )}
           </div>
 
-          {/* SECTION 3: Variant Images & Media (at the bottom of the Variations tab page) */}
+          {/* SECTION 3: Variant Images & Media */}
           {variantItems.length > 0 && (
             <ImageInputGroup
               title="Variant Images"
               description="Upload specific showcase images for each product variant below."
+              layout="grid"
+              fixed
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {variantItems.map((vItem, vIdx) => (
@@ -1388,55 +1421,34 @@ export default function ProductForm({
         </div>
       )}
 
-      {/* TAB 3: MEDIA & GALLERY */}
+      {/* TAB 4: MEDIA & GALLERY */}
       {activeTab === "gallery" && (
         <div className="space-y-8 animate-in fade-in duration-150">
-          {/* SECTION 1: Product Showcase Images & Inputs */}
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <svg
-                    className="w-5 h-5 text-indigo-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>Gallery Images &amp; Input Fields</span>
-                  <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold">
-                    {galleryItems.length} / 10
-                  </span>
-                </h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Maximum 10 images allowed per product. The{" "}
-                  <strong className="text-indigo-600 dark:text-indigo-400 font-bold">
-                    first image (#1)
-                  </strong>{" "}
-                  in sequence is automatically assigned as the{" "}
-                  <strong className="text-amber-600 dark:text-amber-400 font-bold">
-                    Primary Feature Image
-                  </strong>
-                  .
-                </p>
-              </div>
-
-              {/* Upload Controls */}
-              <div className="flex items-center gap-3 shrink-0">
-                {galleryItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setGalleryItems([])}
-                    className="px-3.5 py-2 bg-white dark:bg-zinc-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 border border-zinc-200 dark:border-zinc-800 hover:border-red-200 dark:hover:border-red-900/50 rounded-xl font-semibold text-xs transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            <ImageInputGroup
+              title="Product Showcase Gallery"
+              description="Upload up to 10 product gallery photos. The first image (#1) is the Primary Feature Image shown on storefront listings. Use the built-in image optimizer to compress images."
+              layout="grid"
+              onAdd={
+                galleryItems.length < 10
+                  ? handleAddExternalImageSlot
+                  : undefined
+              }
+              addLabel="Add Image"
+              onRemoveAll={
+                galleryItems.length > 0
+                  ? handleClearAllGalleryItems
+                  : undefined
+              }
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="bulk-gallery-upload"
+                    className="px-3.5 py-2 bg-dashboard-primary hover:bg-dashboard-primary-hover text-dashboard-primary-fg rounded-xl text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 shadow-xs transition-all"
                   >
                     <svg
-                      className="w-4 h-4 text-red-500"
+                      className="w-4 h-4"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -1445,91 +1457,42 @@ export default function ProductForm({
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                       />
                     </svg>
-                    <span>Remove All</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleAddExternalImageSlot}
-                  disabled={galleryItems.length >= 10}
-                  className={`px-3.5 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl font-semibold text-xs text-zinc-700 dark:text-zinc-300 transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5 ${
-                    galleryItems.length >= 10
-                      ? "opacity-50 pointer-events-none cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4 text-indigo-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 4.5v15m7.5-7.5h-15"
-                    />
-                  </svg>
-                  <span>+ Add Image Slot</span>
-                </button>
-
-                <label
-                  className={`px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs transition-all shadow-xs cursor-pointer inline-flex items-center gap-2 ${
-                    galleryItems.length >= 10
-                      ? "opacity-50 pointer-events-none cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                    />
-                  </svg>
-                  <span>Upload Images</span>
+                    <span>Upload Multiple Files</span>
+                  </label>
                   <input
+                    id="bulk-gallery-upload"
                     type="file"
                     multiple
                     accept="image/*"
-                    disabled={galleryItems.length >= 10}
-                    onChange={(e) =>
-                      handleMultipleGalleryUpload(e.target.files)
-                    }
+                    onChange={(e) => {
+                      handleMultipleGalleryUpload(e.target.files);
+                      e.target.value = "";
+                    }}
                     className="hidden"
                   />
-                </label>
+                  <span className="text-xs text-dashboard-muted">
+                    {galleryItems.length} / 10 images added
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* List of ImageInput Components in 2 Column Grid */}
-            {galleryItems.length === 0 ? (
-              <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center bg-white dark:bg-zinc-900">
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-                  No images added yet. Click &quot;Upload Images&quot; above to
-                  add showcase photos (max 10).
-                </p>
-              </div>
-            ) : (
-              <ImageInputGroup>
+              {galleryItems.length === 0 ? (
+                <div className="border-2 border-dashed border-dashboard-border rounded-xl p-8 text-center bg-dashboard-card">
+                  <p className="text-sm text-dashboard-muted font-medium">
+                    No images added yet. Click &quot;Add Image&quot; or &quot;Upload Multiple Files&quot; above to add showcase photos (max 10).
+                  </p>
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {galleryItems.map((item, index) => (
                     <ImageInput
                       key={index}
                       label={
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-mono font-bold">
+                          <span className="px-2 py-0.5 rounded-full bg-dashboard-muted-bg text-dashboard-fg text-xs font-mono font-bold">
                             Image #{index + 1}
                           </span>
                           {index === 0 && (
@@ -1543,7 +1506,7 @@ export default function ProductForm({
                         <button
                           type="button"
                           onClick={() => removeGalleryItem(index)}
-                          className="text-xs font-semibold text-red-500 hover:text-red-700 dark:text-red-400 cursor-pointer flex items-center gap-1"
+                          className="text-xs font-semibold text-dashboard-danger hover:underline cursor-pointer flex items-center gap-1"
                         >
                           <svg
                             className="w-3.5 h-3.5"
@@ -1571,20 +1534,20 @@ export default function ProductForm({
                       uploadFolder="products"
                       className={
                         index === 0
-                          ? "border-amber-400 dark:border-amber-900/60 shadow-xs"
+                          ? "border-amber-400 dark:border-amber-500/60 shadow-xs"
                           : ""
                       }
                     />
                   ))}
                 </div>
-              </ImageInputGroup>
-            )}
+              )}
+            </ImageInputGroup>
           </div>
 
           {/* SECTION 2: Gallery Preview & Sort Order (Smooth Animated Drag-and-Drop) */}
           <div className="space-y-4 pt-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <h4 className="text-sm font-bold text-dashboard-fg flex items-center gap-2">
                 <span>
                   Gallery Preview &amp; Sort Order ({galleryItems.length}{" "}
                   {galleryItems.length === 1 ? "Image" : "Images"})
@@ -1597,7 +1560,7 @@ export default function ProductForm({
                   }, 0);
                   if (totalBytes > 0) {
                     return (
-                      <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50">
+                      <span className="text-xs font-mono font-semibold px-2.5 py-0.5 rounded-full bg-dashboard-accent-subtle text-dashboard-accent-fg border border-dashboard-border">
                         Total Size: {formatBytes(totalBytes)}
                       </span>
                     );
@@ -1605,9 +1568,8 @@ export default function ProductForm({
                   return null;
                 })()}
               </h4>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                Drag any card left or right to reorder. Images shift dynamically
-                to create space.
+              <span className="text-xs text-dashboard-muted">
+                Drag any card left or right to reorder. Images shift dynamically.
               </span>
             </div>
 
@@ -1618,7 +1580,9 @@ export default function ProductForm({
                 className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
               >
                 {galleryItems.map((item, index) => {
-                  const displayUrl = item.file ? item.previewUrl : (item.previewUrl || item.url);
+                  const displayUrl = item.file
+                    ? item.previewUrl
+                    : item.previewUrl || item.url;
                   const isFeature = index === 0;
                   const isBeingDragged = draggedIndex === index;
 
@@ -1631,27 +1595,25 @@ export default function ProductForm({
                       onDragOver={handleDragOver}
                       onDrop={handleDrop}
                       onDragEnd={handleDragEnd}
-                      className={`relative bg-white dark:bg-zinc-900 border rounded-2xl p-2.5 flex flex-col justify-between transition-all duration-200 group shadow-xs select-none cursor-grab active:cursor-grabbing ${
+                      className={`relative bg-dashboard-card border rounded-2xl p-2.5 flex flex-col justify-between transition-all duration-200 group shadow-xs select-none cursor-grab active:cursor-grabbing ${
                         isBeingDragged
-                          ? "opacity-30 scale-95 border-dashed border-indigo-500 shadow-lg"
+                          ? "opacity-30 scale-95 border-dashed border-dashboard-primary shadow-lg"
                           : isFeature
-                            ? "border-amber-400 dark:border-amber-600/60 ring-2 ring-amber-400/20"
-                            : "border-zinc-200 dark:border-zinc-800 hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-md"
+                            ? "border-amber-400 dark:border-amber-500/60 ring-2 ring-amber-400/20"
+                            : "border-dashboard-border hover:border-dashboard-primary hover:shadow-md"
                       }`}
                     >
-                      {/* Top Bar: Sort Handle & Index Badge */}
                       <div className="flex items-center justify-between mb-2">
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                             isFeature
                               ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                              : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                              : "bg-dashboard-muted-bg text-dashboard-muted"
                           }`}
                         >
-                          #{index + 1}
+                          {isFeature ? "★ Cover #1" : `#${index + 1}`}
                         </span>
-
-                        <div className="text-zinc-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        <div className="text-dashboard-muted group-hover:text-dashboard-fg">
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -1668,67 +1630,55 @@ export default function ProductForm({
                         </div>
                       </div>
 
-                      {/* Image Thumbnail */}
-                      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 mb-2">
+                      <div className="relative w-full aspect-square rounded-xl overflow-hidden bg-dashboard-muted-bg mb-2 border border-dashboard-border">
                         {displayUrl ? (
                           <Image
                             src={displayUrl}
-                            alt={item.alt_text || `Gallery image ${index + 1}`}
+                            alt={item.alt_text || `Product image ${index + 1}`}
                             fill
-                            // unoptimized
                             className="object-cover pointer-events-none"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xs font-medium">
-                            No Preview
+                          <div className="w-full h-full flex flex-col items-center justify-center text-dashboard-muted">
+                            <svg
+                              className="w-6 h-6 mb-1"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <span className="text-[10px]">No File</span>
                           </div>
-                        )}
-
-                        {isFeature && (
-                          <span className="absolute top-1.5 left-1.5 bg-amber-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-md shadow-xs tracking-wider">
-                            FEATURE
-                          </span>
                         )}
                       </div>
 
-                      {/* Alt text hint / quick edit */}
-                      <input
-                        type="text"
-                        placeholder="Alt text..."
-                        value={item.alt_text}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          updateGalleryItem(index, { alt_text: val });
-                        }}
-                        className="w-full px-2 py-1 text-[11px] rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 mb-2 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                      />
-
-                      {/* Footer Actions */}
-                      <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
-                        <span className="text-zinc-400 font-mono">
-                          Order {index + 1}
+                      <div className="mt-1 flex items-center justify-between text-[11px] text-dashboard-muted font-mono">
+                        <span className="truncate max-w-[80px]">
+                          {item.file ? item.file.name : item.url ? "URL" : "Slot"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => removeGalleryItem(index)}
-                          className="font-semibold text-red-500 hover:text-red-700 dark:text-red-400 cursor-pointer"
-                        >
-                          Remove
-                        </button>
+                        {item.file && (
+                          <span className="font-semibold">
+                            {formatBytes(item.file.size)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
                 })}
 
-                {/* Dedicated Drop Zone to Move Image to Far Right / End */}
                 <div
                   onDragOver={handleDragOver}
-                  onDragEnter={handleDropToEnd}
                   onDrop={handleDropToEnd}
-                  className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center text-zinc-400 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors min-h-[160px] bg-zinc-50/50 dark:bg-zinc-900/30"
+                  className="border-2 border-dashed border-dashboard-border rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2 hover:border-dashboard-primary transition-all cursor-pointer min-h-[140px]"
                 >
                   <svg
-                    className="w-5 h-5 mb-1 text-zinc-400"
+                    className="w-5 h-5 text-dashboard-muted"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1736,11 +1686,11 @@ export default function ProductForm({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={1.5}
+                      strokeWidth={2}
                       d="M13 5l7 7-7 7M5 5l7 7-7 7"
                     />
                   </svg>
-                  <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                  <span className="text-[11px] font-semibold text-dashboard-muted">
                     Drop here to move to end
                   </span>
                 </div>
@@ -1750,13 +1700,13 @@ export default function ProductForm({
         </div>
       )}
 
-      {/* TAB 4: PHYSICAL ATTRIBUTES */}
+      {/* TAB 5: PHYSICAL ATTRIBUTES */}
       {activeTab === "shipping" && (
         <div className="space-y-4 animate-in fade-in duration-150">
           <div>
             <label
               htmlFor="prod-weight"
-              className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              className="block text-sm font-semibold text-dashboard-fg mb-1"
             >
               Weight (grams)
             </label>
@@ -1769,7 +1719,7 @@ export default function ProductForm({
               {...register("weight", {
                 setValueAs: (v) => (v === "" ? undefined : Number(v)),
               })}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
             />
           </div>
 
@@ -1777,7 +1727,7 @@ export default function ProductForm({
             <div>
               <label
                 htmlFor="prod-dim-length"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Length (cm)
               </label>
@@ -1790,14 +1740,14 @@ export default function ProductForm({
                 {...register("dimensions.length", {
                   setValueAs: (v) => (v === "" ? undefined : Number(v)),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
             </div>
 
             <div>
               <label
                 htmlFor="prod-dim-width"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Width (cm)
               </label>
@@ -1810,14 +1760,14 @@ export default function ProductForm({
                 {...register("dimensions.width", {
                   setValueAs: (v) => (v === "" ? undefined : Number(v)),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
             </div>
 
             <div>
               <label
                 htmlFor="prod-dim-height"
-                className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                className="block text-sm font-semibold text-dashboard-fg mb-1"
               >
                 Height (cm)
               </label>
@@ -1830,14 +1780,14 @@ export default function ProductForm({
                 {...register("dimensions.height", {
                   setValueAs: (v) => (v === "" ? undefined : Number(v)),
                 })}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 dark:focus:border-indigo-500 transition-all text-sm font-mono"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-dashboard-border bg-dashboard-card text-dashboard-fg focus:outline-hidden focus:ring-2 focus:ring-dashboard-primary/20 focus:border-dashboard-primary transition-all text-sm font-mono"
               />
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 5: META & SEO */}
+      {/* TAB 6: META & SEO */}
       {activeTab === "seo" && (
         <div className="animate-in fade-in duration-150">
           <MetaInput
